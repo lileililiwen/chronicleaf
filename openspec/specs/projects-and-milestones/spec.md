@@ -1,7 +1,7 @@
 # projects-and-milestones Specification
 
 ## Purpose
-TBD - created by archiving change projects-and-milestones. Update Purpose after archive.
+Project and Milestone records for the Community edition: typed milestones whose confirmation is always a human action, scoped lookup and optimistic revision checks, and soft archive instead of erase. Delivered by projects-and-milestones.
 ## Requirements
 ### Requirement: PROJECTS-AND-MILESTONES-001 Human-controlled Milestones
 Projects SHALL persist typed Milestones with explicit human confirmation of imported candidates.

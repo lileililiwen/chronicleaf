@@ -1,7 +1,7 @@
 # runtime-shell Specification
 
 ## Purpose
-TBD - created by archiving change community-foundation. Update Purpose after archive.
+Portable single-process runtime: a credential-free API liveness contract, honest dependency readiness, and static hosting of the React browser client built from this repository. Delivered by community-foundation.
 ## Requirements
 ### Requirement: SHELL-001 API liveness contract
 The application SHALL return a stable credential-free liveness JSON response, and unknown API routes SHALL never return SPA HTML.

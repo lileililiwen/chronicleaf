@@ -1,7 +1,7 @@
 # background-jobs Specification
 
 ## Purpose
-TBD - created by archiving change background-jobs. Update Purpose after archive.
+Durable bounded background operations for the Community edition: persisted operation state executed by Hangfire against the same PostgreSQL database, with exactly-once result commits, a three-attempt retry bound, leases, cooperative cancellation and revision supersede. Delivered by background-jobs.
 ## Requirements
 ### Requirement: BACKGROUND-JOBS-001 Durable operation execution
 Operations SHALL persist queue and result state and prevent duplicate result commits after restart.

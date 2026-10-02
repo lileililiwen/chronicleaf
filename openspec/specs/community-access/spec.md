@@ -1,7 +1,7 @@
 # community-access Specification
 
 ## Purpose
-TBD - created by archiving change community-access. Update Purpose after archive.
+Single-user owner access boundary for the Community edition: bounded owner sessions, a stable owner identity, origin and antiforgery enforcement on mutations, a durable login throttle, and revocation when the configured token changes. Site-local login only, never workspace manager auth. Delivered by community-access.
 ## Requirements
 ### Requirement: COMMUNITY-ACCESS-001 Private single-user access
 Private Community APIs SHALL require the configured single-user owner session.

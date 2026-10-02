@@ -1,7 +1,7 @@
 # community-persistence Specification
 
 ## Purpose
-TBD - created by archiving change community-persistence. Update Purpose after archive.
+Durable Community data foundation: the installation, audit and outbox tables behind a real PostgreSQL store, a unit of work that commits domain, audit and outbox writes together, the common API error envelope, and readiness that distinguishes liveness from dependency readiness. Delivered by community-persistence.
 ## Requirements
 ### Requirement: COMMUNITY-PERSISTENCE-001 Transactional durable state
 The installation SHALL persist database state and atomically commit domain, audit and outbox writes.

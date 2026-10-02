@@ -1,4 +1,4 @@
-current_spec: community-access
+current_spec: projects-and-milestones
 
 # Chronicleaf handoff
 
@@ -12,37 +12,44 @@ Implemented and archived, in order:
    `openspec/changes/archive/2026-10-02-community-persistence/`, canonical spec
    `openspec/specs/community-persistence/spec.md`
    (COMMUNITY-PERSISTENCE-001/002).
+3. `community-access` → commit `0b19963`, archived as
+   `openspec/changes/archive/2026-10-02-community-access/`, canonical spec
+   `openspec/specs/community-access/spec.md` (COMMUNITY-ACCESS-001/002).
 
-Delivered so far: the .NET 10 runtime shell with `GET /api/health` (200 JSON), unknown
-`/api/*` → 404 JSON, SPA fallback, unknown asset → 404, missing frontend build → 503
-`web_assets_unavailable`; a React/TypeScript/Vite shell with a committed lockfile; the
-Core/Application/Infrastructure layering with a real EF Core + Npgsql `ChronicleafDbContext`
-owning exactly installation, audit_events and outbox with UNIQUE
-(kind, aggregate_id, revision); `IUnitOfWork.ExecuteAsync` committing domain+audit+outbox
-under READ COMMITTED; the operator-run forward migration via a repo-local dotnet-ef tool
-manifest with no migration on HTTP startup; the `{code,message,traceId,fieldErrors?}`
-envelope; and `GET /api/ready` that separates reachable-and-current schema (200
-`{"status":"ready"}`) from `database_unavailable` and `schema_mismatch`, while `/api/health`
-stays process-only.
+Delivered so far: the .NET 10 runtime shell (`GET /api/health` 200 JSON, unknown `/api/*`
+→ 404 JSON, SPA fallback, unknown asset → 404, missing build → 503) with a React/TypeScript/Vite
+client; the Core/Application/Infrastructure layering over real EF Core + Npgsql with
+installation, audit_events and outbox, `IUnitOfWork.ExecuteAsync` committing domain+audit+outbox
+under READ COMMITTED, operator-run forward migrations via a repo-local dotnet-ef manifest, the
+`{code,message,traceId,fieldErrors?}` envelope, and `GET /api/ready` separating reachable-and-
+current schema from `database_unavailable`/`schema_mismatch`; and now the single-user owner
+boundary: default-deny `/api` with only health, ready and `POST /api/session` public, a
+SHA-256-hashed opaque session cookie (HttpOnly, SameSite=Strict, Secure outside localhost
+Development) validated in constant time against a 12h idle / 7d absolute limit and a stable
+`installation.owner_actor_id`, generic 401s, origin + per-session antiforgery enforcement on
+mutations with 403 before any write, a durable 5-per-15-minutes login throttle returning 429,
+and startup revocation of all sessions when the configured token hash changes.
 
-Evidence recorded for `community-persistence`: `bash scripts/verify.sh` exit 0
-(build, 15/15 shell tests, docker prerequisite, 24/24 real-PostgreSQL tests against a
-disposable PostgreSQL 17.6 container, `npm ci`, `tsc` + `vite build`); Playwright 4/4;
-`docker build`/`run` asserting health and ready; `dotnet ef database update` applied from a
-clean database and a no-op on the second run; name preflight exit 0;
-`openspec validate --all --strict --no-interactive` 53/53 before and after archive.
-No EF InMemory store is used anywhere; the 15 pre-existing shell assertions were not
-modified and still pass.
+Evidence recorded for `community-access`: `CHRONICLEAF_E2E=1 bash scripts/verify.sh` exit 0
+(build, 15/15 shell, 24/24 persistence, 23/23 access against real disposable PostgreSQL,
+`npm ci`, `tsc` + `vite build`, 9/9 Playwright against the published app with a real database);
+`docker build`/`run` asserting health/ready, anonymous 401, login cookie flags, cross-origin 403
+and same-origin logout; name preflight exit 0; `openspec validate --all --strict --no-interactive`
+53/53 before and after archive. One shipped persistence assertion was necessarily generalized
+because a second forward migration invalidates its hard-coded migration count; the idempotence
+property is still asserted on both sides. No EF InMemory store is used anywhere.
 
-Not verified: Kestrel request-body limits, framework-bound `[FromBody]` deserialization
-envelopes, mobile-viewport capture. Deployment stays `deployable: false`; no remote, no
-push, no publication, and no product claim beyond the runtime shell and data foundation.
+Not verified: mobile-viewport capture, Kestrel request-body limits, TLS termination, a second
+process against the same Community database, and the destructive `Down` migration. Deployment
+stays `deployable: false`; no remote, no push, no publication, and no product claim beyond the
+runtime shell, data foundation and owner access boundary.
 
-Next: implement `community-access` only. It is the single dependency-ready package
-(`community-persistence` is now archived); `credential-vault`, `background-jobs` and
-`projects-and-milestones` all still depend on it. Read only that package, set one
-`current_spec`, implement, verify locally, strictly validate, archive without
-`--skip-specs`, then make the implementation commit and the HANDOFF-only pointer commit,
+Next: implement `projects-and-milestones` only. It is the keystone the most remaining MVP
+packages depend on (`local-media-storage`, `milestone-timeline`, `voice-profiles`,
+`milestone-evidence` and everything downstream of it). `credential-vault` and
+`background-jobs` are also dependency-ready now, so they are the follow-on choices. Read only
+that package, set one `current_spec`, implement, verify locally, strictly validate, archive
+without `--skip-specs`, then make the implementation commit and the HANDOFF-only pointer commit,
 and stop. Do not push.
 
 # Bootstrap handoff

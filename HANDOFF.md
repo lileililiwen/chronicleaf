@@ -1,38 +1,49 @@
-current_spec: community-persistence
+current_spec: community-access
 
 # Chronicleaf handoff
 
 ## Current state — 2026-10-02
 
-Implemented and archived: `community-foundation` (commit `ee1da62`, archived as
-`openspec/changes/archive/2026-10-02-community-foundation/`, canonical spec
-`openspec/specs/runtime-shell/spec.md`). The repository now has a real baseline commit;
-the previous all-untracked bootstrap tree is recorded in that commit.
+Implemented and archived, in order:
+1. `community-foundation` → commit `ee1da62`, archived as
+   `openspec/changes/archive/2026-10-02-community-foundation/`, canonical spec
+   `openspec/specs/runtime-shell/spec.md` (SHELL-001/002/003).
+2. `community-persistence` → commit `29fa886`, archived as
+   `openspec/changes/archive/2026-10-02-community-persistence/`, canonical spec
+   `openspec/specs/community-persistence/spec.md`
+   (COMMUNITY-PERSISTENCE-001/002).
 
-Delivered by that change: `src/Chronicleaf.Api` serves GET /api/health 200 JSON
-`{"status":"ok","service":"chronicleaf"}`, 404 JSON `{"code":"not_found"}` for unknown
-`/api/*`, SPA index.html fallback for client routes, 404 for unknown asset paths and 503
-`{"code":"web_assets_unavailable"}` when the frontend build is absent. `src/Chronicleaf.Web`
-is a React/TypeScript/Vite shell with a committed lockfile. `tests/Chronicleaf.Api.Tests`
-holds 15 WebApplicationFactory HTTP assertions plus a Playwright browser fixture. Pinned
-multi-stage Dockerfile and `scripts/verify.sh` as the configured gate.
+Delivered so far: the .NET 10 runtime shell with `GET /api/health` (200 JSON), unknown
+`/api/*` → 404 JSON, SPA fallback, unknown asset → 404, missing frontend build → 503
+`web_assets_unavailable`; a React/TypeScript/Vite shell with a committed lockfile; the
+Core/Application/Infrastructure layering with a real EF Core + Npgsql `ChronicleafDbContext`
+owning exactly installation, audit_events and outbox with UNIQUE
+(kind, aggregate_id, revision); `IUnitOfWork.ExecuteAsync` committing domain+audit+outbox
+under READ COMMITTED; the operator-run forward migration via a repo-local dotnet-ef tool
+manifest with no migration on HTTP startup; the `{code,message,traceId,fieldErrors?}`
+envelope; and `GET /api/ready` that separates reachable-and-current schema (200
+`{"status":"ready"}`) from `database_unavailable` and `schema_mismatch`, while `/api/health`
+stays process-only.
 
-Evidence recorded for this change: `bash scripts/verify.sh` exit 0 (build, 15/15 tests,
-`npm ci`, `tsc` + `vite build`); Playwright 4/4; `docker build` + `docker run` asserting
-both contracts from inside the container; isolated /tmp checkout passes without sibling
-coupling; `node scripts/check-openspec-change-names.mjs` exit 0;
-`openspec validate --all --strict --no-interactive` 53/53 before and after archive; real
-UI screenshot plus revision/privacy record in `docs/assets/`.
+Evidence recorded for `community-persistence`: `bash scripts/verify.sh` exit 0
+(build, 15/15 shell tests, docker prerequisite, 24/24 real-PostgreSQL tests against a
+disposable PostgreSQL 17.6 container, `npm ci`, `tsc` + `vite build`); Playwright 4/4;
+`docker build`/`run` asserting health and ready; `dotnet ef database update` applied from a
+clean database and a no-op on the second run; name preflight exit 0;
+`openspec validate --all --strict --no-interactive` 53/53 before and after archive.
+No EF InMemory store is used anywhere; the 15 pre-existing shell assertions were not
+modified and still pass.
 
-Still not delivered: persistence, access, credentials, jobs, media, milestones, evidence,
-capture, AI, drafts, review/export. Deployment stays `deployable: false`; no remote, no
-push, no publication, no product claim beyond the runtime shell.
+Not verified: Kestrel request-body limits, framework-bound `[FromBody]` deserialization
+envelopes, mobile-viewport capture. Deployment stays `deployable: false`; no remote, no
+push, no publication, and no product claim beyond the runtime shell and data foundation.
 
-Next: implement `community-persistence` only. It is the single dependency-ready package
-after this one (`community-access` also became ready but is downstream of persistence).
-Read its package, set one `current_spec`, implement, verify locally, strictly validate,
-archive without `--skip-specs`, then make the implementation commit and the HANDOFF-only
-pointer commit, and stop. Do not push.
+Next: implement `community-access` only. It is the single dependency-ready package
+(`community-persistence` is now archived); `credential-vault`, `background-jobs` and
+`projects-and-milestones` all still depend on it. Read only that package, set one
+`current_spec`, implement, verify locally, strictly validate, archive without
+`--skip-specs`, then make the implementation commit and the HANDOFF-only pointer commit,
+and stop. Do not push.
 
 # Bootstrap handoff
 

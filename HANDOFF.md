@@ -1,55 +1,54 @@
-current_spec: projects-and-milestones
+current_spec: background-jobs
 
 # Chronicleaf handoff
 
 ## Current state — 2026-10-02
 
 Implemented and archived, in order:
-1. `community-foundation` → commit `ee1da62`, archived as
-   `openspec/changes/archive/2026-10-02-community-foundation/`, canonical spec
-   `openspec/specs/runtime-shell/spec.md` (SHELL-001/002/003).
-2. `community-persistence` → commit `29fa886`, archived as
-   `openspec/changes/archive/2026-10-02-community-persistence/`, canonical spec
-   `openspec/specs/community-persistence/spec.md`
-   (COMMUNITY-PERSISTENCE-001/002).
-3. `community-access` → commit `0b19963`, archived as
-   `openspec/changes/archive/2026-10-02-community-access/`, canonical spec
-   `openspec/specs/community-access/spec.md` (COMMUNITY-ACCESS-001/002).
+1. `community-foundation` → `ee1da62` → `openspec/specs/runtime-shell/spec.md` (SHELL-001/002/003).
+2. `community-persistence` → `29fa886` → `openspec/specs/community-persistence/spec.md`.
+3. `community-access` → `0b19963` → `openspec/specs/community-access/spec.md`.
+4. `projects-and-milestones` → `065dd8e` →
+   `openspec/specs/projects-and-milestones/spec.md` (PROJECTS-AND-MILESTONES-001/002).
 
-Delivered so far: the .NET 10 runtime shell (`GET /api/health` 200 JSON, unknown `/api/*`
-→ 404 JSON, SPA fallback, unknown asset → 404, missing build → 503) with a React/TypeScript/Vite
+Each is archived under `openspec/changes/archive/2026-10-02-<name>/`.
+
+Delivered so far: the .NET 10 runtime shell (`GET /api/health` 200 JSON, unknown `/api/*` → 404
+JSON, SPA fallback, unknown asset → 404, missing build → 503) with a React/TypeScript/Vite
 client; the Core/Application/Infrastructure layering over real EF Core + Npgsql with
 installation, audit_events and outbox, `IUnitOfWork.ExecuteAsync` committing domain+audit+outbox
 under READ COMMITTED, operator-run forward migrations via a repo-local dotnet-ef manifest, the
-`{code,message,traceId,fieldErrors?}` envelope, and `GET /api/ready` separating reachable-and-
-current schema from `database_unavailable`/`schema_mismatch`; and now the single-user owner
-boundary: default-deny `/api` with only health, ready and `POST /api/session` public, a
-SHA-256-hashed opaque session cookie (HttpOnly, SameSite=Strict, Secure outside localhost
-Development) validated in constant time against a 12h idle / 7d absolute limit and a stable
-`installation.owner_actor_id`, generic 401s, origin + per-session antiforgery enforcement on
-mutations with 403 before any write, a durable 5-per-15-minutes login throttle returning 429,
-and startup revocation of all sessions when the configured token hash changes.
+`{code,message,traceId,fieldErrors?}` envelope, and `GET /api/ready` separating
+reachable-and-current schema from `database_unavailable`/`schema_mismatch`; the single-user owner
+boundary (default-deny `/api`, hashed opaque session cookie with HttpOnly/SameSite=Strict/Secure,
+constant-time validation, 12h idle and 7d absolute limits, stable `installation.owner_actor_id`,
+generic 401s, origin + per-session antiforgery on mutations, durable 5-per-15-minutes login
+throttle returning 429, startup revocation when the token hash changes); and the first product
+capability: Projects and Milestones as real persisted records with human-controlled status
+(structurally impossible for an import to be confirmed), SQL compare-and-set revisions with
+If-Match 428/409 and one-wins concurrency, soft archive with read-only enforcement, scoped
+cursor pagination, and a real dashboard/project/milestone UI with a truthful empty state.
 
-Evidence recorded for `community-access`: `CHRONICLEAF_E2E=1 bash scripts/verify.sh` exit 0
-(build, 15/15 shell, 24/24 persistence, 23/23 access against real disposable PostgreSQL,
-`npm ci`, `tsc` + `vite build`, 9/9 Playwright against the published app with a real database);
-`docker build`/`run` asserting health/ready, anonymous 401, login cookie flags, cross-origin 403
-and same-origin logout; name preflight exit 0; `openspec validate --all --strict --no-interactive`
-53/53 before and after archive. One shipped persistence assertion was necessarily generalized
-because a second forward migration invalidates its hard-coded migration count; the idempotence
-property is still asserted on both sides. No EF InMemory store is used anywhere.
+Evidence recorded for `projects-and-milestones`: `CHRONICLEAF_E2E=1 bash scripts/verify.sh`
+exit 0 (build, 15/15 shell, 24/24 persistence, 23/23 access, 19/19 project and milestone against
+real disposable PostgreSQL, `npm ci`, `tsc` + `vite build`, 16/16 Playwright against the
+published app with a real database); `docker build`/`run` asserting health 200, ready 200,
+anonymous 401, authenticated create 201 with Location/ETag and 428 without If-Match; name
+preflight exit 0; `openspec validate --all --strict --no-interactive` 53/53 before and after
+archive. Three shipped assertions were adjusted only where a new forward migration invalidated a
+hard-coded migration count; each now asserts against `ChronicleafSchema.RequiredMigrationIds`
+and is stronger than before. No EF InMemory store is used anywhere.
 
-Not verified: mobile-viewport capture, Kestrel request-body limits, TLS termination, a second
-process against the same Community database, and the destructive `Down` migration. Deployment
-stays `deployable: false`; no remote, no push, no publication, and no product claim beyond the
-runtime shell, data foundation and owner access boundary.
+Not verified: mobile-viewport capture, TLS termination, a second process against the same
+Community database, destructive `Down` migrations, Kestrel request-body limits, and concurrency
+beyond two writers. Deployment stays `deployable: false`; no remote, no push, no publication.
 
-Next: implement `projects-and-milestones` only. It is the keystone the most remaining MVP
-packages depend on (`local-media-storage`, `milestone-timeline`, `voice-profiles`,
-`milestone-evidence` and everything downstream of it). `credential-vault` and
-`background-jobs` are also dependency-ready now, so they are the follow-on choices. Read only
-that package, set one `current_spec`, implement, verify locally, strictly validate, archive
-without `--skip-specs`, then make the implementation commit and the HANDOFF-only pointer commit,
+Next: implement `background-jobs` only. `local-media-storage` also became ready now that
+projects exist, and `credential-vault` is still ready; `background-jobs` is the next one on the
+MVP critical path because `screenshot-capture` and `llm-provider-contract` both depend on it.
+Read only that package, set one `current_spec`, implement, verify locally, strictly validate,
+archive without `--skip-specs`, then make the implementation commit and the HANDOFF-only pointer
+commit, and stop. Do not push.
 and stop. Do not push.
 
 # Bootstrap handoff

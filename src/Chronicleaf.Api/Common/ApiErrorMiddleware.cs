@@ -2,6 +2,7 @@ using System.Text.Json;
 using Chronicleaf.Application.Access;
 using Chronicleaf.Application.Common;
 using Chronicleaf.Application.Milestones;
+using Chronicleaf.Application.Operations;
 // `ApiError` also names the runtime shell's compact not_found/web_assets_unavailable record in
 // namespace Chronicleaf.Api, which wins the lookup from inside this namespace. The alias keeps the
 // envelope type unambiguous: the shell record is a different, shipped contract.
@@ -123,6 +124,39 @@ public sealed class ApiErrorMiddleware(
 
             case ProjectArchivedException archived:
                 return (Envelope.Create(MilestoneError.ProjectArchived, archived.Message, traceId), LogLevel.Information);
+
+            // BACKGROUND-JOBS-001/002. Written here for the same reason as the refusals above: the
+            // feature package raises them and this middleware is still the only place an envelope is
+            // written. The messages are authored in the operations package and name nothing about any
+            // target, provider or stored error code.
+            case OperationNotFoundException operationMissing:
+                return (
+                    Envelope.Create(OperationError.NotFound, operationMissing.Message, traceId),
+                    LogLevel.Information);
+
+            case OperationIdempotencyConflictException idempotencyConflict:
+                return (
+                    Envelope.Create(
+                        OperationError.IdempotencyConflict,
+                        idempotencyConflict.Message,
+                        traceId,
+                        new Dictionary<string, string[]>
+                        {
+                            ["Idempotency-Key"] = ["this key is already bound to a different request"],
+                        }),
+                    LogLevel.Information);
+
+            case OperationNotCancellableException notCancellable:
+                return (
+                    Envelope.Create(
+                        OperationError.NotCancellable,
+                        notCancellable.Message,
+                        traceId,
+                        new Dictionary<string, string[]>
+                        {
+                            ["status"] = [Core.OperationStatuses.ToWire(notCancellable.Status)],
+                        }),
+                    LogLevel.Information);
 
             case MalformedJsonException malformed:
                 return (Envelope.Create(Envelope.MalformedJson, malformed.Message, traceId), LogLevel.Information);

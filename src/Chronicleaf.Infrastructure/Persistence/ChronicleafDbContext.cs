@@ -46,6 +46,8 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     public DbSet<Milestone> Milestones => Set<Milestone>();
 
+    public DbSet<Operation> Operations => Set<Operation>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Installation>(entity =>
@@ -288,11 +290,126 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .HasFilter("source_key IS NOT NULL")
                 .HasDatabaseName("ux_milestones_project_id_source_source_key");
         });
+
+        // The durable operation and the whole of its queue and result state
+        // (BACKGROUND-JOBS-001/002). The revision column carries the EF concurrency token for the same
+        // reason the projects and milestones tables carry one: a stale write is a conflict, never an
+        // overwrite. In practice the worker never relies on it - every one of its writes is already a
+        // conditional statement - but the token keeps an accidental context.SaveChanges from turning a
+        // lost claim into a silent overwrite.
+        modelBuilder.Entity<Operation>(entity =>
+        {
+            entity.ToTable("operations");
+            entity.HasKey(operation => operation.Id);
+            entity.Property(operation => operation.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(operation => operation.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(operation => operation.Kind)
+                .HasColumnName("kind")
+                .HasMaxLength(OperationKindMaxLength)
+                .IsRequired();
+            entity.Property(operation => operation.TargetId).HasColumnName("target_id").IsRequired();
+            entity.Property(operation => operation.InputRevision).HasColumnName("input_revision").IsRequired();
+            entity.Property(operation => operation.IdempotencyKey)
+                .HasColumnName("idempotency_key")
+                .HasMaxLength(OperationIdempotencyKeyMaxLength)
+                .IsRequired();
+            entity.Property(operation => operation.Fingerprint)
+                .HasColumnName("fingerprint")
+                .HasMaxLength(OperationFingerprintMaxLength)
+                .IsRequired();
+            entity.Property(operation => operation.Status)
+                .HasColumnName("status")
+                .HasConversion(
+                    status => OperationStatuses.ToWire(status),
+                    wire => ParseStatus(wire))
+                .HasMaxLength(OperationStatusMaxLength)
+                .IsRequired();
+            entity.Property(operation => operation.Attempt).HasColumnName("attempt").IsRequired();
+            entity.Property(operation => operation.HeartbeatAt)
+                .HasColumnName("heartbeat_at")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(operation => operation.ErrorCode)
+                .HasColumnName("error_code")
+                .HasMaxLength(OperationErrorCodeMaxLength);
+            entity.Property(operation => operation.ResultRef)
+                .HasColumnName("result_ref")
+                .HasMaxLength(OperationResultRefMaxLength);
+            entity.Property(operation => operation.LeaseExpiresAt)
+                .HasColumnName("lease_expires_at")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(operation => operation.LeaseToken).HasColumnName("lease_token");
+            entity.Property(operation => operation.NextAttemptAt)
+                .HasColumnName("next_attempt_at")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(operation => operation.CompletedAt)
+                .HasColumnName("completed_at")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(operation => operation.CancelRequestedAt)
+                .HasColumnName("cancel_requested_at")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(operation => operation.LeaseRecoveries).HasColumnName("lease_recoveries").IsRequired();
+            entity.Property(operation => operation.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(operation => operation.UpdatedAt)
+                .HasColumnName("updated_at")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(operation => operation.Revision)
+                .HasColumnName("revision")
+                .IsConcurrencyToken();
+
+            // The idempotence of a request, decided by the database. A repeated (scope, kind, key)
+            // cannot create a second operation, and the stored fingerprint is what tells a replay of
+            // the same work apart from a conflict on different work.
+            entity.HasIndex(operation => new { operation.ScopeId, operation.Kind, operation.IdempotencyKey })
+                .IsUnique()
+                .HasDatabaseName("ux_operations_scope_id_kind_idempotency_key");
+
+            // Every list and the lease sweep read a scope newest-first.
+            entity.HasIndex(operation => new { operation.ScopeId, operation.CreatedAt, operation.Id })
+                .HasDatabaseName("ix_operations_scope_id_created_at_id");
+
+            // The claim that is allowed to recover an expired lease. Without this index every claim
+            // from `queued` would still scan the running rows of the scope.
+            entity.HasIndex(operation => new { operation.Status, operation.LeaseExpiresAt })
+                .HasDatabaseName("ix_operations_status_lease_expires_at");
+        });
     }
 
-    /// <summary>At most 32 characters; the longest fixed milestone type is <c>first-customer</c>.</summary>
+    /// <summary>At most 80 characters, matching the delivered outbox kind column.</summary>
+    private const int OperationKindMaxLength = 80;
+
+    /// <summary>At most 200 characters; a caller's key, stored as given and never interpreted.</summary>
+    private const int OperationIdempotencyKeyMaxLength = 200;
+
+    /// <summary>
+    /// At most 128 characters. The fingerprint is a fixed-shape derived value, not a payload, so this
+    /// bound cannot be reached by a caller and exists only so the column is not unbounded.
+    /// </summary>
+    private const int OperationFingerprintMaxLength = 128;
+
+    /// <summary>At most 16 characters; the longest status is <c>superseded</c>.</summary>
+    private const int OperationStatusMaxLength = 16;
+
+    /// <summary>At most 64 characters; the longest code is <c>operation_provider_unavailable</c>.</summary>
+    private const int OperationErrorCodeMaxLength = 64;
+
+    /// <summary>At most 200 characters; an opaque reference, never a payload.</summary>
+    private const int OperationResultRefMaxLength = 200;
+
+    /// <summary>At most 32 characters; the longest milestone type is <c>first-customer</c>.</summary>
     private const int MilestoneTypeMaxLength = 32;
 
     /// <summary>At most 16 characters; the longest status is <c>dismissed</c>.</summary>
     private const int MilestoneStatusMaxLength = 16;
+
+    /// <summary>
+    /// Refuses a stored status this build does not know. A value that is not one of the six is not a
+    /// status to be guessed at: it means the row was written by a build with a different vocabulary,
+    /// and reading it as some other status would report a lie to the owner.
+    /// </summary>
+    private static OperationStatus ParseStatus(string wire) =>
+        OperationStatuses.TryParse(wire, out var status)
+            ? status
+            : throw new InvalidOperationException($"'{wire}' is not a known operation status.");
 }

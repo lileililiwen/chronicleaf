@@ -18,8 +18,32 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.4" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.4" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.4" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Durable execution (BACKGROUND-JOBS-001). Versions are pinned exactly, and each was restored
+      from nuget.org and run against the real PostgreSQL the tests use before being written here.
+
+      Hangfire.PostgreSql 1.21.1 is the newest version published for the PostgreSQL storage. It
+      targets netstandard2.0 and declares Npgsql 6.0.11, which NuGet unifies to the 10.0.3 the EF
+      provider already brings; the probe that runs the queue against PostgreSQL 17 through that
+      unified Npgsql is part of the integration suite, so the unification is exercised rather than
+      assumed.
+
+      Newtonsoft.Json is pinned to a patched 13.0.3. Hangfire.PostgreSql's own transitive floor is
+      11.0.1, which carries a known high-severity advisory (GHSA-5crp-9r3c-p9vr); without this
+      reference restore emits NU1903 and the build would carry a known-vulnerable serializer.
+    -->
+    <PackageReference Include="Hangfire.Core" Version="1.8.21" />
+    <PackageReference Include="Hangfire.PostgreSql" Version="1.21.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
   <ItemGroup>

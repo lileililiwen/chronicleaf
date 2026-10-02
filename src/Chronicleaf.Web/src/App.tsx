@@ -52,8 +52,8 @@ export function App() {
         <section className="later" data-testid="later-packages">
           <h2 className="later__heading">Not in this change</h2>
           <ul className="later__list">
-            <li>Evidence bundles, capture, media and background jobs.</li>
-            <li>Turning a project&apos;s milestones into a drafted or exported story.</li>
+            <li>Evidence bundles, capture and media.</li>
+            <li>AI drafting, export and publishing to external services.</li>
           </ul>
           <p className="shell__state" data-testid="setup-pending">
             {SETUP_PENDING}

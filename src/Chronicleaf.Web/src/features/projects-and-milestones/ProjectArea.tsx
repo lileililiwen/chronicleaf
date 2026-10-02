@@ -2,6 +2,7 @@ import { Dashboard } from './Dashboard';
 import { MilestoneEditor } from './MilestoneEditor';
 import { ProjectDetail } from './ProjectDetail';
 import { ProjectEditor } from './ProjectEditor';
+import { OperationsArea } from '../background-jobs/OperationsArea';
 import { getMilestone, getProject, listProjects } from './api';
 import { useMilestone, useProject, useProjects } from './useRecords';
 import { segmentsOf, useRoute } from './useRoute';
@@ -13,6 +14,11 @@ import { segmentsOf, useRoute } from './useRoute';
  * because every route below is private and would answer 401 anyway. What this adds is the small map
  * from a path to a view.
  *
+ * This is the only place that map lives, and there is one route reader behind it. A second reader
+ * elsewhere in the tree would hold its own copy of the current path, and a navigation from one of them
+ * would leave the other reading a route the owner is no longer on - which is the kind of disagreement
+ * that shows up as a page that navigated and did not.
+ *
  * Paths:
  * - `/` the dashboard
  * - `/projects` every project
@@ -21,6 +27,8 @@ import { segmentsOf, useRoute } from './useRoute';
  * - `/projects/{id}/edit` editing that project
  * - `/projects/{id}/milestones/new` recording a milestone
  * - `/projects/{id}/milestones/{milestoneId}` editing a milestone
+ * - `/operations` the background jobs panel (BACKGROUND-JOBS-001/002)
+ * - `/operations/{id}` one background job
  */
 export function ProjectArea() {
   const { path, navigate } = useRoute();
@@ -28,6 +36,10 @@ export function ProjectArea() {
 
   if (segments.length === 0) {
     return <DashboardRoute onNavigate={navigate} />;
+  }
+
+  if (segments[0] === 'operations') {
+    return <OperationsArea path={segments.join('/')} onNavigate={navigate} />;
   }
 
   if (segments[0] === 'projects') {

@@ -8,8 +8,10 @@
 using Chronicleaf.Api;
 using Chronicleaf.Api.Access;
 using Chronicleaf.Api.Common;
+using Chronicleaf.Api.Operations;
 using Chronicleaf.Api.Projects;
 using Chronicleaf.Infrastructure.Access;
+using Chronicleaf.Infrastructure.Operations;
 using Chronicleaf.Infrastructure.Persistence;
 using Chronicleaf.Infrastructure.Projects;
 using Microsoft.Extensions.FileProviders;
@@ -38,6 +40,13 @@ builder.Services.AddChronicleafAccess(builder.Configuration, builder.Environment
 // own to fall back on: a database without the projects-and-milestones migration reports
 // schema_mismatch at /api/ready rather than serving an empty installation.
 builder.Services.AddProjectMilestones();
+
+// BACKGROUND-JOBS-001/002. Durable operation execution: the same PostgreSQL database as everything
+// else, in its own schema, with no in-memory fallback. Registration refuses to start when there is no
+// connection string or when the dashboard is asked for, because a queue that only lives inside one
+// process cannot honour what this package promises. A database without the background-operations
+// migration reports schema_mismatch at /api/ready.
+builder.Services.AddChronicleafOperationQueue(builder.Configuration);
 
 // The rotation guard is applied once at start-up, so an access token that was changed since the
 // last run revokes every existing session before this process serves anything.
@@ -85,6 +94,11 @@ app.MapAccessEndpoints();
 // marked public, so the access package's default-deny boundary already covers every one of them
 // and the public allow-list stays exactly as the design fixed it.
 app.MapProjectMilestoneEndpoints();
+
+// BACKGROUND-JOBS-001/002: the private operation routes. None is marked public, so the access
+// package's default-deny boundary already covers every one of them and the public allow-list stays
+// exactly as the design fixed it.
+app.MapOperationEndpoints();
 
 // SHELL-001/SHELL-002: every unmatched path is either an unknown API path, an unknown
 // static asset, or a client route. Only the last one falls back to the SPA entry point. This

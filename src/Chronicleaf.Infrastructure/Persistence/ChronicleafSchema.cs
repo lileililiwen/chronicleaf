@@ -31,12 +31,21 @@ public static class ChronicleafSchema
     /// </summary>
     public const string ProjectsAndMilestonesMigrationId = "20261002101309_AddProjectsAndMilestones";
 
+    /// <summary>
+    /// The forward migration that adds the <c>operations</c> table and the queue's own
+    /// <c>hangfire</c> schema (BACKGROUND-JOBS-001/002). A database that has never applied it has
+    /// nowhere to record what background work was asked for or what became of it, so readiness says
+    /// so by name rather than answering 200 and failing on the first operation.
+    /// </summary>
+    public const string BackgroundOperationsMigrationId = "20261002112221_AddBackgroundOperations";
+
     /// <summary>Every migration a database must carry before this build calls itself ready.</summary>
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
         InitialMigrationId,
         OwnerAccessMigrationId,
         ProjectsAndMilestonesMigrationId,
+        BackgroundOperationsMigrationId,
     ];
 
     /// <summary>
@@ -44,7 +53,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = ProjectsAndMilestonesMigrationId;
+    public const string ExpectedMigrationId = BackgroundOperationsMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

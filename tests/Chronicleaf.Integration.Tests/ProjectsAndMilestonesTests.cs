@@ -10,6 +10,7 @@ using Chronicleaf.Application.Outbox;
 using Chronicleaf.Application.Persistence;
 using Chronicleaf.Core;
 using Chronicleaf.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -1034,7 +1035,13 @@ public sealed class ProjectsAndMilestonesTests(ChronicleafPostgresFixture postgr
         // The readiness contract now names this package's migration, so a database migrated by an
         // earlier build is a mismatch that says which migration is missing.
         Assert.Contains(ChronicleafSchema.ProjectsAndMilestonesMigrationId, ChronicleafSchema.RequiredMigrationIds);
-        Assert.Equal(ChronicleafSchema.ProjectsAndMilestonesMigrationId, ChronicleafSchema.ExpectedMigrationId);
+
+        // BACKGROUND-JOBS-001 added a later forward migration, so the newest required id moved on.
+        // What this scenario asserts is unchanged: the schema's own identity is the newest required
+        // migration, the applied history carries it, nothing is missing, and a database stopped at the
+        // access package's migration reports exactly the remaining gaps, by name. Only the id it names
+        // is this build's newest rather than this package's.
+        Assert.Equal(ChronicleafSchema.BackgroundOperationsMigrationId, ChronicleafSchema.ExpectedMigrationId);
 
         var database = await ProvisionedDatabaseAsync("schema_mismatch");
         var applied = await ChronicleafPostgresFixture.ReadTextAsync(
@@ -1043,11 +1050,13 @@ public sealed class ProjectsAndMilestonesTests(ChronicleafPostgresFixture postgr
 
         Assert.NotNull(applied);
         Assert.Contains(ChronicleafSchema.ProjectsAndMilestonesMigrationId, applied, StringComparison.Ordinal);
+        Assert.Contains(ChronicleafSchema.BackgroundOperationsMigrationId, applied, StringComparison.Ordinal);
         Assert.Empty(ChronicleafSchema.MissingMigrationIds(applied.Split('|')));
 
-        // A database stopped at the access package's migration reports exactly that one gap, by name.
+        // A database stopped at the access package's migration reports exactly the two later gaps,
+        // by name and in requirement order.
         Assert.Equal(
-            [ChronicleafSchema.ProjectsAndMilestonesMigrationId],
+            [ChronicleafSchema.ProjectsAndMilestonesMigrationId, ChronicleafSchema.BackgroundOperationsMigrationId],
             ChronicleafSchema
                 .MissingMigrationIds([ChronicleafSchema.InitialMigrationId, ChronicleafSchema.OwnerAccessMigrationId])
                 .ToArray());
@@ -1264,8 +1273,13 @@ public sealed class ProjectsAndMilestonesTests(ChronicleafPostgresFixture postgr
 /// </summary>
 internal sealed class OwnerClient : IDisposable
 {
-    private const string AccessToken = "chronicleaf-operator-setup-token-0123456789abcdef";
-    private const string PublicOrigin = "https://chronicleaf.example";
+    // Internal rather than private so another fixture in this assembly can host the same boundary
+    // with the same token and origin. The value is unchanged.
+    internal const string AccessToken = "chronicleaf-operator-setup-token-0123456789abcdef";
+
+    /// <summary>The hash the operators of every host in this assembly configure the boundary with.</summary>
+    internal static readonly string AccessTokenHash = Sha256.Sha256Hex(AccessToken);
+    internal const string PublicOrigin = "https://chronicleaf.example";
     private const string CookieName = "chronicleaf_session";
     private const string AntiforgeryHeader = "X-Chronicleaf-Antiforgery";
 
@@ -1278,7 +1292,12 @@ internal sealed class OwnerClient : IDisposable
         _cookie = cookie;
     }
 
-    public static async Task<OwnerClient> CreateAsync(ChronicleafApiHost host)
+    /// <summary>
+    /// Signs in for real against any host. The parameter is the framework's factory rather than one
+    /// concrete host, so a second fixture in this assembly can reuse the same real sign-in instead of
+    /// writing another one.
+    /// </summary>
+    public static async Task<OwnerClient> CreateAsync(WebApplicationFactory<Program> host)
     {
         ArgumentNullException.ThrowIfNull(host);
 
@@ -1304,6 +1323,13 @@ internal sealed class OwnerClient : IDisposable
     /// <summary>A mutation that must present the revision it is editing.</summary>
     public Task<HttpRequestMessage> Post(string path, object? body, long? revision) =>
         Build(HttpMethod.Post, path, body, revision);
+
+    /// <summary>
+    /// A mutation that takes no body of its own, such as a stop request. An empty JSON object is
+    /// sent because the delivered boundary requires a content type on every mutation, and the route
+    /// reads no body from it.
+    /// </summary>
+    public Task<HttpRequestMessage> PostWithoutBody(string path) => Build(HttpMethod.Post, path, null);
 
     public Task<HttpRequestMessage> Patch(
         string path,

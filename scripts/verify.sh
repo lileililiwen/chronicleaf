@@ -69,6 +69,12 @@ else
   # project or milestone simulated in memory, or an EF in-memory provider, is refused as evidence here
   # for the same reason it is for the stages above.
   step "project and milestone tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~ProjectsAndMilestonesTests"
+  # BACKGROUND-JOBS-001/002. Durable execution is proven against the same real disposable PostgreSQL
+  # and a real Hangfire server holding real connections to it. An in-memory job store, a fake queue,
+  # an EF in-memory provider or a stubbed worker is refused as evidence here for the same reason it
+  # is for the stages above: this package's whole claim is that a result survives a restart, and only
+  # a real queue and a real database can be evidence for that.
+  step "background job tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~BackgroundJobsTests"
 fi
 
 step "frontend install" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm ci'

@@ -106,6 +106,37 @@ access_token="$(openssl rand -hex 32)"
 access_token_hash="$(printf '%s' "$access_token" | sha256sum | cut -d' ' -f1)"
 printf '%s' "$access_token" >"$token_file"
 
+# BACKGROUND-JOBS-001/002. The operations panel can only report operations that exist, and the only
+# honest way to give the browser fixture some is to write real rows into the real database - the same
+# way the integration scenarios do. Nothing here is simulated for the UI's benefit and no row invents
+# a job that was never asked for: each is a genuine (scope, kind, key) submission the panel can read
+# back through the real private route, and the queued rows carry no outbox event on purpose so the
+# running application does not execute them and change what the fixture is asserting.
+echo "==> recording the background operations the panel fixture reads"
+queued_operation="$(cat /proc/sys/kernel/random/uuid)"
+cancelled_operation="$(cat /proc/sys/kernel/random/uuid)"
+failed_operation="$(cat /proc/sys/kernel/random/uuid)"
+succeeded_operation="$(cat /proc/sys/kernel/random/uuid)"
+now="$(date -u +%Y-%m-%dT%H:%M:%S.000000Z)"
+docker exec "$postgres_container" psql --username=chronicleaf --dbname="$database_name" --quiet --set=ON_ERROR_STOP=1 \
+  --command "INSERT INTO operations (
+                 id, scope_id, kind, target_id, input_revision, idempotency_key, fingerprint,
+                 status, attempt, lease_recoveries, created_at, updated_at, revision)
+               VALUES
+                 ('${queued_operation}',    '${installation_id}', 'test.queued',    gen_random_uuid(), 1, 'e2e-queued',    'e2e-queued',    'queued',    0, 0, '${now}', '${now}', 1),
+                 ('${cancelled_operation}', '${installation_id}', 'test.cancelled', gen_random_uuid(), 1, 'e2e-cancelled', 'e2e-cancelled', 'cancelled', 1, 0, '${now}', '${now}', 2),
+                 ('${failed_operation}',    '${installation_id}', 'test.failed',    gen_random_uuid(), 1, 'e2e-failed',    'e2e-failed',    'failed',    3, 0, '${now}', '${now}', 4),
+                 ('${succeeded_operation}', '${installation_id}', 'test.succeeded', gen_random_uuid(), 1, 'e2e-succeeded', 'e2e-succeeded', 'succeeded', 1, 0, '${now}', '${now}', 3);
+               UPDATE operations
+               SET error_code = 'operation_transient_failure', completed_at = '${now}'
+               WHERE id = '${failed_operation}';
+               UPDATE operations
+               SET result_ref = 'e2e-result:export', completed_at = '${now}'
+               WHERE id = '${succeeded_operation}';
+               UPDATE operations
+               SET cancel_requested_at = '${now}', completed_at = '${now}'
+               WHERE id = '${cancelled_operation}';" >/dev/null
+
 echo "==> starting the published application at $base_url"
 # exec replaces the subshell, so $! is the server process itself and the trap below
 # actually stops it instead of orphaning it on the port.
@@ -147,5 +178,6 @@ echo "==> npm run test:e2e (real browser against $base_url)"
   cd "$repo_root/src/Chronicleaf.Web" && \
     CHRONICLEAF_BASE_URL="$base_url" \
     CHRONICLEAF_E2E_ACCESS_TOKEN="$(cat "$token_file")" \
+    CHRONICLEAF_E2E_QUEUED_OPERATION="$queued_operation" \
     npm run test:e2e
 )

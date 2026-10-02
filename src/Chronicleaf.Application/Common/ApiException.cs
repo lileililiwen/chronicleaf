@@ -34,6 +34,13 @@ public static class ApiErrorStatus
         ApiError.NotFound => 404,
         Milestones.MilestoneError.ProjectArchived => 409,
 
+        // The background-jobs package's codes. Again additive: a 404 for an operation this caller may
+        // not reach, and two 409s for conditions that are conflicts with the operation's own state -
+        // an idempotency key already bound to other work, and a terminal operation asked to stop.
+        Operations.OperationError.NotFound => 404,
+        Operations.OperationError.IdempotencyConflict => 409,
+        Operations.OperationError.NotCancellable => 409,
+
         _ => 500,
     };
 }

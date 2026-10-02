@@ -1,0 +1,6 @@
+# Forge standard snapshot Compose selection (baseline-service@1.1.0).
+services:
+  chronicleaf:
+    build:
+      context: ../..
+      dockerfile: Dockerfile

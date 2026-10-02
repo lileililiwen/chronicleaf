@@ -1,0 +1,9 @@
+schema: 1
+project:
+  id: chronicleaf
+  name: Chronicleaf
+  profile: aspnet-web
+  maturity: L1
+  target_maturity: L1
+runtime:
+  language: csharp

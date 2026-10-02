@@ -1,0 +1,24 @@
+schema: spec-driven
+context: |
+  Chronicleaf turns human-confirmed project milestones into grounded publishable stories.
+  Runtime: C# .NET 10 / ASP.NET Core 10, React + TypeScript + Vite, PostgreSQL.
+  Primary UX is React web; Community is single-user/self-hosted/BYOK, one application + DB.
+  Use Playwright .NET for product capture and Hangfire/PostgreSQL for durable tasks.
+  requirement.md owns full scope; ROADMAP.md owns package dependencies/stages.
+  current_spec in HANDOFF.md remains the selected work boundary.
+  Evidence snapshots are immutable; derivatives require independent human review.
+  Platform adapters never control core state; never auto-publish generated drafts.
+  Consume published Platform.Storage/Local/S3 and Platform.Jobs, no sibling source coupling.
+  Work on main; preserve unrelated files; planning does not implement/archive/push.
+rules:
+  proposal:
+    - Include Why, What Changes, Package Boundary and Split Assessment, Sibling and Shared Architecture Reconnaissance, BFS Impact Map, Capabilities, Non-goals.
+    - State one independent outcome, dependencies, delivery phase and any material blocker.
+  design:
+    - Specify owner/files/runtime, exported contracts, data/state/revisions, permissions, errors, failure/rollback and exact verification oracles.
+    - Include requirement-to-design/scenario/task/oracle traceability; do not guess unresolved policy.
+  tasks:
+    - Use BFS Baseline, DFS Implementation, BFS Cross-surface Regression, then Verification.
+    - Local meaningful checks and strict validation precede archive; exactly two implementation/archive and HANDOFF-only commits.
+  specs:
+    - Use ADDED or MODIFIED delta requirements with stable IDs and observable success, failure and boundary scenarios.

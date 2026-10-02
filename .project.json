@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "id": "chronicleaf",
+  "kind": "product",
+  "profile": "dotnet-product",
+  "lifecycle": "active",
+  "verification": {
+    "command": "bash scripts/verify.sh",
+    "evidence_status": "verified"
+  },
+  "deployment": {
+    "deployable": false,
+    "jenkins_job": null,
+    "compose_file": null
+  },
+  "discoverability": {
+    "description": "Turn project milestones into publishable stories.",
+    "keywords": [
+      "milestone",
+      "developer storytelling",
+      "BYOK",
+      "project timeline"
+    ],
+    "topics": [
+      "developer-tools",
+      "milestones",
+      "self-hosted",
+      "byok",
+      "aspnet-core",
+      "react"
+    ],
+    "audience": [
+      "independent developers",
+      "open-source maintainers",
+      "small software studios"
+    ],
+    "use_cases": [
+      "grounded Markdown milestone drafts",
+      "project evolution archives"
+    ],
+    "search_phrases": [
+      "GitHub milestone to Markdown story"
+    ],
+    "homepage": "",
+    "license_spdx": "AGPL-3.0-only",
+    "visibility": "undecided"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "generator": "forge@0.1.0",
+  "project": "chronicleaf",
+  "profile": "aspnet-web",
+  "pack": "baseline-service",
+  "version": "1.1.0",
+  "asset_digest": "e0214bbc11a23c5b31db192444107bed84da63e970c2ba469e00321e6f3466ec",
+  "generated_at": "2026-09-30T13:06:19.294700948+00:00",
+  "files": [
+    {
+      "path": ".standard/ci/verify.yml",
+      "digest": "23d79b7ed7d3b0bf216145a960de7edca9f81b8b601b917498d4bf60af597344"
+    },
+    {
+      "path": ".standard/compose/docker-compose.yaml",
+      "digest": "b0693020bb0c47cb0fdaaa2fdf99e69bb1e5ec965e3838e14c7f43947c9df348"
+    },
+    {
+      "path": ".standard/profile.yaml",
+      "digest": "83af5507f6c1000d0db0bbaaf9a94143551fce63903935de3b5adb3ee0ef55ab"
+    },
+    {
+      "path": ".standard/quality/quality.yaml",
+      "digest": "923a89d452953d53b296b341c76279730fe3fea9a1388d7337bd127b128ccf9f"
+    },
+    {
+      "path": ".standard/scripts/verify.sh",
+      "digest": "d86c39728ce308d9c02641eeae24365570e6a60f71f429c18cbb4dc19c5cf281"
+    }
+  ]
+}

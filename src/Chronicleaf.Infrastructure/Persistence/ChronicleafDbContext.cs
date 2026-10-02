@@ -8,8 +8,9 @@ namespace Chronicleaf.Infrastructure.Persistence;
 /// <summary>
 /// The PostgreSQL context behind the Community data foundation: the singleton
 /// <c>installation</c> row, the append-only <c>audit_events</c> log, the durable
-/// <c>outbox</c>, and the access package's <c>session</c>, <c>login_attempt</c> and
-/// <c>access_state</c> tables.
+/// <c>outbox</c>, the access package's <c>session</c>, <c>login_attempt</c> and
+/// <c>access_state</c> tables, and the <c>projects</c> and <c>milestones</c> tables that hold
+/// the owner's own records.
 /// </summary>
 /// <remarks>
 /// The three data-foundation tables are owned by their package and are not changed here; the
@@ -17,6 +18,12 @@ namespace Chronicleaf.Infrastructure.Persistence;
 /// later package adds its own tables in its own migration: this context never creates or edits
 /// them, and nothing here exposes a raw-SQL or audit-editing path. All timestamps are
 /// <c>timestamptz</c> and all identifiers are UUIDs, as the repository contracts require.
+/// <para>
+/// The <c>projects</c> and <c>milestones</c> records are immutable in the domain, so they are
+/// written with explicit parameterized statements that carry the revision compare-and-set; the
+/// change tracker is what reads them. Both revisions are declared concurrency tokens as well, so the
+/// model itself records that a stale write is a conflict rather than an overwrite.
+/// </para>
 /// </remarks>
 public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> options) : DbContext(options)
 {
@@ -34,6 +41,10 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
     public DbSet<LoginAttempt> LoginAttempts => Set<LoginAttempt>();
 
     public DbSet<AccessTokenState> AccessTokenStates => Set<AccessTokenState>();
+
+    public DbSet<Project> Projects => Set<Project>();
+
+    public DbSet<Milestone> Milestones => Set<Milestone>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -179,5 +190,109 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .HasColumnName("updated_at")
                 .HasColumnType("timestamp with time zone");
         });
+
+        // PROJECTS-AND-MILESTONES-002: a project belongs to exactly one owner scope, carries the
+        // optimistic revision every edit presents, and is archived rather than deleted.
+        modelBuilder.Entity<Project>(entity =>
+        {
+            entity.ToTable("projects");
+            entity.HasKey(project => project.Id);
+            entity.Property(project => project.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(project => project.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(project => project.Name)
+                .HasColumnName("name")
+                .HasMaxLength(Project.NameMaxLength)
+                .IsRequired();
+            entity.Property(project => project.Description)
+                .HasColumnName("description")
+                .HasMaxLength(Project.DescriptionMaxLength)
+                .IsRequired();
+            entity.Property(project => project.RepoConnectionId).HasColumnName("repo_connection_id");
+            entity.Property(project => project.ProjectUrl)
+                .HasColumnName("project_url")
+                .HasMaxLength(Project.ProjectUrlMaxLength);
+            entity.Property(project => project.Revision).HasColumnName("revision").IsRequired();
+            entity.Property(project => project.ArchivedAt)
+                .HasColumnName("archived_at")
+                .HasColumnType("timestamp with time zone");
+
+            // A stale write is a conflict, never an overwrite. The token is what the parameterized
+            // compare-and-set in PostgresProjectStore matches on.
+            entity.Property(project => project.Revision).IsConcurrencyToken();
+
+            // Every read is scoped, and a list is ordered by name, so the index serves both.
+            entity.HasIndex(project => new { project.ScopeId, project.Name })
+                .HasDatabaseName("ix_projects_scope_id_name");
+        });
+
+        // PROJECTS-AND-MILESTONES-001: a milestone is owned by its project and carries the source it
+        // came from, the status only the owner may change, and its own revision.
+        modelBuilder.Entity<Milestone>(entity =>
+        {
+            entity.ToTable("milestones");
+            entity.HasKey(milestone => milestone.Id);
+            entity.Property(milestone => milestone.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(milestone => milestone.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(milestone => milestone.Title)
+                .HasColumnName("title")
+                .HasMaxLength(Milestone.TitleMaxLength)
+                .IsRequired();
+            entity.Property(milestone => milestone.Version)
+                .HasColumnName("version")
+                .HasMaxLength(Milestone.VersionMaxLength);
+            entity.Property(milestone => milestone.OccurredAt)
+                .HasColumnName("occurred_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(milestone => milestone.Type)
+                .HasColumnName("type")
+                .HasMaxLength(MilestoneTypeMaxLength)
+                .IsRequired();
+            entity.Property(milestone => milestone.Source)
+                .HasColumnName("source")
+                .HasMaxLength(MilestoneSource.MaxLength)
+                .IsRequired();
+            entity.Property(milestone => milestone.SourceKey)
+                .HasColumnName("source_key")
+                .HasMaxLength(MilestoneSource.SourceKeyMaxLength);
+            entity.Property(milestone => milestone.Status)
+                .HasColumnName("status")
+                .HasMaxLength(MilestoneStatusMaxLength)
+                .IsRequired();
+            entity.Property(milestone => milestone.Revision).HasColumnName("revision").IsRequired();
+            entity.Property(milestone => milestone.Notes)
+                .HasColumnName("notes")
+                .HasMaxLength(Milestone.NotesMaxLength)
+                .IsRequired();
+            entity.Property(milestone => milestone.KnownLimitations)
+                .HasColumnName("known_limitations")
+                .HasColumnType("text[]")
+                .IsRequired();
+            entity.Property(milestone => milestone.NextSteps)
+                .HasColumnName("next_steps")
+                .HasColumnType("text[]")
+                .IsRequired();
+
+            entity.Property(milestone => milestone.Revision).IsConcurrencyToken();
+
+            // The list order every read uses: occurredAt desc, id desc.
+            entity.HasIndex(milestone => new { milestone.ProjectId, milestone.OccurredAt, milestone.Id })
+                .HasDatabaseName("ix_milestones_project_id_occurred_at_id");
+
+            // The idempotence of an import, enforced by the database rather than by a read-then-write
+            // in application code. The filter is what makes it partial: a record the owner wrote has
+            // no source key, so the uniqueness never constrains manual history and several manual
+            // records can share a project, a source and an empty key.
+            entity.HasIndex(milestone => new { milestone.ProjectId, milestone.Source, milestone.SourceKey })
+                .IsUnique()
+                .HasFilter("source_key IS NOT NULL")
+                .HasDatabaseName("ux_milestones_project_id_source_source_key");
+        });
     }
+
+    /// <summary>At most 32 characters; the longest fixed milestone type is <c>first-customer</c>.</summary>
+    private const int MilestoneTypeMaxLength = 32;
+
+    /// <summary>At most 16 characters; the longest status is <c>dismissed</c>.</summary>
+    private const int MilestoneStatusMaxLength = 16;
 }

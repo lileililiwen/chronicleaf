@@ -27,6 +27,13 @@ public static class ApiErrorStatus
         Access.AccessError.TooManyRequests => 429,
         Access.AccessError.InstallationMissing => 503,
 
+        // The projects-and-milestones package's codes. Like the access codes above, they add
+        // mappings and change no existing status: a 404 for an id this caller may not reach, and a
+        // 409 for an edit of an archived project, which is a conflict with the record's own state
+        // rather than with another writer.
+        ApiError.NotFound => 404,
+        Milestones.MilestoneError.ProjectArchived => 409,
+
         _ => 500,
     };
 }

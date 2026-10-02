@@ -153,3 +153,380 @@ body {
   font-size: 0.9375rem;
   min-height: 1.4em;
 }
+
+/* PROJECTS-AND-MILESTONES-001/002: the owner's own records, behind the session gate. */
+.product {
+  margin: 2.5rem 0 0;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--shell-border);
+}
+
+.view__heading {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.view__state,
+.view__hint,
+.view__crumbs {
+  margin: 0.625rem 0 0;
+  color: var(--shell-muted);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.view__crumbs {
+  margin: 0 0 0.75rem;
+}
+
+.view__actions,
+.form__actions,
+.milestone__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  margin: 1.25rem 0 0;
+}
+
+.action {
+  padding: 0.5rem 0.9375rem;
+  border: 1px solid var(--shell-border);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--shell-foreground);
+  font: inherit;
+  font-size: 0.9375rem;
+  cursor: pointer;
+}
+
+.action:hover:not(:disabled) {
+  border-color: var(--shell-muted);
+}
+
+.action--primary {
+  border-color: var(--shell-accent);
+  color: var(--shell-accent);
+}
+
+.action--danger {
+  border-color: #a8543f;
+  color: #e8896b;
+}
+
+.action:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.action:focus-visible,
+.link:focus-visible,
+.filter:focus-visible,
+.card:focus-visible,
+.badge:focus-visible {
+  outline: 2px solid var(--shell-accent);
+  outline-offset: 2px;
+}
+
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--shell-muted);
+  font: inherit;
+  font-size: 0.9375rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.empty {
+  margin: 1.25rem 0 0;
+  padding: 1.5rem;
+  border: 1px dashed var(--shell-border);
+  border-radius: 0.75rem;
+}
+
+.empty__title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.empty__body {
+  margin: 0.5rem 0 0;
+  color: var(--shell-muted);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.empty .action {
+  margin-top: 1.125rem;
+}
+
+.cards {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  width: 100%;
+  padding: 1rem;
+  border: 1px solid var(--shell-border);
+  border-radius: 0.75rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.card__name {
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.card__body {
+  color: var(--shell-muted);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.badge {
+  align-self: flex-start;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--shell-border);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  text-transform: lowercase;
+}
+
+.badge--ok {
+  border-color: #4f7d5c;
+  color: #86c39b;
+}
+
+.badge--pending {
+  border-color: var(--shell-accent);
+  color: var(--shell-accent);
+}
+
+.badge--muted {
+  color: var(--shell-muted);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1.75rem 0 0;
+}
+
+.filter {
+  padding: 0.3125rem 0.75rem;
+  border: 1px solid var(--shell-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--shell-muted);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.filter--active {
+  border-color: var(--shell-accent);
+  color: var(--shell-accent);
+}
+
+.milestones {
+  display: grid;
+  gap: 0.875rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.milestone {
+  padding: 1.125rem;
+  border: 1px solid var(--shell-border);
+  border-radius: 0.75rem;
+}
+
+.milestone__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.milestone__title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.milestone__meta {
+  margin: 0.5rem 0 0;
+  color: var(--shell-muted);
+  font-size: 0.875rem;
+}
+
+.milestone__notes {
+  margin: 0.75rem 0 0;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.milestone__list {
+  margin: 0.75rem 0 0;
+}
+
+.milestone__list h4 {
+  margin: 0;
+  color: var(--shell-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.milestone__list ul {
+  margin: 0.375rem 0 0;
+  padding-left: 1.125rem;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.project__header {
+  margin: 0.75rem 0 0;
+}
+
+.project__description {
+  margin: 0.625rem 0 0;
+  line-height: 1.6;
+}
+
+.project__url {
+  margin: 0.375rem 0 0;
+  color: var(--shell-muted);
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+
+.project__url-label {
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.form {
+  display: grid;
+  gap: 1rem;
+  margin: 1.25rem 0 0;
+}
+
+.form__row {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+
+.form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.form__label {
+  color: var(--shell-muted);
+  font-size: 0.875rem;
+}
+
+.form__input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--shell-border);
+  border-radius: 0.5rem;
+  background: var(--shell-background);
+  color: var(--shell-foreground);
+  font: inherit;
+}
+
+.form__input--area {
+  resize: vertical;
+}
+
+.form__input:focus-visible {
+  outline: 2px solid var(--shell-accent);
+  outline-offset: 2px;
+}
+
+.form__hint {
+  margin: 0;
+  color: var(--shell-muted);
+  font-size: 0.8125rem;
+}
+
+.form__error,
+.notice--error {
+  margin: 0;
+  color: #e8896b;
+  font-size: 0.875rem;
+}
+
+.notice {
+  margin: 1.25rem 0 0;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--shell-border);
+  border-radius: 0.5rem;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.notice--conflict,
+.notice--error {
+  border-color: #a8543f;
+}
+
+.notice--ok {
+  border-color: #4f7d5c;
+  color: #86c39b;
+}
+
+.notice--muted {
+  color: var(--shell-muted);
+}
+
+.later {
+  margin: 3rem 0 0;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--shell-border);
+}
+
+.later__heading {
+  margin: 0;
+  color: var(--shell-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.later__list {
+  margin: 0.625rem 0 0;
+  padding-left: 1.125rem;
+  color: var(--shell-muted);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.later .shell__state {
+  margin-top: 1.25rem;
+}

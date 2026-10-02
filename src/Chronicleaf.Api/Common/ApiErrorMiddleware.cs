@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Chronicleaf.Application.Access;
 using Chronicleaf.Application.Common;
+using Chronicleaf.Application.Milestones;
 // `ApiError` also names the runtime shell's compact not_found/web_assets_unavailable record in
 // namespace Chronicleaf.Api, which wins the lookup from inside this namespace. The alias keeps the
 // envelope type unambiguous: the shell record is a different, shipped contract.
@@ -113,6 +114,15 @@ public sealed class ApiErrorMiddleware(
 
             case InstallationNotProvisionedException notProvisioned:
                 return (Envelope.Create(AccessError.InstallationMissing, notProvisioned.Message, traceId), LogLevel.Warning);
+
+            // PROJECTS-AND-MILESTONES-002. Written here for the same reason the access refusals are:
+            // the feature package raises them, and this middleware is still the only place an
+            // envelope is written.
+            case ResourceNotFoundException missing:
+                return (Envelope.Create(MilestoneError.NotFound, missing.Message, traceId), LogLevel.Information);
+
+            case ProjectArchivedException archived:
+                return (Envelope.Create(MilestoneError.ProjectArchived, archived.Message, traceId), LogLevel.Information);
 
             case MalformedJsonException malformed:
                 return (Envelope.Create(Envelope.MalformedJson, malformed.Message, traceId), LogLevel.Information);

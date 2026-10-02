@@ -18,6 +18,13 @@ public sealed record ApiError
     public const string DependencyTimeout = "dependency_timeout";
     public const string InternalError = "internal_error";
 
+    /// <summary>
+    /// A resource id that does not exist, or exists in a scope this caller may not read. It is the
+    /// same code the runtime shell already uses for an unserved <c>/api</c> path, for the same
+    /// reason: a caller learns that there is nothing here and nothing about what might be.
+    /// </summary>
+    public const string NotFound = "not_found";
+
     private static readonly JsonSerializerOptions Wire = new(JsonSerializerDefaults.Web)
     {
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,

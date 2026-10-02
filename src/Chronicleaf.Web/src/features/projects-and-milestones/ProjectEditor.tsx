@@ -1,0 +1,158 @@
+import { useState } from 'react';
+
+import { MilestoneApiError, createProject, updateProject } from './api';
+import type { ProjectDraft } from './types';
+
+/**
+ * Creating a project, and editing one that already exists.
+ *
+ * The form owns the fields the API accepts and nothing else: there is no archive switch here, no
+ * connection picker and no milestone field, because those are separate decisions made elsewhere. The
+ * revision the editor was opened at is held in state and sent back on save, so a save that was based
+ * on a stale view is refused by the server and reported here rather than overwriting the newer edit.
+ */
+export function ProjectEditor({
+  project,
+  onSaved,
+  onCancel,
+}: {
+  /** `null` creates a project; a project edits it. */
+  readonly project: { readonly id: string; readonly revision: number; readonly name: string; readonly description: string; readonly projectUrl: string | null } | null;
+  readonly onSaved: (projectId: string) => void;
+  readonly onCancel: () => void;
+}) {
+  const [name, setName] = useState(project?.name ?? '');
+  const [description, setDescription] = useState(project?.description ?? '');
+  const [projectUrl, setProjectUrl] = useState(project?.projectUrl ?? '');
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<MilestoneApiError | null>(null);
+  const [conflict, setConflict] = useState<string | null>(null);
+
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (busy) {
+      return;
+    }
+
+    const draft: ProjectDraft = { name, description, projectUrl };
+    setBusy(true);
+    setFailure(null);
+    setConflict(null);
+
+    try {
+      const saved =
+        project === null
+          ? await createProject(draft)
+          : await updateProject(project.id, project.revision, draft);
+
+      onSaved(saved.id);
+    } catch (thrown) {
+      const apiError = thrown instanceof MilestoneApiError ? thrown : null;
+
+      if (apiError?.status === 409) {
+        // Somebody else's edit landed first. The values in this form were not written, and the
+        // owner is told that rather than being left to assume they were.
+        setConflict(
+          apiError.storedRevision === null
+            ? 'This project changed since you opened it, so your edit was not saved.'
+            : `This project changed since you opened it (the stored revision is ${apiError.storedRevision}). Your edit was not saved.`,
+        );
+      } else {
+        setFailure(apiError);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="view" data-testid={project === null ? 'project-create' : 'project-edit'}>
+      <h2 className="view__heading">{project === null ? 'New project' : `Edit ${project.name}`}</h2>
+
+      <form className="form" onSubmit={submit} data-testid="project-form">
+        <div className="form__field">
+          <label className="form__label" htmlFor="project-name">
+            Name
+          </label>
+          <input
+            className="form__input"
+            id="project-name"
+            name="name"
+            value={name}
+            maxLength={120}
+            required
+            onChange={(event) => setName(event.target.value)}
+            data-testid="project-name-input"
+          />
+          {failure?.messageFor('name') ? (
+            <p className="form__error" data-testid="project-name-error">
+              {failure.messageFor('name')}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="form__field">
+          <label className="form__label" htmlFor="project-description">
+            Description
+          </label>
+          <textarea
+            className="form__input form__input--area"
+            id="project-description"
+            name="description"
+            rows={3}
+            maxLength={2000}
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            data-testid="project-description-input"
+          />
+        </div>
+
+        <div className="form__field">
+          <label className="form__label" htmlFor="project-url">
+            Project URL
+          </label>
+          <input
+            className="form__input"
+            id="project-url"
+            name="projectUrl"
+            type="url"
+            placeholder="https://"
+            value={projectUrl}
+            onChange={(event) => setProjectUrl(event.target.value)}
+            data-testid="project-url-input"
+          />
+          <p className="form__hint">
+            Stored as you type it. Chronicleaf never opens this address itself.
+          </p>
+          {failure?.messageFor('projectUrl') ? (
+            <p className="form__error" data-testid="project-url-error">
+              {failure.messageFor('projectUrl')}
+            </p>
+          ) : null}
+        </div>
+
+        {conflict ? (
+          <p className="notice notice--conflict" role="alert" data-testid="project-conflict">
+            {conflict}
+          </p>
+        ) : null}
+
+        {failure && !conflict ? (
+          <p className="notice notice--error" role="alert" data-testid="project-error">
+            {failure.message}
+          </p>
+        ) : null}
+
+        <div className="form__actions">
+          <button type="submit" className="action action--primary" disabled={busy} data-testid="project-save">
+            {busy ? 'Saving…' : 'Save project'}
+          </button>
+          <button type="button" className="action" onClick={onCancel} data-testid="project-cancel">
+            Cancel
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}

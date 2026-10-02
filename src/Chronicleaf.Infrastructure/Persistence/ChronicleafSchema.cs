@@ -6,11 +6,10 @@ namespace Chronicleaf.Infrastructure.Persistence;
 /// <remarks>
 /// The forward migration ids are pinned here because readiness compares them against the
 /// <c>__EFMigrationsHistory</c> of the reachable database. A database whose history stops at an
-/// earlier migration is a real, older schema, not a ready one - and because the access package
-/// adds its own migration, readiness now requires <em>every</em> id in
-/// <see cref="RequiredMigrationIds"/>, not only the newest one. A database that has the newest
-/// migration but is missing an earlier one would be in a state no supported upgrade path produces,
-/// and it is refused rather than half-trusted.
+/// earlier migration is a real, older schema, not a ready one - and because every later package adds
+/// its own migration, readiness requires <em>every</em> id in <see cref="RequiredMigrationIds"/>, not
+/// only the newest one. A database that has the newest migration but is missing an earlier one would
+/// be in a state no supported upgrade path produces, and it is refused rather than half-trusted.
 /// </remarks>
 public static class ChronicleafSchema
 {
@@ -23,19 +22,29 @@ public static class ChronicleafSchema
     /// </summary>
     public const string OwnerAccessMigrationId = "20261002091842_AddCommunityOwnerAccessBoundary";
 
+    /// <summary>
+    /// The forward migration that adds the <c>projects</c> and <c>milestones</c> tables
+    /// (PROJECTS-AND-MILESTONES-001/002). A database that has never applied it is not a Community
+    /// schema this build can serve: its owner has no project to work on and its routes would fail
+    /// against missing tables, so readiness says so by name rather than answering 200 and failing on
+    /// the first request.
+    /// </summary>
+    public const string ProjectsAndMilestonesMigrationId = "20261002101309_AddProjectsAndMilestones";
+
     /// <summary>Every migration a database must carry before this build calls itself ready.</summary>
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
         InitialMigrationId,
         OwnerAccessMigrationId,
+        ProjectsAndMilestonesMigrationId,
     ];
 
     /// <summary>
     /// The newest required forward migration, kept for the single-id checks that predate the
-    /// second migration and for the readiness message. It is the last entry of
+    /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = OwnerAccessMigrationId;
+    public const string ExpectedMigrationId = ProjectsAndMilestonesMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

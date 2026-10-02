@@ -8,8 +8,10 @@
 using Chronicleaf.Api;
 using Chronicleaf.Api.Access;
 using Chronicleaf.Api.Common;
+using Chronicleaf.Api.Projects;
 using Chronicleaf.Infrastructure.Access;
 using Chronicleaf.Infrastructure.Persistence;
+using Chronicleaf.Infrastructure.Projects;
 using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -30,6 +32,12 @@ builder.Services.AddChronicleafPersistence(builder.Configuration);
 // boundary that cannot verify a token must not pretend to exist. It registers the session
 // store, the durable login throttle and the start-up token-rotation guard.
 builder.Services.AddChronicleafAccess(builder.Configuration, builder.Environment.EnvironmentName);
+
+// PROJECTS-AND-MILESTONES-001/002. The owner's own Project and Milestone records, stored by the
+// same context, unit of work and audit trail the packages above delivered, with no store of its
+// own to fall back on: a database without the projects-and-milestones migration reports
+// schema_mismatch at /api/ready rather than serving an empty installation.
+builder.Services.AddProjectMilestones();
 
 // The rotation guard is applied once at start-up, so an access token that was changed since the
 // last run revokes every existing session before this process serves anything.
@@ -72,6 +80,11 @@ app.MapGet("/api/ready", ReadinessEndpoint.CheckAsync).AllowPublicApi();
 // COMMUNITY-ACCESS-001: the owner session routes. POST /api/session is the one of them that
 // is public - it is the exchange itself - and the other two are private by default.
 app.MapAccessEndpoints();
+
+// PROJECTS-AND-MILESTONES-001/002: the private project and milestone routes. None of them is
+// marked public, so the access package's default-deny boundary already covers every one of them
+// and the public allow-list stays exactly as the design fixed it.
+app.MapProjectMilestoneEndpoints();
 
 // SHELL-001/SHELL-002: every unmatched path is either an unknown API path, an unknown
 // static asset, or a client route. Only the last one falls back to the SPA entry point. This

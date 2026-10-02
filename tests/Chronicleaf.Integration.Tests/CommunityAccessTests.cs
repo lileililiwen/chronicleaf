@@ -847,7 +847,9 @@ public sealed class CommunityAccessTests(ChronicleafPostgresFixture postgres) : 
         Assert.Equal(1, await ChronicleafPostgresFixture.CountRowsAsync(database, "installation"));
         Assert.Equal(0, await ChronicleafPostgresFixture.CountRowsAsync(database, "audit_events"));
         Assert.Equal(0, await ChronicleafPostgresFixture.CountRowsAsync(database, "outbox"));
-        Assert.Equal(2, await ChronicleafPostgresFixture.CountRowsAsync(database, "__EFMigrationsHistory"));
+        Assert.Equal(
+            ChronicleafSchema.RequiredMigrationIds.Count,
+            await ChronicleafPostgresFixture.CountRowsAsync(database, "__EFMigrationsHistory"));
 
         // The backfilled identity is the one the access layer uses, and it does not change again.
         await using var host = ChronicleafApiHost.StartWithAccess(database, Clock, AccessTokenHash, PublicOrigin);
@@ -857,7 +859,9 @@ public sealed class CommunityAccessTests(ChronicleafPostgresFixture postgres) : 
 
         // Applying the migrations again is a no-op, the identity is stable, and readiness is current.
         await ChronicleafPostgresFixture.MigrateAsync(database);
-        Assert.Equal(2, await ChronicleafPostgresFixture.CountRowsAsync(database, "__EFMigrationsHistory"));
+        Assert.Equal(
+            ChronicleafSchema.RequiredMigrationIds.Count,
+            await ChronicleafPostgresFixture.CountRowsAsync(database, "__EFMigrationsHistory"));
         Assert.Equal(
             backfilled,
             await ChronicleafPostgresFixture.ReadTextAsync(

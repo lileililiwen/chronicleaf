@@ -181,6 +181,88 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.ToTable("installation", (string)null);
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.Milestone", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.PrimitiveCollection<string[]>("KnownLimitations")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("known_limitations");
+
+                    b.PrimitiveCollection<string[]>("NextSteps")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("next_steps");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(20000)
+                        .HasColumnType("character varying(20000)")
+                        .HasColumnName("notes");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("SourceKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("source_key");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("title");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("type");
+
+                    b.Property<string>("Version")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId", "OccurredAt", "Id")
+                        .HasDatabaseName("ix_milestones_project_id_occurred_at_id");
+
+                    b.HasIndex("ProjectId", "Source", "SourceKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_milestones_project_id_source_source_key")
+                        .HasFilter("source_key IS NOT NULL");
+
+                    b.ToTable("milestones", (string)null);
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.OutboxEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -224,6 +306,54 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ux_outbox_kind_aggregate_revision");
 
                     b.ToTable("outbox", (string)null);
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.Project", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("ProjectUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("project_url");
+
+                    b.Property<Guid?>("RepoConnectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("repo_connection_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ScopeId", "Name")
+                        .HasDatabaseName("ix_projects_scope_id_name");
+
+                    b.ToTable("projects", (string)null);
                 });
 #pragma warning restore 612, 618
         }

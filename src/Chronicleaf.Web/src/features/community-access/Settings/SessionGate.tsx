@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { useOwnerSession } from '../useOwnerSession';
+import type { OwnerSessionState } from '../useOwnerSession';
 import { ABSOLUTE_LIFETIME_DAYS, IDLE_TIMEOUT_HOURS } from '../types';
 
 /**
@@ -14,9 +14,13 @@ import { ABSOLUTE_LIFETIME_DAYS, IDLE_TIMEOUT_HOURS } from '../types';
  *
  * The whole form works from the keyboard: the labelled field is reachable with Tab, Enter submits
  * it, and the state that follows is announced in a live region.
+ *
+ * The session state is passed in rather than read here, so the whole page reads it exactly once.
+ * Two components each asking the server for their own session would each be handed their own
+ * antiforgery value, and the second would invalidate the first - so one reader, one value.
  */
-export function SessionGate() {
-  const { status, session, error, signIn, signOut } = useOwnerSession();
+export function SessionGate({ session: state }: { readonly session: OwnerSessionState }) {
+  const { status, session, error, signIn, signOut } = state;
   const [accessToken, setAccessToken] = useState('');
   const [busy, setBusy] = useState(false);
   const tokenInput = useRef<HTMLInputElement | null>(null);

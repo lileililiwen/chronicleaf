@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Chronicleaf native verification (SHELL-003, COMMUNITY-PERSISTENCE-001/002, COMMUNITY-ACCESS-001/002).
+# Chronicleaf native verification (SHELL-003, COMMUNITY-PERSISTENCE-001/002, COMMUNITY-ACCESS-001/002,
+# PROJECTS-AND-MILESTONES-001/002).
 #
 # Required chain, in order:
 #   1. dotnet build            - .NET 10 Core/Application/Infrastructure/Api and test projects
 #   2. dotnet test             - shell contract assertions, then the real-PostgreSQL integration
-#                                tests of tests/Chronicleaf.Integration.Tests
+#                                tests of tests/Chronicleaf.Integration.Tests, one stage per package
+#                                so a failure names the package that broke
 #   3. npm ci                  - locked frontend dependencies
 #   4. npm run build           - tsc then vite build
 #
@@ -62,6 +64,11 @@ else
   # PostgreSQL. A session row, an idle deadline or a login counter simulated in memory is refused
   # as evidence, so they are a separate stage with their own result.
   step "access tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~CommunityAccessTests"
+  # PROJECTS-AND-MILESTONES-001/002. The milestone lifecycle, the revision conflict, the soft archive
+  # and the restart are proven against the same real disposable PostgreSQL and the real API host. A
+  # project or milestone simulated in memory, or an EF in-memory provider, is refused as evidence here
+  # for the same reason it is for the stages above.
+  step "project and milestone tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~ProjectsAndMilestonesTests"
 fi
 
 step "frontend install" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm ci'
@@ -69,7 +76,10 @@ step "frontend build" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm run b
 
 if [ "${CHRONICLEAF_E2E:-0}" = "1" ]; then
   # Publishes the real application, starts a disposable PostgreSQL, applies the committed
-  # migrations, and drives the shell and access fixtures in a real browser.
+  # migrations, and drives the shell, access and projects-and-milestones fixtures in a real browser.
+  # The last of those is included by playwright.config.ts, which already matches tests/**/*.spec.ts;
+  # this stage therefore fails if the browser cannot record a project, confirm a candidate or refuse
+  # a stale edit against a real database.
   step "browser fixtures" bash scripts/e2e.sh
 fi
 

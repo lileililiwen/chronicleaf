@@ -2,10 +2,13 @@
 // openspec/specs/runtime-shell/spec.md): a credential-free API liveness contract plus
 // static hosting of the built React client from this repository's own build output.
 // Durable Community state and honest dependency readiness come from the persistence package
-// (COMMUNITY-PERSISTENCE-001/002); this file stays the composition root and adds no product
+// (COMMUNITY-PERSISTENCE-001/002); the single-user access boundary is
+// COMMUNITY-ACCESS-001/002. This file stays the composition root and adds no product
 // feature of its own.
 using Chronicleaf.Api;
+using Chronicleaf.Api.Access;
 using Chronicleaf.Api.Common;
+using Chronicleaf.Infrastructure.Access;
 using Chronicleaf.Infrastructure.Persistence;
 using Microsoft.Extensions.FileProviders;
 
@@ -21,6 +24,16 @@ var webAssets = WebAssetCatalog.Resolve(builder.Configuration, builder.Environme
 // and never installs a substitute store: the operator runs the explicit `dotnet ef database
 // update` command, and an unreachable or unconfigured database is reported at /api/ready.
 builder.Services.AddChronicleafPersistence(builder.Configuration);
+
+// COMMUNITY-ACCESS-001/002. Registration requires the operator's access token hash outside
+// Development and fails start-up with a redacted message when it is absent, because a
+// boundary that cannot verify a token must not pretend to exist. It registers the session
+// store, the durable login throttle and the start-up token-rotation guard.
+builder.Services.AddChronicleafAccess(builder.Configuration, builder.Environment.EnvironmentName);
+
+// The rotation guard is applied once at start-up, so an access token that was changed since the
+// last run revokes every existing session before this process serves anything.
+builder.Services.AddHostedService<AccessTokenRotationStartup>();
 
 var app = builder.Build();
 
@@ -42,18 +55,29 @@ app.UseRouting();
 // endpoints below and leaves the shell's own 404/503 bodies untouched.
 app.UseMiddleware<ApiErrorMiddleware>();
 
+// COMMUNITY-ACCESS-001/002: the default-deny boundary. It runs after routing, so it can see
+// which endpoint matched, and it refuses a private route or a mutation before the endpoint
+// body runs - which is what makes a refused request a request that wrote nothing. Its own
+// failures are raised as access exceptions and translated by the middleware above.
+app.UseMiddleware<OwnerSessionBoundaryMiddleware>();
+
 // SHELL-001: liveness only. No database, provider, version or environment detail is exposed,
 // and it keeps answering 200 when PostgreSQL is unreachable or unconfigured.
-app.MapGet("/api/health", () => Results.Json(HealthResponse.Instance));
+app.MapGet("/api/health", () => Results.Json(HealthResponse.Instance)).AllowPublicApi();
 
 // COMMUNITY-PERSISTENCE-002: readiness. 200 {"status":"ready"} only for a reachable, current
 // schema; otherwise 503 database_unavailable or schema_mismatch.
-app.MapGet("/api/ready", ReadinessEndpoint.CheckAsync);
+app.MapGet("/api/ready", ReadinessEndpoint.CheckAsync).AllowPublicApi();
+
+// COMMUNITY-ACCESS-001: the owner session routes. POST /api/session is the one of them that
+// is public - it is the exchange itself - and the other two are private by default.
+app.MapAccessEndpoints();
 
 // SHELL-001/SHELL-002: every unmatched path is either an unknown API path, an unknown
-// static asset, or a client route. Only the last one falls back to the SPA entry point.
-app.MapGet("/", (HttpContext context) => WebAssetRouting.ServeClientRoute(context, webAssets));
-app.MapFallback("{**clientRoute}", (HttpContext context) => WebAssetRouting.ServeClientRoute(context, webAssets));
+// static asset, or a client route. Only the last one falls back to the SPA entry point. This
+// endpoint serves no stored data and is the shell's shipped 404, so it is public.
+app.MapGet("/", (HttpContext context) => WebAssetRouting.ServeClientRoute(context, webAssets)).AllowPublicApi();
+app.MapFallback("{**clientRoute}", (HttpContext context) => WebAssetRouting.ServeClientRoute(context, webAssets)).AllowPublicApi();
 
 app.Run();
 

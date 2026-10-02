@@ -16,6 +16,17 @@ public static class ApiErrorStatus
         ApiError.DatabaseUnavailable => 503,
         ApiError.SchemaMismatch => 503,
         ApiError.DependencyTimeout => 504,
+
+        // The access package's codes. They extend this mapping without changing a single existing
+        // status: a feature package adds a code, the envelope shape stays the same, and a status a
+        // shipped client already relies on is never renumbered.
+        Access.AccessError.Unauthenticated => 401,
+        Access.AccessError.InvalidCredentials => 401,
+        Access.AccessError.OriginMismatch => 403,
+        Access.AccessError.AntiforgeryInvalid => 403,
+        Access.AccessError.TooManyRequests => 429,
+        Access.AccessError.InstallationMissing => 503,
+
         _ => 500,
     };
 }

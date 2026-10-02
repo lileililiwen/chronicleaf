@@ -6,11 +6,16 @@ namespace Chronicleaf.Core;
 /// </summary>
 public sealed class Installation
 {
-    public Installation(Guid id, int schemaVersion, DateTimeOffset createdAt)
+    public Installation(
+        Guid id,
+        int schemaVersion,
+        DateTimeOffset createdAt,
+        Guid? ownerActorId = null)
     {
         Id = id;
         SchemaVersion = schemaVersion;
         CreatedAt = createdAt;
+        OwnerActorId = ownerActorId;
     }
 
     public Guid Id { get; }
@@ -18,6 +23,15 @@ public sealed class Installation
     public int SchemaVersion { get; }
 
     public DateTimeOffset CreatedAt { get; }
+
+    /// <summary>
+    /// The stable single-user owner identity, added by the access package's forward migration.
+    /// It is nullable in the database so that an installation row written by the persistence
+    /// package keeps working, and it is generated exactly once: the access layer fills it when it
+    /// is still null and never changes it again, not on token rotation and not on session
+    /// rotation. Every owner session carries exactly this value.
+    /// </summary>
+    public Guid? OwnerActorId { get; }
 }
 
 /// <summary>

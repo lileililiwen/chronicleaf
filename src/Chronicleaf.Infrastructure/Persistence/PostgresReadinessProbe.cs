@@ -107,9 +107,10 @@ public sealed class PostgresReadinessProbe(ChronicleafDbContext dbContext, strin
                 .ToListAsync(timeout.Token)
                 .ConfigureAwait(false);
 
-            if (!applied.Contains(ChronicleafSchema.ExpectedMigrationId, StringComparer.Ordinal))
+            if (!ChronicleafSchema.IsCurrent(applied))
             {
-                return Mismatch($"the applied migrations do not include {ChronicleafSchema.ExpectedMigrationId}");
+                return Mismatch(
+                    $"the applied migrations do not include {string.Join(", ", ChronicleafSchema.MissingMigrationIds(applied))}");
             }
 
             return new ReadinessReport(

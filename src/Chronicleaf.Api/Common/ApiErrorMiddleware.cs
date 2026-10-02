@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Chronicleaf.Application.Access;
 using Chronicleaf.Application.Common;
 // `ApiError` also names the runtime shell's compact not_found/web_assets_unavailable record in
 // namespace Chronicleaf.Api, which wins the lookup from inside this namespace. The alias keeps the
@@ -68,6 +69,16 @@ public sealed class ApiErrorMiddleware(
         context.Response.Clear();
         context.Response.StatusCode = ApiErrorStatus.ForCode(error.Code);
         context.Response.ContentType = "application/json; charset=utf-8";
+
+        // A throttled client is told when it may try again, derived from its own oldest counted
+        // failure. The header carries a duration and nothing else: no address, no attempt count
+        // and no token. It is written after Clear(), which is what drops previously set headers.
+        if (exception is TooManyRequestsException throttled)
+        {
+            context.Response.Headers.RetryAfter = throttled.RetryAfterSeconds.ToString(
+                System.Globalization.CultureInfo.InvariantCulture);
+        }
+
         await context.Response.WriteAsync(error.ToJson(), context.RequestAborted).ConfigureAwait(false);
     }
 
@@ -82,6 +93,27 @@ public sealed class ApiErrorMiddleware(
 
         switch (exception)
         {
+            // COMMUNITY-ACCESS-001/002. The four refusals below are written here so the access
+            // package never writes an envelope of its own; each message is generic by design, so
+            // none of them discloses whether a token, a session or an origin exists.
+            case UnauthenticatedException unauthenticated:
+                return (Envelope.Create(AccessError.Unauthenticated, unauthenticated.Message, traceId), LogLevel.Information);
+
+            case InvalidCredentialsException invalidCredentials:
+                return (Envelope.Create(AccessError.InvalidCredentials, invalidCredentials.Message, traceId), LogLevel.Information);
+
+            case OriginMismatchException originMismatch:
+                return (Envelope.Create(AccessError.OriginMismatch, originMismatch.Message, traceId), LogLevel.Information);
+
+            case AntiforgeryFailedException antiforgery:
+                return (Envelope.Create(AccessError.AntiforgeryInvalid, antiforgery.Message, traceId), LogLevel.Information);
+
+            case TooManyRequestsException tooManyRequests:
+                return (Envelope.Create(AccessError.TooManyRequests, tooManyRequests.Message, traceId), LogLevel.Information);
+
+            case InstallationNotProvisionedException notProvisioned:
+                return (Envelope.Create(AccessError.InstallationMissing, notProvisioned.Message, traceId), LogLevel.Warning);
+
             case MalformedJsonException malformed:
                 return (Envelope.Create(Envelope.MalformedJson, malformed.Message, traceId), LogLevel.Information);
 

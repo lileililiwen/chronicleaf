@@ -1,23 +1,124 @@
 #!/usr/bin/env bash
-# Run the browser fixtures against the real built and published Chronicleaf shell.
+# Run the browser fixtures against the real built and published Chronicleaf application.
 #
-# The application is published and started from its own output; the Playwright fixtures
-# drive a real browser against that server. No mock, stub or dev server is involved.
+# The application is published and started from its own output; the Playwright fixtures drive a
+# real browser against that server, and the server signs real sessions in a real disposable
+# PostgreSQL. No mock, stub or dev server is involved.
+#
+# The access boundary is configured here the way a deployment configures it, because the browser
+# fixtures sign in for real:
+#   Chronicleaf__AccessTokenHash  SHA-256 hex of a token generated for this run only
+#   Chronicleaf__PublicOrigin      the loopback origin the browser actually uses
+#   ConnectionStrings__Chronicleaf the disposable PostgreSQL, migrated by the operator command
+#
+# The plaintext token is written to a file inside the publish directory, is never echoed, and is
+# handed to the fixtures through the environment.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 publish_dir="${CHRONICLEAF_PUBLISH_DIR:-dist/e2e}"
 base_url="${CHRONICLEAF_BASE_URL:-http://127.0.0.1:5081}"
 log_file="$repo_root/$publish_dir/server.log"
+token_file="$repo_root/$publish_dir/access-token"
+database_name="chronicleaf_e2e"
+
+# The image is pinned; a floating tag would make this run unreproducible.
+postgres_image="postgres:17.6-alpine"
+postgres_container="chronicleaf-e2e-postgres-$$"
+postgres_port=""
+
+cleanup() {
+  local exit_status=$?
+  if [ -n "$server_pid" ] && kill -0 "$server_pid" 2>/dev/null; then
+    kill "$server_pid" 2>/dev/null || true
+    wait "$server_pid" 2>/dev/null || true
+  fi
+  if [ -n "$postgres_container" ]; then
+    docker rm --force --volumes "$postgres_container" >/dev/null 2>&1 || true
+  fi
+  # The token is a secret for the lifetime of this run and must not survive it.
+  rm -f "$token_file"
+  exit "$exit_status"
+}
+server_pid=""
+trap cleanup EXIT
+
+require_docker() {
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "FAILED (prerequisite unavailable): docker is not on PATH; the browser fixtures need a real PostgreSQL container." >&2
+    return 1
+  fi
+  if ! docker info >/dev/null 2>&1; then
+    echo "FAILED (prerequisite unavailable): the docker daemon is not reachable; the browser fixtures need a real PostgreSQL container." >&2
+    return 1
+  fi
+}
+require_docker
 
 bash "$repo_root/scripts/publish.sh" "$publish_dir" Release
 
-echo "==> starting the published shell at $base_url"
+echo "==> starting the disposable PostgreSQL for this run"
+docker run --detach --rm \
+  --name "$postgres_container" \
+  --env POSTGRES_DB="$database_name" \
+  --env POSTGRES_USER=chronicleaf \
+  --env POSTGRES_PASSWORD=chronicleaf-e2e \
+  --publish 127.0.0.1::5432 \
+  "$postgres_image" >/dev/null
+
+postgres_port="$(docker port "$postgres_container" 5432/tcp | head -n 1 | sed 's/.*://')"
+if [ -z "$postgres_port" ]; then
+  echo "the disposable PostgreSQL did not publish a port:" >&2
+  docker logs "$postgres_container" >&2 || true
+  exit 1
+fi
+
+for _ in $(seq 1 60); do
+  if docker exec "$postgres_container" pg_isready --username=chronicleaf --dbname="$database_name" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+
+connection_string="Host=127.0.0.1;Port=${postgres_port};Database=${database_name};Username=chronicleaf;Password=chronicleaf-e2e;Timeout=5;Command Timeout=10"
+
+echo "==> applying the committed migrations (the operator command, never start-up)"
+(
+  cd "$repo_root"
+  ConnectionStrings__Chronicleaf="$connection_string" \
+  Chronicleaf__AccessTokenHash="$(head -c 64 /dev/zero | tr '\0' '0' | sha256sum | cut -d' ' -f1)" \
+    dotnet ef database update \
+      --project src/Chronicleaf.Infrastructure \
+      --startup-project src/Chronicleaf.Api \
+      --no-build >/dev/null
+)
+
+# The singleton installation is operator-provisioned state, not something a visitor may claim.
+echo "==> provisioning the single installation"
+installation_id="$(cat /proc/sys/kernel/random/uuid)"
+docker exec "$postgres_container" psql --username=chronicleaf --dbname="$database_name" --quiet --set=ON_ERROR_STOP=1 \
+  --command "INSERT INTO installation (id, schema_version, created_at)
+             VALUES ('${installation_id}', 1, now())
+             ON CONFLICT (id) DO NOTHING;" >/dev/null
+
+# A token for this run only: 32 random bytes, hashed for the server and kept for the fixtures.
+access_token="$(openssl rand -hex 32)"
+access_token_hash="$(printf '%s' "$access_token" | sha256sum | cut -d' ' -f1)"
+printf '%s' "$access_token" >"$token_file"
+
+echo "==> starting the published application at $base_url"
 # exec replaces the subshell, so $! is the server process itself and the trap below
 # actually stops it instead of orphaning it on the port.
-(cd "$repo_root/$publish_dir" && exec env ASPNETCORE_URLS="$base_url" dotnet Chronicleaf.Api.dll >"$log_file" 2>&1) &
+(
+  cd "$repo_root/$publish_dir" && exec env \
+    ASPNETCORE_URLS="$base_url" \
+    ASPNETCORE_ENVIRONMENT=Production \
+    ConnectionStrings__Chronicleaf="$connection_string" \
+    Chronicleaf__AccessTokenHash="$access_token_hash" \
+    Chronicleaf__PublicOrigin="$base_url" \
+    dotnet Chronicleaf.Api.dll >"$log_file" 2>&1
+) &
 server_pid=$!
-trap 'kill "$server_pid" 2>/dev/null || true' EXIT
 
 ready=0
 for _ in $(seq 1 60); do
@@ -26,7 +127,7 @@ for _ in $(seq 1 60); do
     break
   fi
   if ! kill -0 "$server_pid" 2>/dev/null; then
-    echo "the published shell exited before becoming ready:" >&2
+    echo "the published application exited before becoming ready:" >&2
     cat "$log_file" >&2
     exit 1
   fi
@@ -34,10 +135,17 @@ for _ in $(seq 1 60); do
 done
 
 if [ "$ready" -ne 1 ]; then
-  echo "the published shell did not answer /api/health within 60s:" >&2
+  echo "the published application did not answer /api/health within 60s:" >&2
   cat "$log_file" >&2
   exit 1
 fi
 
 echo "==> npm run test:e2e (real browser against $base_url)"
-(cd "$repo_root/src/Chronicleaf.Web" && CHRONICLEAF_BASE_URL="$base_url" npm run test:e2e)
+# The token reaches the fixtures through the environment only. It is not printed by this script
+# and it is deleted from disk when the run ends.
+(
+  cd "$repo_root/src/Chronicleaf.Web" && \
+    CHRONICLEAF_BASE_URL="$base_url" \
+    CHRONICLEAF_E2E_ACCESS_TOKEN="$(cat "$token_file")" \
+    npm run test:e2e
+)

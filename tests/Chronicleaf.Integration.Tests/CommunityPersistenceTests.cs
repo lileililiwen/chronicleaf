@@ -161,13 +161,23 @@ public sealed class CommunityPersistenceTests(ChronicleafPostgresFixture postgre
         await ProvisionAsync(host.Services, InstallationId, InstallationProvisioned, revision: 1);
 
         var before = await ReadInstallationAsync(database);
-        Assert.Equal(1, await ChronicleafPostgresFixture.CountRowsAsync(database, "__EFMigrationsHistory"));
 
-        // Applying the committed migration a second time must be a no-op.
+        // How many migrations this build has applied. The count is captured rather than written
+        // down, because the access package has since added a second forward migration: the
+        // property under test is that a second run adds no migration and changes no row, and that
+        // holds for any number of applied migrations.
+        var appliedMigrations = await ChronicleafPostgresFixture.CountRowsAsync(database, "__EFMigrationsHistory");
+        Assert.True(
+            appliedMigrations >= 1,
+            "the first migration run must have applied at least this build's initial migration");
+
+        // Applying the committed migrations a second time must be a no-op.
         await ChronicleafPostgresFixture.MigrateAsync(database);
 
         Assert.Equal(before, await ReadInstallationAsync(database));
-        Assert.Equal(1, await ChronicleafPostgresFixture.CountRowsAsync(database, "__EFMigrationsHistory"));
+        Assert.Equal(
+            appliedMigrations,
+            await ChronicleafPostgresFixture.CountRowsAsync(database, "__EFMigrationsHistory"));
         Assert.Equal(1, await ChronicleafPostgresFixture.CountRowsAsync(database, "installation"));
         Assert.Equal(1, await ChronicleafPostgresFixture.CountRowsAsync(database, "audit_events"));
         Assert.Equal(1, await ChronicleafPostgresFixture.CountRowsAsync(database, "outbox"));

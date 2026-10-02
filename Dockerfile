@@ -6,6 +6,35 @@
 # `dotnet ef database update --project src/Chronicleaf.Infrastructure
 #  --startup-project src/Chronicleaf.Api` explicitly, and this image deliberately
 # starts without a database so that liveness stays honest and readiness reports it.
+#
+# Configuration a deployment must supply at run time. The image carries no credential and no
+# default for any of them; a container started without the two required values does not serve the
+# access boundary at all.
+#
+#   ConnectionStrings__Chronicleaf   REQUIRED for readiness to be anything but
+#                                    database_unavailable, e.g.
+#                                    "Host=postgres;Database=chronicleaf;Username=..."
+#   Chronicleaf__AccessTokenHash     REQUIRED outside Development. The SHA-256 hex, 64 lower-case
+#                                    hex characters, of the operator's random setup token of at
+#                                    least 32 random bytes. Generate one with:
+#                                      openssl rand -hex 32 | xxd -r -p | sha256sum
+#                                    The plaintext token is never configured, stored or logged; it
+#                                    is exchanged once for a session cookie. Changing this value
+#                                    revokes every existing session on the next start.
+#   Chronicleaf__PublicOrigin        REQUIRED for mutations, e.g. "https://chronicleaf.example".
+#                                    A mutation whose Origin is anything else is refused with 403,
+#                                    so an unset value fails closed rather than open.
+#   ASPNETCORE_ENVIRONMENT           Optional. Only "Development" relaxes one rule, and only on a
+#                                    loopback public origin: the session cookie may then omit
+#                                    Secure. Every other value keeps Secure on and still requires
+#                                    the access token hash.
+#
+# A minimal run looks like:
+#   docker run --rm -p 8080:8080 \
+#     -e ConnectionStrings__Chronicleaf="$CHRONICLEAF_CONNECTION" \
+#     -e Chronicleaf__AccessTokenHash="$CHRONICLEAF_ACCESS_TOKEN_HASH" \
+#     -e Chronicleaf__PublicOrigin="https://chronicleaf.example" \
+#     chronicleaf:latest
 ARG NODE_IMAGE=node:24.18.0-bookworm-slim
 ARG DOTNET_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0.400
 ARG DOTNET_ASPNET_IMAGE=mcr.microsoft.com/dotnet/aspnet:10.0.4

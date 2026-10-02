@@ -1,3 +1,5 @@
+import { SessionGate } from './features/community-access/Settings/SessionGate';
+
 /** Visible identity of the shell. Asserted by the browser fixtures in e2e/shell.spec.ts. */
 export const BRAND = 'Chronicleaf';
 
@@ -23,6 +25,12 @@ export function App() {
         <p className="shell__state" data-testid="setup-pending">
           {SETUP_PENDING}
         </p>
+
+        {/*
+          COMMUNITY-ACCESS-001: the local owner signs in here, and only here. The session cookie is
+          the browser's own, so this component is a form and a state, never a credential store.
+        */}
+        <SessionGate />
       </section>
     </main>
   );

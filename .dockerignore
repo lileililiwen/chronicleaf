@@ -1,0 +1,13 @@
+# Build outputs never belong in the image: the container restores and builds from source.
+# Without this, a host `obj/project.assets.json` (absolute paths from the developer's machine)
+# is copied over the restore the image performs, and the publish fails on packages that the
+# image never downloaded.
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/TestResults/
+**/playwright-report/
+**/test-results/
+.git/
+.gitignore

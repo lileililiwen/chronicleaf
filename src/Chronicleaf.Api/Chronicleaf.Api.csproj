@@ -8,4 +8,22 @@
     <AssemblyName>Chronicleaf.Api</AssemblyName>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="../Chronicleaf.Application/Chronicleaf.Application.csproj" />
+    <ProjectReference Include="../Chronicleaf.Core/Chronicleaf.Core.csproj" />
+    <ProjectReference Include="../Chronicleaf.Infrastructure/Chronicleaf.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Design-time only. The API is the composition root and therefore the startup project for
+      `dotnet ef`, which requires the design package to be reachable from the startup project.
+      PrivateAssets keeps it out of the published application.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
 </Project>

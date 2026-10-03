@@ -1,10 +1,10 @@
-current_spec: milestone-evidence
+current_spec: credential-vault
 
 # Chronicleaf handoff
 
 ## Current state — 2026-10-03
 
-Seven changes implemented, verified and archived, each with exactly two commits (implementation/
+Eight changes implemented, verified and archived, each with exactly two commits (implementation/
 tests/archive, then this HANDOFF-only pointer):
 
 | # | Change | Implementation commit | Canonical spec |
@@ -16,6 +16,7 @@ tests/archive, then this HANDOFF-only pointer):
 | 5 | `background-jobs` | `5154b26` | `openspec/specs/background-jobs/spec.md` |
 | 6 | `local-media-storage` | `77fa203` | `openspec/specs/local-media-storage/spec.md` |
 | 7 | `platform-jobs-adoption` | `b1ff0f6` | `openspec/specs/platform-jobs-adoption/spec.md` |
+| 8 | `milestone-evidence` | `70419de` | `openspec/specs/milestone-evidence/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -75,12 +76,25 @@ compare-and-set revisions, soft archive and a real product UI; durable backgroun
 Hangfire with PostgreSQL storage, SQL-enforced exactly-one-result, bounded retries, leases,
 cancellation and supersede; and private media on `Platform.Storage`/`Platform.Storage.Local` with
 server-generated keys, two-phase upload/promote, traversal and symlink containment, and
-`media_in_use`.
+`media_in_use`; and immutable, revisioned Evidence Bundles where append-only and honesty are
+enforced by the database itself.
+
+**What the database now guarantees, not just the code.** Evidence is append-only by PostgreSQL
+triggers that refuse `UPDATE`/`DELETE` on bundles and items from any writer, and a collected fact
+cannot be claimed because four check constraints refuse an `unavailable` item with no reason, an
+`unavailable` item with media, a `partial` item naming no exclusion, and a `complete` item with no
+text. Bundle revision is decided by `ON CONFLICT (milestone_id, revision) DO NOTHING RETURNING id`,
+so two writers on one expected revision produce exactly one committed bundle rather than a merge,
+and idempotent append is fact identity `(milestoneId, kind, sourceRef, sourceRevision,
+payloadSha256)` over a canonical JSON hash, so arrival order cannot change it. `milestone-evidence`
+also implemented the real `IMediaReferenceChecker` that `local-media-storage` deliberately left as a
+seam, so `media_in_use` now actually holds for referenced media.
 
 Evidence, all re-run by the parent session rather than taken on report: `CHRONICLEAF_E2E=1 bash
 scripts/verify.sh` exit 0 with the platform-feed stage, 15/15 shell, 24/24 persistence, 23/23 access,
-19/19 project and milestone, 12/12 jobs, 9/9 media, `npm ci`, `tsc` + `vite build` and 21/21
-Playwright against the published app with a real PostgreSQL; `BackgroundJobsTests` 12/12 on three
+19/19 project and milestone, 12/12 jobs, 9/9 media, 14/14 evidence, `npm ci`, `tsc` + `vite build`
+and 24/24 Playwright across two database-isolated browser suites against the published app with a real
+PostgreSQL; `BackgroundJobsTests` 12/12 on three
 consecutive runs before and after the platform swap (41s, 41s, 41s) to show the lease and two-worker
 scenarios are not flaky; the feed check exits 0 and exits 1 with the feed removed; the isolated
 no-sibling build proven in both directions; container smokes for media and jobs; name preflight exit
@@ -101,10 +115,14 @@ test waits long enough for a 15s beat to fire), no upload UI for media, no sched
 orphan reconciler, and `media-smoke.sh` not exercised in CI. Deployment stays `deployable: false`;
 there is no remote, no push and no publication.
 
-Next: implement `milestone-evidence` only. It is ready (`projects-and-milestones` and
-`local-media-storage` are both archived) and is the keystone for the evidence chain, since
-`github-evidence` and `screenshot-capture` both depend on it, and `llm-provider-contract` needs it
-too. `credential-vault` and `voice-profiles` are also ready. Read only that package, keep one
+Next: implement `credential-vault` only. It is ready (`community-access` is archived) and it is one
+of the two remaining prerequisites for `llm-provider-contract`; `voice-profiles` is the other, and
+both are already in the agreed batch. After those two, the unblocked set is `github-evidence` and
+`screenshot-capture` (both need `milestone-evidence`, now archived) and then
+`llm-provider-contract` → `llm-openai-adapter` → `grounded-markdown-drafts` →
+`screenshot-curation` → `markdown-review-export` → `community-compose-release`, which is the first
+complete workflow. `milestone-evidence` being archived also means `voice-profiles` and
+`llm-provider-contract` now have a second, not sole, dependency met. Read only that package, keep one
 `current_spec`, implement, verify locally, strictly validate, archive without `--skip-specs`, then
 make the implementation commit and the HANDOFF-only pointer commit, and stop. Do not push.
 

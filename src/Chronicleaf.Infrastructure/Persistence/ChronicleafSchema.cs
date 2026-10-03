@@ -64,6 +64,14 @@ public static class ChronicleafSchema
     /// </summary>
     public const string CredentialVaultMigrationId = "20261003124600_AddCredentialVaultCredentials";
 
+    /// <summary>
+    /// The forward migration that adds the <c>voice_profiles</c> and <c>voice_drafts</c> tables
+    /// (VOICE-PROFILES-001/002). A database that has never applied it has nowhere to record the
+    /// owner's writing voice, so its voice routes would fail against missing tables; readiness says
+    /// so by name rather than answering 200 and failing on the first read.
+    /// </summary>
+    public const string VoiceProfilesMigrationId = "20261003131200_AddVoiceProfiles";
+
     /// <summary>Every migration a database must carry before this build calls itself ready.</summary>
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
@@ -74,6 +82,7 @@ public static class ChronicleafSchema
         LocalMediaMigrationId,
         MilestoneEvidenceMigrationId,
         CredentialVaultMigrationId,
+        VoiceProfilesMigrationId,
     ];
 
     /// <summary>
@@ -81,7 +90,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = CredentialVaultMigrationId;
+    public const string ExpectedMigrationId = VoiceProfilesMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

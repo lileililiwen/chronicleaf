@@ -1,3 +1,4 @@
+using Chronicleaf.Application.Voice;
 using Chronicleaf.Core;
 using Chronicleaf.Core.Access;
 
@@ -13,8 +14,10 @@ namespace Chronicleaf.Infrastructure.Persistence;
 /// <c>installation</c> row, the append-only <c>audit_events</c> log, the durable
 /// <c>outbox</c>, the access package's <c>session</c>, <c>login_attempt</c> and
 /// <c>access_state</c> tables, and the <c>projects</c>, <c>milestones</c>, <c>media</c>,
-/// <c>evidence_bundles</c> and <c>evidence_items</c> tables that hold the owner's own records, and
-/// the <c>credentials</c> table that holds sealed provider credentials and no plaintext.
+/// <c>evidence_bundles</c> and <c>evidence_items</c> tables that hold the owner's own records, the
+/// <c>credentials</c> table that holds sealed provider credentials and no plaintext, and the
+/// <c>voice_profiles</c> and <c>voice_drafts</c> tables that hold the owner's writing voice and the
+/// text written under it (VOICE-PROFILES-001/002).
 /// </summary>
 /// <remarks>
 /// The three data-foundation tables are owned by their package and are not changed here; the
@@ -59,6 +62,10 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
     public DbSet<EvidenceItem> EvidenceItems => Set<EvidenceItem>();
 
     public DbSet<Credential> Credentials => Set<Credential>();
+
+    public DbSet<VoiceProfile> VoiceProfiles => Set<VoiceProfile>();
+
+    public DbSet<VoiceDraft> VoiceDrafts => Set<VoiceDraft>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -625,7 +632,108 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
             entity.HasIndex(credential => new { credential.ScopeId, credential.Provider, credential.Id })
                 .HasDatabaseName("ix_credentials_scope_id_provider_id");
         });
+
+        // VOICE-PROFILES-001: one voice profile per project, holding a preset and the owner's
+        // explicit deviations from it. There is no resolved column and there never will be one: the
+        // effective voice is derived at read time, so a stored copy could only ever disagree with
+        // its own inputs. The overrides ride in a jsonb column through a value converter, because
+        // the difference between "not overridden" and "overridden to false" is exactly a JSON null
+        // against a JSON false, and a relational column per field could not express it.
+        modelBuilder.Entity<VoiceProfile>(entity =>
+        {
+            entity.ToTable("voice_profiles");
+            entity.HasKey(profile => profile.Id);
+            entity.Property(profile => profile.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(profile => profile.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(profile => profile.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(profile => profile.PresetId)
+                .HasColumnName("preset_id")
+                .HasMaxLength(VoiceLimits.PresetIdMaxLength)
+                .IsRequired();
+            entity.Property(profile => profile.Overrides)
+                .HasColumnName("overrides")
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    value => VoiceOverridesCodec.Serialize(value),
+                    json => VoiceOverridesCodec.Deserialize(json) ?? VoiceOverrides.Empty)
+                .IsRequired();
+            entity.Property(profile => profile.Revision).HasColumnName("revision").IsRequired();
+            entity.Property(profile => profile.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(profile => profile.UpdatedAt)
+                .HasColumnName("updated_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            entity.Property(profile => profile.Revision).IsConcurrencyToken();
+
+            // One row per project per scope. This index is what turns two concurrent first saves
+            // into one row and one conflict rather than two rows that both claim to be the voice.
+            entity.HasIndex(profile => new { profile.ScopeId, profile.ProjectId })
+                .IsUnique()
+                .HasDatabaseName("ux_voice_profiles_scope_id_project_id");
+
+            // The profile is only ever reached through its project, and a project is never deleted,
+            // so a profile is retained with the project it states the voice for.
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(profile => profile.ProjectId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_voice_profiles_project_id");
+        });
+
+        // VOICE-PROFILES-001/002: one owner-written draft, with the voice it was created under
+        // copied into it. The `voice_snapshot` column is the whole point of the requirement's
+        // boundary scenario: it holds a self-contained value, so there is no id in it for a later
+        // profile edit to follow, and a draft written under an older voice keeps that voice.
+        modelBuilder.Entity<VoiceDraft>(entity =>
+        {
+            entity.ToTable("voice_drafts");
+            entity.HasKey(draft => draft.Id);
+            entity.Property(draft => draft.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(draft => draft.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(draft => draft.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(draft => draft.Title).HasColumnName("title").IsRequired();
+            entity.Property(draft => draft.Body).HasColumnName("body").IsRequired();
+            entity.Property(draft => draft.Status)
+                .HasColumnName("status")
+                .HasMaxLength(VoiceDraftStatusMaxLength)
+                .IsRequired();
+            entity.Property(draft => draft.Revision).HasColumnName("revision").IsRequired();
+            entity.Property(draft => draft.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(draft => draft.UpdatedAt)
+                .HasColumnName("updated_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(draft => draft.VoiceSnapshot)
+                .HasColumnName("voice_snapshot")
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    value => VoiceSnapshotCodec.Serialize(value),
+                    json => VoiceSnapshotCodec.Deserialize(json)!)
+                .IsRequired();
+
+            entity.Property(draft => draft.Revision).IsConcurrencyToken();
+
+            // The order the draft list reads, so the cursor is an index walk rather than a sort.
+            entity.HasIndex(draft => new { draft.ScopeId, draft.ProjectId, draft.CreatedAt, draft.Id })
+                .HasDatabaseName("ix_voice_drafts_scope_id_project_id_created_at_id");
+
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(draft => draft.ProjectId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_voice_drafts_project_id");
+        });
     }
+
+    /// <summary>At most 12 characters; the longest draft status is <c>approved</c>.</summary>
+    private const int VoiceDraftStatusMaxLength = 12;
 
     /// <summary>At most 16 characters; the longest evidence kind is <c>project-metadata</c>.</summary>
     private const int EvidenceKindMaxLength = 16;

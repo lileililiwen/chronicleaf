@@ -697,3 +697,120 @@ body {
   font-family: inherit;
   resize: vertical;
 }
+
+/*
+ * VOICE-PROFILES-001/002. The three surfaces below are the ones this change adds to the vocabulary
+ * above: a group of panels, the per-field resolution table that makes an override visible, and the
+ * findings list. Everything else reuses the delivered .form*, .evidence* and .notice* rules rather
+ * than a parallel set that could drift from them.
+ */
+
+.voice-panels {
+  display: grid;
+  gap: 1.25rem;
+  margin: 1.25rem 0 0;
+}
+
+.voice-overrides {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  padding: 1rem;
+  border: 1px solid var(--shell-border);
+  border-radius: 0.75rem;
+}
+
+.voice-overrides__legend {
+  padding: 0 0.375rem;
+  color: var(--shell-muted);
+  font-size: 0.875rem;
+}
+
+/*
+ * The resolution table. `effective` and `source` are the two columns that carry the requirement: a
+ * row whose source is "Your override" is a field where the owner beat the preset, shown rather than
+ * inferred from a value that happens to differ.
+ */
+.voice-table {
+  width: 100%;
+  margin: 1rem 0 0;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.voice-table__caption {
+  margin-bottom: 0.5rem;
+  color: var(--shell-muted);
+  font-size: 0.875rem;
+  text-align: left;
+}
+
+.voice-table th,
+.voice-table td {
+  padding: 0.4375rem 0.625rem;
+  border-bottom: 1px solid var(--shell-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.voice-table thead th {
+  color: var(--shell-muted);
+  font-weight: 500;
+  font-size: 0.8125rem;
+}
+
+.voice-table tbody th {
+  font-weight: 500;
+}
+
+/*
+ * A finding. The excerpt is set in a monospace face on purpose: it is a slice of the owner's own
+ * characters at a stated offset, and it should look like data rather than like prose the app wrote.
+ */
+.findings {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.finding {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--shell-border);
+  border-left: 3px solid var(--shell-accent);
+  border-radius: 0.5rem;
+}
+
+.finding__rule {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.finding__span {
+  margin: 0;
+  color: var(--shell-muted);
+  font-size: 0.8125rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.finding__excerpt {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.finding__term {
+  margin: 0;
+  color: var(--shell-muted);
+  font-size: 0.8125rem;
+}
+
+.finding__message {
+  margin: 0;
+  font-size: 0.875rem;
+}

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Chronicleaf native verification (SHELL-003, COMMUNITY-PERSISTENCE-001/002, COMMUNITY-ACCESS-001/002,
 # PROJECTS-AND-MILESTONES-001/002, BACKGROUND-JOBS-001/002, LOCAL-MEDIA-STORAGE-001/002,
-# MILESTONE-EVIDENCE-001/002, CREDENTIAL-VAULT-001/002).
+# MILESTONE-EVIDENCE-001/002, CREDENTIAL-VAULT-001/002, VOICE-PROFILES-001/002).
 #
 # Required chain, in order:
 #   1. platform feed           - the committed packages/platform-feed is what the build resolves, from
@@ -30,6 +30,22 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
+# Asserts that a --filter expression actually selects tests. `dotnet test --filter` with a
+# pattern that matches nothing exits 0, so a mistyped filter would turn a whole suite into a
+# silent no-op that reports success. voice-profiles already hit this: the class is
+# VoiceProfilesTests, a singular filter matched 0, and the gate stayed green.
+assert_filter_matches() {
+  local filter="$1"
+  local matched
+  matched="$(dotnet test Chronicleaf.sln --no-build --nologo --list-tests --filter "$filter" 2>/dev/null \
+    | grep -cE '^ {4}' || true)"
+  if [ "$matched" -eq 0 ]; then
+    echo "FAILED: test filter matched no tests: ${filter}" >&2
+    return 1
+  fi
+  echo "    filter ${filter} selects ${matched} test(s)"
+}
+
 step() {
   local name="$1"
   shift
@@ -37,6 +53,21 @@ step() {
   # The status is captured in a || list because `set -e` must not abort before the
   # failing command is reported. Returning it aborts the script with the same code.
   local status=0
+  local prev=''
+  # Any stage that filters tests is checked first, so a filter that silently selects
+  # nothing fails loudly instead of reporting a green no-op.
+  local filter=''
+  local arg
+  for arg in "$@"; do
+    if [ "$prev" = '--filter' ] || [ "$prev" = 'FullyQualifiedName~' ]; then
+      filter="${arg}"
+      break
+    fi
+    prev="$arg"
+  done
+  if [ -n "$filter" ]; then
+    assert_filter_matches "$filter" || return 1
+  fi
   "$@" || status=$?
   if [ "$status" -ne 0 ]; then
     echo "FAILED (exit ${status}): ${name}: $*" >&2
@@ -107,6 +138,16 @@ else
   # refused everywhere above: the claim under test is that a secret cannot be recovered from what was
   # stored, and a simulated key would prove nothing about that.
   step "credential vault tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~CredentialVaultTests"
+  # VOICE-PROFILES-001/002. That an explicit override beats the preset for every field it names, that
+  # an unknown preset is refused with nothing written, that the forbidden-term and structural findings
+  # carry spans into the owner's own text, and - the claim nothing else in this file can make - that a
+  # voice profile change after a draft was created leaves that draft's stored snapshot byte-identical,
+  # are all proven against the same real disposable PostgreSQL through the real API host. The
+  # byte-identity is asserted by reading the voice_snapshot column itself, not by comparing two values
+  # this process built. A stubbed checker, a simulated store or an EF in-memory provider is refused
+  # here for the same reason it is everywhere above: the claim is that a finding reports a span without
+  # touching the text, and a checker that was never really run proves nothing about that.
+  step "voice profile tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~VoiceProfilesTests"
 fi
 
 step "frontend install" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm ci'
@@ -115,10 +156,11 @@ step "frontend build" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm run b
 if [ "${CHRONICLEAF_E2E:-0}" = "1" ]; then
   # Publishes the real application, starts a disposable PostgreSQL per suite, applies the committed
   # migrations, and drives the shell, access, projects-and-milestones, background-jobs,
-  # milestone-evidence and credential-vault fixtures in a real browser. The last three are included by
-  # playwright.config.ts, which already matches tests/**/*.spec.ts; this stage therefore fails if the
-  # browser cannot record a project, confirm a candidate, refuse a stale edit, or read a milestone's
-  # evidence and be told the truth by a 409 against a real database.
+  # milestone-evidence, credential-vault and voice-profiles fixtures in a real browser. The last four
+  # are included by playwright.config.ts, which already matches tests/**/*.spec.ts; this stage
+  # therefore fails if the browser cannot record a project, confirm a candidate, refuse a stale edit,
+  # read a milestone's evidence and be told the truth by a 409 against a real database, or turn emoji
+  # off over a preset that asked for it and see the effective value change.
   step "browser fixtures" bash scripts/e2e.sh
 fi
 

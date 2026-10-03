@@ -13,6 +13,7 @@ using Chronicleaf.Api.Media;
 using Chronicleaf.Api.Operations;
 using Chronicleaf.Api.Projects;
 using Chronicleaf.Api.Secrets;
+using Chronicleaf.Api.Voice;
 using Chronicleaf.Infrastructure.Access;
 using Chronicleaf.Infrastructure.Evidence;
 using Chronicleaf.Infrastructure.Media;
@@ -20,6 +21,7 @@ using Chronicleaf.Infrastructure.Operations;
 using Chronicleaf.Infrastructure.Persistence;
 using Chronicleaf.Infrastructure.Projects;
 using Chronicleaf.Infrastructure.Secrets;
+using Chronicleaf.Infrastructure.Voice;
 using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -77,6 +79,13 @@ builder.Services.AddMilestoneEvidence();
 // every credential route refuses with credential_vault_unavailable and nothing is ever stored in the
 // clear. A database without the credential-vault migration reports schema_mismatch at /api/ready.
 builder.Services.AddCredentialVault(builder.Configuration);
+
+// VOICE-PROFILES-001/002. The owner's writing voice, its presets and the deterministic checker
+// that judges text against it, over the same PostgreSQL, unit of work and audit trail the packages
+// above delivered. There is no model in this registration and nothing to call: the checker is rule
+// evaluation, so there is no provider to configure and no key to go missing. A database without the
+// voice-profiles migration reports schema_mismatch at /api/ready.
+builder.Services.AddVoiceProfiles();
 
 // The rotation guard is applied once at start-up, so an access token that was changed since the
 // last run revokes every existing session before this process serves anything.
@@ -145,6 +154,12 @@ app.MapMilestoneEvidenceEndpoints();
 // the public allow-list stays exactly as the access package fixed it. No route here returns a secret,
 // on success or on failure.
 app.MapCredentialEndpoints();
+
+// VOICE-PROFILES-001/002: the private voice routes. None of them is marked public, so the access
+// package's default-deny boundary already covers every one of them and the public allow-list stays
+// exactly as the access package fixed it - a project's voice is readable only by the owner it
+// belongs to.
+app.MapVoiceEndpoints();
 
 // SHELL-001/SHELL-002: every unmatched path is either an unknown API path, an unknown
 // static asset, or a client route. Only the last one falls back to the SPA entry point. This

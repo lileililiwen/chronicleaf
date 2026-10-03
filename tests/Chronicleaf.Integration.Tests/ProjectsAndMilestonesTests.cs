@@ -1045,10 +1045,14 @@ public sealed class ProjectsAndMilestonesTests(ChronicleafPostgresFixture postgr
         // MILESTONE-EVIDENCE-001 moved it on once more, for the same reason, and this scenario now
         // also requires the evidence migration to be applied and to be named when it is missing.
         // CREDENTIAL-VAULT-001/002 moved it on again, and the same is now required of its migration.
+        // VOICE-PROFILES-001/002 moved it on once more, so the same is required of the voice
+        // migration as well. Every step of this has made the scenario strictly wider: one more id
+        // that readiness refuses to serve without.
         Assert.Contains(ChronicleafSchema.LocalMediaMigrationId, ChronicleafSchema.RequiredMigrationIds);
         Assert.Contains(ChronicleafSchema.MilestoneEvidenceMigrationId, ChronicleafSchema.RequiredMigrationIds);
         Assert.Contains(ChronicleafSchema.CredentialVaultMigrationId, ChronicleafSchema.RequiredMigrationIds);
-        Assert.Equal(ChronicleafSchema.CredentialVaultMigrationId, ChronicleafSchema.ExpectedMigrationId);
+        Assert.Contains(ChronicleafSchema.VoiceProfilesMigrationId, ChronicleafSchema.RequiredMigrationIds);
+        Assert.Equal(ChronicleafSchema.VoiceProfilesMigrationId, ChronicleafSchema.ExpectedMigrationId);
 
         var database = await ProvisionedDatabaseAsync("schema_mismatch");
         var applied = await ChronicleafPostgresFixture.ReadTextAsync(
@@ -1061,9 +1065,10 @@ public sealed class ProjectsAndMilestonesTests(ChronicleafPostgresFixture postgr
         Assert.Contains(ChronicleafSchema.LocalMediaMigrationId, applied, StringComparison.Ordinal);
         Assert.Contains(ChronicleafSchema.MilestoneEvidenceMigrationId, applied, StringComparison.Ordinal);
         Assert.Contains(ChronicleafSchema.CredentialVaultMigrationId, applied, StringComparison.Ordinal);
+        Assert.Contains(ChronicleafSchema.VoiceProfilesMigrationId, applied, StringComparison.Ordinal);
         Assert.Empty(ChronicleafSchema.MissingMigrationIds(applied.Split('|')));
 
-        // A database stopped at the access package's migration reports exactly the five later gaps,
+        // A database stopped at the access package's migration reports exactly the six later gaps,
         // by name and in requirement order.
         Assert.Equal(
             [
@@ -1072,6 +1077,7 @@ public sealed class ProjectsAndMilestonesTests(ChronicleafPostgresFixture postgr
                 ChronicleafSchema.LocalMediaMigrationId,
                 ChronicleafSchema.MilestoneEvidenceMigrationId,
                 ChronicleafSchema.CredentialVaultMigrationId,
+                ChronicleafSchema.VoiceProfilesMigrationId,
             ],
             ChronicleafSchema
                 .MissingMigrationIds([ChronicleafSchema.InitialMigrationId, ChronicleafSchema.OwnerAccessMigrationId])

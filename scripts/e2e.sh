@@ -14,7 +14,7 @@
 # The plaintext token is written to a file inside the publish directory, is never echoed, and is
 # handed to the fixtures through the environment.
 #
-# Three fixtures groups run, each against its own published instance and its own disposable database,
+# Four fixtures groups run, each against its own published instance and its own disposable database,
 # because one of them asserts something another one changes. tests/projects-and-milestones.spec.ts
 # states that its installation starts with an empty project list - that is the claim it is making
 # about a new installation - and a project cannot be removed once it exists, because archiving is
@@ -23,7 +23,13 @@
 # The credential fixture is the third because it is about a new installation too: it asserts that
 # every provider reads as unconfigured before anything is stored, and a credential that was stored by
 # an earlier fixture would make that claim false.
-# Three databases is the smallest way to keep each claim honest, and it means no group is run against
+# The voice fixture is the fourth for the same reason. tests/voice-profiles.spec.ts asserts that a
+# project's voice starts on the design's defaults, and then it saves one, turns emoji off and records
+# a draft. A voice profile cannot be un-set through the UI - there is no reset control, because
+# clearing an override is the owner's decision and not a side effect of opening a page - so a second
+# run against the same installation would start on the profile the first run left behind and its
+# first assertion would be false. Its own database is the only way that claim stays true on every run.
+# Four databases is the smallest way to keep each claim honest, and it means no group is run against
 # state another one left behind.
 #
 # The credential vault reads a real operator key from a real file, generated for this run only, in a
@@ -37,9 +43,11 @@ publish_dir="${CHRONICLEAF_PUBLISH_DIR:-dist/e2e}"
 base_url="${CHRONICLEAF_BASE_URL:-http://127.0.0.1:5081}"
 evidence_base_url="${CHRONICLEAF_EVIDENCE_BASE_URL:-http://127.0.0.1:5082}"
 credentials_base_url="${CHRONICLEAF_CREDENTIALS_BASE_URL:-http://127.0.0.1:5083}"
+voice_base_url="${CHRONICLEAF_VOICE_BASE_URL:-http://127.0.0.1:5084}"
 log_file="$repo_root/$publish_dir/server.log"
 evidence_log_file="$repo_root/$publish_dir/server-evidence.log"
 credentials_log_file="$repo_root/$publish_dir/server-credentials.log"
+voice_log_file="$repo_root/$publish_dir/server-voice.log"
 key_file=""
 
 # The operator key for this run: 32 random bytes in a temporary file outside the repository and
@@ -68,7 +76,7 @@ cleanup() {
   stop_suite
   # The tokens are secrets for the lifetime of this run and must not survive it.
   rm -f "$repo_root/$publish_dir/access-token" "$repo_root/$publish_dir/access-token-evidence" \
-    "$repo_root/$publish_dir/access-token-credentials"
+    "$repo_root/$publish_dir/access-token-credentials" "$repo_root/$publish_dir/access-token-voice"
   # So is the encryption key: it is removed whether the run passed or failed.
   remove_key_file
   exit "$exit_status"
@@ -313,4 +321,18 @@ start_suite credentials "$credentials_base_url" "$credentials_log_file" "$repo_r
 echo "==> npm run test:e2e (real browser against $credentials_base_url)"
 run_suite "$credentials_base_url" "$credentials_log_file" "$repo_root/$publish_dir/access-token-credentials" \
   tests/credential-vault.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 4: the writing voice. It asserts that a project starts on the design's defaults, and it then
+# changes them and records a draft under the changed voice - none of which it can undo through the
+# UI. It therefore needs its own installation and its own published instance, and it is the fourth
+# suite for exactly the reason suite 1 is the first.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a fourth disposable PostgreSQL and published application at $voice_base_url"
+start_suite voice "$voice_base_url" "$voice_log_file" "$repo_root/$publish_dir/access-token-voice"
+
+echo "==> npm run test:e2e (real browser against $voice_base_url)"
+run_suite "$voice_base_url" "$voice_log_file" "$repo_root/$publish_dir/access-token-voice" \
+  tests/voice-profiles.spec.ts
 stop_suite

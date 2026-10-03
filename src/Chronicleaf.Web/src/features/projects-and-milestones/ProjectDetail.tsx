@@ -9,6 +9,7 @@ import {
   listMilestones,
 } from './api';
 import { MilestoneEvidencePanel } from '../milestone-evidence/MilestoneEvidencePanel';
+import { VoiceArea } from '../voice-profiles/VoiceArea';
 import { milestoneTypeLabel, type Milestone, type MilestoneStatus, type Project } from './types';
 import { useMilestones, useProject } from './useRecords';
 
@@ -168,6 +169,15 @@ export function ProjectDetail({
               </button>
             </div>
           ) : null}
+
+          {/*
+            VOICE-PROFILES-001/002. The project's writing voice, a check of text against it and the
+            drafts already written under it. It sits behind its own toggle because it is three
+            surfaces and an owner opening a project to record a milestone does not need all of them
+            at once. An archived project still shows it read-only: a voice is a fact about how this
+            project was written, and the drafts it produced are kept.
+          */}
+          <VoiceArea projectId={record.id} />
         </header>
       )}
 

@@ -1,10 +1,10 @@
-current_spec: local-media-storage
+current_spec: milestone-evidence
 
 # Chronicleaf handoff
 
-## Current state — 2026-10-02
+## Current state — 2026-10-03
 
-Five changes implemented, verified and archived, each with exactly two commits (implementation/
+Six changes implemented, verified and archived, each with exactly two commits (implementation/
 tests/archive, then this HANDOFF-only pointer):
 
 | # | Change | Implementation commit | Canonical spec |
@@ -14,9 +14,41 @@ tests/archive, then this HANDOFF-only pointer):
 | 3 | `community-access` | `0b19963` | `openspec/specs/community-access/spec.md` |
 | 4 | `projects-and-milestones` | `065dd8e` | `openspec/specs/projects-and-milestones/spec.md` |
 | 5 | `background-jobs` | `5154b26` | `openspec/specs/background-jobs/spec.md` |
+| 6 | `local-media-storage` | `77fa203` | `openspec/specs/local-media-storage/spec.md` |
 
-Each package is archived under `openspec/changes/archive/2026-10-02-<name>/`. No `--skip-specs`
-was ever used.
+Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
+ever used.
+
+## Platform packages — read this before touching any Platform.* dependency
+
+`Platform.*` 0.1.0 packages are real, built, and available. The authoritative list is
+`/home/paul/code/dotnet-platform-libs/artifacts/packages/` (76 nupkgs). **An earlier agent
+incorrectly reported them as unavailable** and rebuilt a Platform contract locally; do not repeat
+that. Ruling 12 of `/home/paul/code/ARCHITECTURE.md` (~lines 485-515) decides how a consumer takes
+them, and two sibling repos already follow it:
+
+- a **repo-relative** feed directory with the `.nupkg` files **committed** — chronicleaf's is
+  `packages/platform-feed/`;
+- `nuget.config` with `<clear />`, that relative path, and nuget.org;
+- **no absolute sibling path in any build-time config, and the `NUGET_PLATFORM_FEED` environment
+  variable is explicitly rejected** — an env var a CI runner lacks is the same failure class as a
+  hard-coded path;
+- `scripts/pack-platform.sh` is the one place a sibling path may appear; it is maintenance only and
+  nothing in the build calls it;
+- `scripts/verify-platform-feed.sh` runs as the first stage of `scripts/verify.sh` and fails when
+  the committed feed does not match what the build resolves.
+
+SHELL-003 is satisfied by the committed feed, and was proven in both directions by the parent: a
+fresh `/tmp` copy with no `.git`, no `bin`/`obj`, no sibling and an empty `NUGET_PACKAGES` builds
+with 0 warnings and 0 errors, and fails `NU1301` exit 1 when only `packages/platform-feed` is
+removed.
+
+**Open deviation to reconcile:** that same feed also contains `Platform.Jobs` and
+`Platform.Jobs.Hangfire` 0.1.0. The background-jobs change (commit `5154b26`) used raw
+`Hangfire.Core`/`Hangfire.PostgreSql` with a Chronicleaf-owned `IOperationDispatcher`, because it
+was told `Platform.Jobs` was unavailable. Its design said to adopt the platform contracts, so
+adopting `Platform.Jobs`/`Platform.Jobs.Hangfire` (which pin Hangfire 1.8.23, against the 1.8.21
+in use) is a real follow-up, and is a decision for the owner rather than a silent refactor.
 
 Delivered: the .NET 10 runtime shell with a real React/TypeScript/Vite client; the
 Core/Application/Infrastructure layering over EF Core + Npgsql with installation, audit_events and
@@ -25,16 +57,20 @@ outbox, `IUnitOfWork.ExecuteAsync` under READ COMMITTED, operator-run forward mi
 single-user owner boundary with hashed opaque sessions, constant-time validation, origin and
 per-session antiforgery, a durable login throttle and startup revocation on token-hash change;
 Projects and Milestones as persisted records with structurally human-controlled status, SQL
-compare-and-set revisions, soft archive and a real product UI; and durable background operations
-on Hangfire with PostgreSQL storage, SQL-enforced exactly-one-result, bounded retries, leases,
-cancellation and supersede.
+compare-and-set revisions, soft archive and a real product UI; durable background operations on
+Hangfire with PostgreSQL storage, SQL-enforced exactly-one-result, bounded retries, leases,
+cancellation and supersede; and private media on `Platform.Storage`/`Platform.Storage.Local` with
+server-generated keys, two-phase upload/promote, traversal and symlink containment, and
+`media_in_use`.
 
 Evidence, all re-run by the parent session rather than taken on report: `CHRONICLEAF_E2E=1 bash
-scripts/verify.sh` exit 0 with 15/15 shell, 24/24 persistence, 23/23 access, 19/19 project and
-milestone, 12/12 jobs, `npm ci`, `tsc` + `vite build` and 21/21 Playwright against the published
-app with a real PostgreSQL; `BackgroundJobsTests` 12/12 on three consecutive runs (39s, 40s, 39s)
-to show the lease and two-worker scenarios are not flaky; name preflight exit 0; `openspec
-validate --all --strict --no-interactive` 53/53 before and after every archive.
+scripts/verify.sh` exit 0 with the platform-feed stage, 15/15 shell, 24/24 persistence, 23/23 access,
+19/19 project and milestone, 12/12 jobs, 9/9 media, `npm ci`, `tsc` + `vite build` and 21/21
+Playwright against the published app with a real PostgreSQL; `BackgroundJobsTests` 12/12 on three
+consecutive runs (39s, 40s, 39s) to show the lease and two-worker scenarios are not flaky; the
+isolated no-sibling build proven in both directions; `scripts/media-smoke.sh` container run exit 0;
+name preflight exit 0; `openspec validate --all --strict --no-interactive` 53/53 before and after
+every archive.
 
 A real defect was caught by that independent verification and fixed before its commit:
 `LeaseHeartbeat` disposed both of its cancellation sources when `StartAsync` returned, which
@@ -45,18 +81,17 @@ is actually reachable. No test was edited to make it pass.
 
 Remaining verification gaps, stated rather than implied: mobile-viewport capture, TLS
 termination, a second process against the same Community database, destructive `Down` migrations,
-Kestrel request-body limits, concurrency beyond two writers, and the lost-lease cooperative cancel
-(no test waits long enough for a 15s beat to fire). Deployment stays `deployable: false`; there is
-no remote, no push and no publication.
+Kestrel request-body limits, concurrency beyond two writers, the lost-lease cooperative cancel (no
+test waits long enough for a 15s beat to fire), no upload UI for media, no scheduler for the media
+orphan reconciler, and `media-smoke.sh` not exercised in CI. Deployment stays `deployable: false`;
+there is no remote, no push and no publication.
 
-Next: implement `local-media-storage` only. It is ready (its dependencies are
-`community-persistence`, `community-access` and `projects-and-milestones`, all archived) and it is
-the next package on the MVP critical path, because `milestone-evidence` — and through it
-`github-evidence`, `screenshot-capture` and `voice-profiles` — depends on it. `credential-vault`
-is also still ready and is what unblocks `llm-provider-contract`. Read only that package, keep one
+Next: implement `milestone-evidence` only. It is ready (`projects-and-milestones` and
+`local-media-storage` are both archived) and is the keystone for the evidence chain, since
+`github-evidence` and `screenshot-capture` both depend on it, and `llm-provider-contract` needs it
+too. `credential-vault` and `voice-profiles` are also ready. Read only that package, keep one
 `current_spec`, implement, verify locally, strictly validate, archive without `--skip-specs`, then
 make the implementation commit and the HANDOFF-only pointer commit, and stop. Do not push.
-and stop. Do not push.
 
 # Bootstrap handoff
 

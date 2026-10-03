@@ -1,10 +1,10 @@
-current_spec: llm-provider-contract
+current_spec: github-evidence
 
 # Chronicleaf handoff
 
 ## Current state — 2026-10-03
 
-Ten changes implemented, verified and archived, each with exactly two commits (implementation/
+Eleven changes implemented, verified and archived, each with exactly two commits (implementation/
 tests/archive, then this HANDOFF-only pointer):
 
 | # | Change | Implementation commit | Canonical spec |
@@ -19,6 +19,7 @@ tests/archive, then this HANDOFF-only pointer):
 | 8 | `milestone-evidence` | `70419de` | `openspec/specs/milestone-evidence/spec.md` |
 | 9 | `credential-vault` | `9d1e3c8` | `openspec/specs/credential-vault/spec.md` |
 | 10 | `voice-profiles` | `fd4a6bd` | `openspec/specs/voice-profiles/spec.md` |
+| 11 | `llm-provider-contract` | `f226b42` | `openspec/specs/llm-provider-contract/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -118,16 +119,33 @@ seam, so `media_in_use` now actually holds for referenced media.
 
 Evidence, all re-run by the parent session rather than taken on report: `CHRONICLEAF_E2E=1 bash
 scripts/verify.sh` exit 0 with the platform-feed stage, 15/15 shell, 24/24 persistence, 23/23 access,
-19/19 project and milestone, 12/12 jobs, 9/9 media, 14/14 evidence, 32/32 credential vault, `npm ci`,
-`tsc` + `vite build` and 34/34 Playwright across four database-isolated browser suites against the
-published app with a real PostgreSQL; `scripts/e2e.sh` green on seven runs, five of them on the exact
+19/19 project and milestone, 12/12 jobs, 9/9 media, 14/14 evidence, 32/32 credential vault, 22/22
+voice profiles, 26/26 LLM provider contract, `npm ci`, `tsc` + `vite build` and 38/38 Playwright
+across five database-isolated browser suites against the published app with a real PostgreSQL;
+`scripts/e2e.sh` green on seven runs, five of them on the exact
 final code of the last package, whose first run exposed three real UI bugs; `scripts/e2e.sh` 4/4 clean here after 5/5 by the implementer -
 nine consecutive green runs of a suite that had been failing about half the time; `BackgroundJobsTests` 12/12 on three
 consecutive runs before and after the platform swap (41s, 41s, 41s) to show the lease and two-worker
 scenarios are not flaky; the feed check exits 0 and exits 1 with the feed removed; the isolated
 no-sibling build proven in both directions; container smokes for media and jobs; name preflight exit
 0; `openspec validate --all --strict --no-interactive` 53/53, then 54/54 after
-`platform-jobs-adoption` was authored, before and after every archive.
+`platform-jobs-adoption` was authored, then 55/55 after `llm-provider-contract` was archived, before
+and after every archive.
+
+**The generation contract is provider-neutral and consented.** A new leaf assembly `Chronicleaf.AI` holds
+the `ILLMProvider` contract and zero `ProjectReference`/`PackageReference`, so the five future adapter
+packages (`llm-openai-adapter`, `llm-anthropic-adapter`, `llm-gemini-adapter`, `llm-openrouter-adapter`,
+`llm-ollama-adapter`) reach a contract without reaching the credential vault, the evidence store or any
+domain record. The consent handshake stores `generation_previews(id, scope_id, milestone_id, purpose,
+aggregate_ref, snapshot_json, sha256, expires_at)` with a 15-minute TTL, no raw credential, and a SHA-256
+over a canonical JSON document whose object members are written out as literals and recursed into
+arrays - a canonicaliser that stopped at the top level was a real bug fixed during integration. The
+provider request is rebuilt from the saved snapshot bytes at call time, never from fresh database reads,
+so any change to evidence, voice or credential revision after consent yields `consent_stale` 409 before
+the transport is reached. No provider is implemented: the only `ILLMProvider` is a test double
+registered only in test DI, and `Production_registration_contains_no_adapter_and_no_settings_value_can_reach_one`
+proves the production composition root cannot reach it. `scripts/verify.sh` has the new
+`llm provider contract tests` stage and the new browser suite is the fifth database-isolated run.
 
 Two real defects were caught by that independent verification and fixed before their commits:
 `LeaseHeartbeat` disposed both of its cancellation sources when `StartAsync` returned, which threw
@@ -143,17 +161,17 @@ test waits long enough for a 15s beat to fire), no upload UI for media, no sched
 orphan reconciler, and `media-smoke.sh` not exercised in CI. Deployment stays `deployable: false`;
 there is no remote, no push and no publication.
 
-Next: implement `llm-provider-contract` only. All four of its dependencies — `credential-vault`, `background-jobs`,
-`voice-profiles` and `milestone-evidence` — are now archived, so it is the next
-ready package and the keystone for the provider layer. Once it lands, the unblocked
-set is `github-evidence` and
-`screenshot-capture` (both need `milestone-evidence`, now archived) and then
-`llm-provider-contract` → `llm-openai-adapter` → `grounded-markdown-drafts` →
+Next: implement `github-evidence` only. All three of its dependencies — `milestone-evidence`,
+`credential-vault` and `background-jobs` — are archived, so it is the next ready package in the chain
+and the keystone that turns local milestones into evidence that names a real upstream repository. With
+it and `screenshot-capture` (deps: `milestone-evidence`, `local-media-storage`, `background-jobs`,
+all archived) both unblocked, the order is `github-evidence` → `screenshot-capture` and then the AI
+publishing chain `llm-provider-contract` → `llm-openai-adapter` → `grounded-markdown-drafts` →
 `screenshot-curation` → `markdown-review-export` → `community-compose-release`, which is the first
-complete workflow. `milestone-evidence` being archived also means `voice-profiles` and
-`llm-provider-contract` now have a second, not sole, dependency met. Read only that package, keep one
-`current_spec`, implement, verify locally, strictly validate, archive without `--skip-specs`, then
-make the implementation commit and the HANDOFF-only pointer commit, and stop. Do not push.
+complete workflow. `llm-provider-contract` being archived also means `grounded-markdown-drafts` is
+now only waiting on `llm-openai-adapter` (the first real BYOK transport). Read only that package,
+keep one `current_spec`, implement, verify locally, strictly validate, archive without `--skip-specs`,
+then make the implementation commit and the HANDOFF-only pointer commit, and stop. Do not push.
 
 # Bootstrap handoff
 

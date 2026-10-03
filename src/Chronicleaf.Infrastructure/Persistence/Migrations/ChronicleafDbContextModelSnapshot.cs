@@ -320,6 +320,57 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.ToTable("evidence_items", (string)null);
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.GenerationPreview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AggregateRef")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("aggregate_ref");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid?>("MilestoneId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("milestone_id");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("purpose");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("sha256");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("snapshot_json");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MilestoneId");
+
+                    b.HasIndex("ScopeId", "ExpiresAt")
+                        .HasDatabaseName("ix_generation_previews_scope_id_expires_at");
+
+                    b.ToTable("generation_previews", (string)null);
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.Installation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -846,6 +897,15 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .HasForeignKey("SupersedesId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_evidence_items_supersedes_id");
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.GenerationPreview", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Milestone", null)
+                        .WithMany()
+                        .HasForeignKey("MilestoneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_generation_previews_milestone_id");
                 });
 
             modelBuilder.Entity("Chronicleaf.Core.Media", b =>

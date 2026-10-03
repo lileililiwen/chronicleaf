@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Chronicleaf.AI</RootNamespace>
+    <AssemblyName>Chronicleaf.AI</AssemblyName>
+  </PropertyGroup>
+
+  <!--
+    Deliberately empty, and that is the package's structural guarantee rather than an oversight.
+
+    LLM-PROVIDER-CONTRACT-001/002 own one thing: the provider-neutral transport contract under
+    Contracts/. This project references no other Chronicleaf project, so it cannot reach the vault
+    that owns credentials, the store that owns previews, the evidence bundles that supply the
+    untrusted input or the domain records at all. The five adapter packages that will each add
+    src/Chronicleaf.AI/Providers/<Name>/ reference this contract and nothing else in the
+    repository, which is what keeps a transport swap from becoming a dependency on a product
+    feature.
+  -->
+
+</Project>

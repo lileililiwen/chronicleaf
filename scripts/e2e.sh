@@ -29,7 +29,15 @@
 # clearing an override is the owner's decision and not a side effect of opening a page - so a second
 # run against the same installation would start on the profile the first run left behind and its
 # first assertion would be false. Its own database is the only way that claim stays true on every run.
-# Four databases is the smallest way to keep each claim honest, and it means no group is run against
+# The generation fixture is the fifth for the same reason again, and more sharply.
+# tests/llm-provider-contract.spec.ts asserts that a new installation reads as unconfigured for every
+# provider slot, that no slot reports an installed adapter, and that a selection nothing can call is
+# refused before a redacted snapshot is frozen. A credential stored by the credential fixture would
+# make the first claim false; a credential this fixture's own runs stored would make the second and third
+# false on the next run, because a credential cannot be un-stored through the UI either. It is also
+# the only suite that creates a milestone with recorded evidence, and an evidence bundle is append-only,
+# so sharing a database with any other suite would put a second bundle where one suite expects one.
+# Five databases is the smallest way to keep each claim honest, and it means no group is run against
 # state another one left behind.
 #
 # The credential vault reads a real operator key from a real file, generated for this run only, in a
@@ -44,10 +52,12 @@ base_url="${CHRONICLEAF_BASE_URL:-http://127.0.0.1:5081}"
 evidence_base_url="${CHRONICLEAF_EVIDENCE_BASE_URL:-http://127.0.0.1:5082}"
 credentials_base_url="${CHRONICLEAF_CREDENTIALS_BASE_URL:-http://127.0.0.1:5083}"
 voice_base_url="${CHRONICLEAF_VOICE_BASE_URL:-http://127.0.0.1:5084}"
+generation_base_url="${CHRONICLEAF_GENERATION_BASE_URL:-http://127.0.0.1:5085}"
 log_file="$repo_root/$publish_dir/server.log"
 evidence_log_file="$repo_root/$publish_dir/server-evidence.log"
 credentials_log_file="$repo_root/$publish_dir/server-credentials.log"
 voice_log_file="$repo_root/$publish_dir/server-voice.log"
+generation_log_file="$repo_root/$publish_dir/server-generation.log"
 key_file=""
 
 # The operator key for this run: 32 random bytes in a temporary file outside the repository and
@@ -76,7 +86,8 @@ cleanup() {
   stop_suite
   # The tokens are secrets for the lifetime of this run and must not survive it.
   rm -f "$repo_root/$publish_dir/access-token" "$repo_root/$publish_dir/access-token-evidence" \
-    "$repo_root/$publish_dir/access-token-credentials" "$repo_root/$publish_dir/access-token-voice"
+    "$repo_root/$publish_dir/access-token-credentials" "$repo_root/$publish_dir/access-token-voice" \
+    "$repo_root/$publish_dir/access-token-generation"
   # So is the encryption key: it is removed whether the run passed or failed.
   remove_key_file
   exit "$exit_status"
@@ -335,4 +346,18 @@ start_suite voice "$voice_base_url" "$voice_log_file" "$repo_root/$publish_dir/a
 echo "==> npm run test:e2e (real browser against $voice_base_url)"
 run_suite "$voice_base_url" "$voice_log_file" "$repo_root/$publish_dir/access-token-voice" \
   tests/voice-profiles.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 5: the bounded generation surface. It asserts that a new installation reads as unconfigured
+# for every provider slot, that no slot reports an adapter, and that a selection nothing can call is
+# refused before a snapshot is frozen - all of which a stored credential or an earlier run of this
+# suite itself would make false. Its own installation, its own database and its own published instance.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a fifth disposable PostgreSQL and published application at $generation_base_url"
+start_suite generation "$generation_base_url" "$generation_log_file" "$repo_root/$publish_dir/access-token-generation"
+
+echo "==> npm run test:e2e (real browser against $generation_base_url)"
+run_suite "$generation_base_url" "$generation_log_file" "$repo_root/$publish_dir/access-token-generation" \
+  tests/llm-provider-contract.spec.ts
 stop_suite

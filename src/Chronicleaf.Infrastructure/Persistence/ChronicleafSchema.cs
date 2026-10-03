@@ -72,6 +72,14 @@ public static class ChronicleafSchema
     /// </summary>
     public const string VoiceProfilesMigrationId = "20261003131200_AddVoiceProfiles";
 
+    /// <summary>
+    /// The forward migration that adds the <c>generation_previews</c> table
+    /// (LLM-PROVIDER-CONTRACT-002). A database that has never applied it has nowhere to record an
+    /// owner-authorized redacted input, so its generation routes would fail against a missing table;
+    /// readiness says so by name rather than answering 200 and failing on the first preview.
+    /// </summary>
+    public const string GenerationPreviewsMigrationId = "20261003141800_AddGenerationPreviews";
+
     /// <summary>Every migration a database must carry before this build calls itself ready.</summary>
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
@@ -83,6 +91,7 @@ public static class ChronicleafSchema
         MilestoneEvidenceMigrationId,
         CredentialVaultMigrationId,
         VoiceProfilesMigrationId,
+        GenerationPreviewsMigrationId,
     ];
 
     /// <summary>
@@ -90,7 +99,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = VoiceProfilesMigrationId;
+    public const string ExpectedMigrationId = GenerationPreviewsMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

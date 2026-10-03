@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Chronicleaf.Application.Access;
+using Chronicleaf.Application.AI;
 using Chronicleaf.Application.Common;
 using Chronicleaf.Application.Media;
 using Chronicleaf.Application.Milestones;
@@ -262,6 +263,39 @@ public sealed class ApiErrorMiddleware(
                 return (
                     Envelope.Create(Envelope.InternalError, internalFailure.Message, traceId),
                     LogLevel.Error);
+
+            // LLM-PROVIDER-CONTRACT-001/002. Written here for the same reason as every other feature
+            // package's refusals: this package raises them and this middleware is still the only place
+            // an envelope is written. The messages are authored in the AI package and name no
+            // provider, no model, no credential, no key and no endpoint - a provider's own error body,
+            // status line and request id stay inside the adapter, and this middleware would otherwise
+            // be the place they leaked. GenerationFailedException carries the code the adapter
+            // reported, which is the one point in the request path where a provider outcome is named;
+            // it is named as a closed-set code and never as provider prose.
+            case ConsentStaleException stale:
+                return (Envelope.Create(AiError.ConsentStale, stale.Message, traceId), LogLevel.Information);
+
+            case GenerationTimeoutException generationTimedOut:
+                return (Envelope.Create(AiError.GenerationTimeout, generationTimedOut.Message, traceId), LogLevel.Warning);
+
+            case ProviderNotInstalledException notInstalled:
+                return (Envelope.Create(AiError.ProviderNotInstalled, notInstalled.Message, traceId), LogLevel.Information);
+
+            case ModelNotSupportedException unsupportedModel:
+                return (Envelope.Create(AiError.ModelNotSupported, unsupportedModel.Message, traceId), LogLevel.Information);
+
+            case GenerationPreviewConflictException previewConflict:
+                return (Envelope.Create(AiError.PreviewConflict, previewConflict.Message, traceId), LogLevel.Information);
+
+            case GenerationFailedException failed:
+                // A throttle and a rejected credential are the provider's own answers passed through
+                // rather than conditions of this server, so they are logged as warnings - something an
+                // owner has to act on - and never at error level.
+                return (
+                    Envelope.Create(failed.Code, failed.Message, traceId),
+                    failed.Code is AiError.RateLimited or AiError.CredentialRejected
+                        ? LogLevel.Warning
+                        : LogLevel.Information);
 
             case BadHttpRequestException badRequest when badRequest.StatusCode == StatusCodes.Status413PayloadTooLarge:
                 return (

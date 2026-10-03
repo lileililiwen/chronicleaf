@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../src/Chronicleaf.AI/Chronicleaf.AI.csproj" />
     <ProjectReference Include="../../src/Chronicleaf.Api/Chronicleaf.Api.csproj" />
     <ProjectReference Include="../../src/Chronicleaf.Application/Chronicleaf.Application.csproj" />
     <ProjectReference Include="../../src/Chronicleaf.Core/Chronicleaf.Core.csproj" />

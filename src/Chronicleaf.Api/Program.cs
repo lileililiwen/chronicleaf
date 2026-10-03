@@ -7,6 +7,7 @@
 // feature of its own.
 using Chronicleaf.Api;
 using Chronicleaf.Api.Access;
+using Chronicleaf.Api.AI;
 using Chronicleaf.Api.Common;
 using Chronicleaf.Api.Evidence;
 using Chronicleaf.Api.Media;
@@ -15,6 +16,7 @@ using Chronicleaf.Api.Projects;
 using Chronicleaf.Api.Secrets;
 using Chronicleaf.Api.Voice;
 using Chronicleaf.Infrastructure.Access;
+using Chronicleaf.Infrastructure.AI;
 using Chronicleaf.Infrastructure.Evidence;
 using Chronicleaf.Infrastructure.Media;
 using Chronicleaf.Infrastructure.Operations;
@@ -86,6 +88,16 @@ builder.Services.AddCredentialVault(builder.Configuration);
 // evaluation, so there is no provider to configure and no key to go missing. A database without the
 // voice-profiles migration reports schema_mismatch at /api/ready.
 builder.Services.AddVoiceProfiles();
+
+// LLM-PROVIDER-CONTRACT-001/002. The provider-neutral bounded generation contract, the store for
+// owner-authorized redacted snapshots, and the routes that run one bounded call. This registration
+// adds NO provider adapter and no key: the five adapters are separate roadmap packages, each of
+// which will register its own ILLMProvider here. Until one does, the resolver is built over an empty
+// set and every provider answers provider_not_installed before a credential, a socket or a token is
+// involved - which is the honest state of a contract with no transports, and what a test asserts
+// rather than assumes. A database without the generation-previews migration reports schema_mismatch
+// at /api/ready.
+builder.Services.AddAIGeneration();
 
 // The rotation guard is applied once at start-up, so an access token that was changed since the
 // last run revokes every existing session before this process serves anything.
@@ -160,6 +172,12 @@ app.MapCredentialEndpoints();
 // exactly as the access package fixed it - a project's voice is readable only by the owner it
 // belongs to.
 app.MapVoiceEndpoints();
+
+// LLM-PROVIDER-CONTRACT-001/002: the private generation routes. None of them is marked public, so the
+// access package's default-deny boundary already covers every one of them. No route here returns a
+// secret, and no route returns provider prose: a provider failure becomes one of this package's own
+// authored codes and messages.
+app.MapAIGenerationEndpoints();
 
 // SHELL-001/SHELL-002: every unmatched path is either an unknown API path, an unknown
 // static asset, or a client route. Only the last one falls back to the SPA entry point. This

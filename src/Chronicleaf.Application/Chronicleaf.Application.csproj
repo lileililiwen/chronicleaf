@@ -9,11 +9,19 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../Chronicleaf.AI/Chronicleaf.AI.csproj" />
     <ProjectReference Include="../Chronicleaf.Core/Chronicleaf.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.4" />
+    <!--
+      The llm-provider-contract service logs identifiers, codes and durations for a bounded provider
+      call - never evidence text and never a system instruction. That needs a logger interface in
+      this project; the abstraction is the same one Infrastructure already references, so no new
+      assembly enters the graph.
+    -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.4" />
   </ItemGroup>
 
 </Project>

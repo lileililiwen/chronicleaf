@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Chronicleaf native verification (SHELL-003, COMMUNITY-PERSISTENCE-001/002, COMMUNITY-ACCESS-001/002,
 # PROJECTS-AND-MILESTONES-001/002, BACKGROUND-JOBS-001/002, LOCAL-MEDIA-STORAGE-001/002,
-# MILESTONE-EVIDENCE-001/002, CREDENTIAL-VAULT-001/002, VOICE-PROFILES-001/002).
+# MILESTONE-EVIDENCE-001/002, CREDENTIAL-VAULT-001/002, VOICE-PROFILES-001/002,
+# LLM-PROVIDER-CONTRACT-001/002).
 #
 # Required chain, in order:
 #   1. platform feed           - the committed packages/platform-feed is what the build resolves, from
@@ -148,6 +149,28 @@ else
   # here for the same reason it is everywhere above: the claim is that a finding reports a span without
   # touching the text, and a checker that was never really run proves nothing about that.
   step "voice profile tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~VoiceProfilesTests"
+  # LLM-PROVIDER-CONTRACT-001/002. That a completed call records text, finish state and usage without
+  # touching project or milestone state; that a refusal and a malformed answer are two different codes
+  # and neither becomes a draft; that a provider without native schema support is refused the
+  # capability and every answer is checked locally instead; that the bytes sent are the saved preview
+  # and carry no tool channel; that a changed, expired or foreign consent is a 409 or a 404 with the
+  # transport never reached; that a timeout and a cancellation each produce exactly one attempt and no
+  # approval; that a bounded retry re-sends the identical request and is counted; and that a
+  # deployment with no adapter refuses a provider instead of reaching one - all proven against the
+  # same real disposable PostgreSQL and a real temporary operator key file, through the real API host.
+  #
+  # A simulation is refused as evidence here, and the refusal is specific rather than general. The
+  # only ILLMProvider in this repository is a test double, it is registered solely in the test host,
+  # and these scenarios assert what Chronicleaf does with a request and a result: the consent, the
+  # bounds, the error mapping and the local validation. A provider that answered in-process proves
+  # nothing about any provider, so no stage here may be read as evidence that a model was called, that
+  # a schema was enforced remotely, or that a paid call is cheap - and the stage that would tempt that
+  # reading most, the one asserting a completed call, asserts the milestone's own status and revision
+  # and the absence of any approval action alongside the text. The production-registration scenario
+  # closes the loop from the other side: the same provider id on a host built from the production
+  # composition root answers 422, because no configuration value can reach a double that was never
+  # registered.
+  step "llm provider contract tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~LlmProviderContractTests"
 fi
 
 step "frontend install" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm ci'
@@ -156,11 +179,13 @@ step "frontend build" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm run b
 if [ "${CHRONICLEAF_E2E:-0}" = "1" ]; then
   # Publishes the real application, starts a disposable PostgreSQL per suite, applies the committed
   # migrations, and drives the shell, access, projects-and-milestones, background-jobs,
-  # milestone-evidence, credential-vault and voice-profiles fixtures in a real browser. The last four
+  # milestone-evidence, credential-vault, voice-profiles and llm-provider-contract fixtures in a real
+  # browser. The last five
   # are included by playwright.config.ts, which already matches tests/**/*.spec.ts; this stage
   # therefore fails if the browser cannot record a project, confirm a candidate, refuse a stale edit,
-  # read a milestone's evidence and be told the truth by a 409 against a real database, or turn emoji
-  # off over a preset that asked for it and see the effective value change.
+  # read a milestone's evidence and be told the truth by a 409 against a real database, turn emoji
+  # off over a preset that asked for it and see the effective value change, or be shown every provider
+  # slot on a new installation with the truth about which of them can actually be called.
   step "browser fixtures" bash scripts/e2e.sh
 fi
 

@@ -67,6 +67,8 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     public DbSet<VoiceDraft> VoiceDrafts => Set<VoiceDraft>();
 
+    public DbSet<GenerationPreview> GenerationPreviews => Set<GenerationPreview>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Installation>(entity =>
@@ -730,10 +732,66 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_voice_drafts_project_id");
         });
+
+        // LLM-PROVIDER-CONTRACT-002: one owner-authorized redacted input snapshot, written once.
+        // There is no revision column, no updated_at and no concurrency token on this table, and
+        // that is the requirement rather than an omission: a consent that can be edited in place is
+        // a consent the owner never gave, so the only way a row changes is that it expires and stops
+        // being usable. `sha256` covers the snapshot bytes so a stored row can be shown to be the
+        // bytes the owner saw, and `milestone_id` is nullable because the generic route is
+        // expressible ahead of the extensions that own the other purposes.
+        modelBuilder.Entity<GenerationPreview>(entity =>
+        {
+            entity.ToTable("generation_previews");
+            entity.HasKey(preview => preview.Id);
+            entity.Property(preview => preview.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(preview => preview.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(preview => preview.MilestoneId).HasColumnName("milestone_id");
+            entity.Property(preview => preview.Purpose)
+                .HasColumnName("purpose")
+                .HasMaxLength(GenerationPreviewPurposeMaxLength)
+                .IsRequired();
+            entity.Property(preview => preview.AggregateRef)
+                .HasColumnName("aggregate_ref")
+                .HasMaxLength(GenerationPreviewPurposeMaxLength)
+                .IsRequired();
+            entity.Property(preview => preview.SnapshotJson)
+                .HasColumnName("snapshot_json")
+                .HasColumnType("jsonb")
+                .IsRequired();
+            entity.Property(preview => preview.Sha256)
+                .HasColumnName("sha256")
+                .HasMaxLength(Sha256HexMaxLength)
+                .IsRequired();
+            entity.Property(preview => preview.ExpiresAt)
+                .HasColumnName("expires_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            // Expiry is the only lifecycle a row has, so the column the sweep and the stale check
+            // share is an index rather than a filter over the whole table.
+            entity.HasIndex(preview => new { preview.ScopeId, preview.ExpiresAt })
+                .HasDatabaseName("ix_generation_previews_scope_id_expires_at");
+
+            entity.HasOne<Milestone>()
+                .WithMany()
+                .HasForeignKey(preview => preview.MilestoneId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_generation_previews_milestone_id");
+        });
     }
 
     /// <summary>At most 12 characters; the longest draft status is <c>approved</c>.</summary>
     private const int VoiceDraftStatusMaxLength = 12;
+
+    /// <summary>
+    /// At most 64 characters; it holds a purpose name and a GUID, and the longest purpose this
+    /// build enables is <c>milestone-story</c>.
+    /// </summary>
+    private const int GenerationPreviewPurposeMaxLength = GenerationPreviewPurposes.MaxLength;
+
+    /// <summary>A lower-case hex SHA-256 is 64 characters, with no room to spare and none to grow.</summary>
+    private const int Sha256HexMaxLength = 64;
 
     /// <summary>At most 16 characters; the longest evidence kind is <c>project-metadata</c>.</summary>
     private const int EvidenceKindMaxLength = 16;

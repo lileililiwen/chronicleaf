@@ -66,6 +66,30 @@ public static class ApiErrorStatus
         Secrets.CredentialVaultError.VaultUnavailable => 503,
         Secrets.CredentialVaultError.Undecryptable => 503,
 
+        // The llm-provider-contract package's codes. Additive in the same way, and the choices here
+        // are the package's failure policy rather than defaults. 409 for a consent that no longer
+        // covers the input: nothing is wrong with the request, and a 422 would invite a client to
+        // resend the same already-consented bytes while a 404 would send it looking for another
+        // preview. 504 for an ambiguous provider timeout, which is deliberately not retried because
+        // the provider may already be billing the call. 422 for a provider slot with no installed
+        // adapter and for a model the installed adapter's provider does not accept, because both are
+        // answerable before anything is spent. 429 for a provider's own throttling, which is the
+        // provider's answer passed through rather than this server's rate limiter. 502 for a
+        // refusal and for malformed provider output: the request was well formed and something
+        // upstream produced something unusable. 503 for a pre-response outage with the bounded retry
+        // spent, and 409 for a preview id collision. The two that reuse delivered codes -
+        // ValidationFailed and NotFound - are already mapped above.
+        AI.AiError.ConsentStale => 409,
+        AI.AiError.PreviewConflict => 409,
+        AI.AiError.GenerationTimeout => 504,
+        AI.AiError.ProviderNotInstalled => 422,
+        AI.AiError.ModelNotSupported => 422,
+        AI.AiError.CredentialRejected => 422,
+        AI.AiError.RateLimited => 429,
+        AI.AiError.ProviderRefused => 502,
+        AI.AiError.ProviderInvalidResponse => 502,
+        AI.AiError.ProviderUnavailable => 503,
+
         _ => 500,
     };
 }

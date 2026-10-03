@@ -9,6 +9,7 @@ import {
   listMilestones,
 } from './api';
 import { MilestoneEvidencePanel } from '../milestone-evidence/MilestoneEvidencePanel';
+import { LlmProviderArea } from '../llm-provider-contract/LlmProviderArea';
 import { VoiceArea } from '../voice-profiles/VoiceArea';
 import { milestoneTypeLabel, type Milestone, type MilestoneStatus, type Project } from './types';
 import { useMilestones, useProject } from './useRecords';
@@ -320,6 +321,15 @@ function MilestoneRow({
 
       {/* What was actually collected for this milestone, read from the server on its own route. */}
       <MilestoneEvidencePanel
+        milestoneId={milestone.id}
+        milestoneTitle={milestone.title}
+        archived={archived}
+      />
+
+      {/* A bounded draft from exactly that evidence, through a provider the owner named. The panel is
+          absent for an archived milestone: a generation is a draft for a live record, and offering
+          one for something that can no longer change would invite work nobody can finish. */}
+      <LlmProviderArea
         milestoneId={milestone.id}
         milestoneTitle={milestone.title}
         archived={archived}

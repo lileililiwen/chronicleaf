@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../Chronicleaf.AI/Chronicleaf.AI.csproj" />
     <ProjectReference Include="../Chronicleaf.Application/Chronicleaf.Application.csproj" />
     <ProjectReference Include="../Chronicleaf.Core/Chronicleaf.Core.csproj" />
     <ProjectReference Include="../Chronicleaf.Infrastructure/Chronicleaf.Infrastructure.csproj" />

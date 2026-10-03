@@ -1047,12 +1047,14 @@ public sealed class ProjectsAndMilestonesTests(ChronicleafPostgresFixture postgr
         // CREDENTIAL-VAULT-001/002 moved it on again, and the same is now required of its migration.
         // VOICE-PROFILES-001/002 moved it on once more, so the same is required of the voice
         // migration as well. Every step of this has made the scenario strictly wider: one more id
-        // that readiness refuses to serve without.
+        // that readiness refuses to serve without. LLM-PROVIDER-CONTRACT-001/002 moved it on again
+        // for the generation-previews table, on the same terms.
         Assert.Contains(ChronicleafSchema.LocalMediaMigrationId, ChronicleafSchema.RequiredMigrationIds);
         Assert.Contains(ChronicleafSchema.MilestoneEvidenceMigrationId, ChronicleafSchema.RequiredMigrationIds);
         Assert.Contains(ChronicleafSchema.CredentialVaultMigrationId, ChronicleafSchema.RequiredMigrationIds);
         Assert.Contains(ChronicleafSchema.VoiceProfilesMigrationId, ChronicleafSchema.RequiredMigrationIds);
-        Assert.Equal(ChronicleafSchema.VoiceProfilesMigrationId, ChronicleafSchema.ExpectedMigrationId);
+        Assert.Contains(ChronicleafSchema.GenerationPreviewsMigrationId, ChronicleafSchema.RequiredMigrationIds);
+        Assert.Equal(ChronicleafSchema.GenerationPreviewsMigrationId, ChronicleafSchema.ExpectedMigrationId);
 
         var database = await ProvisionedDatabaseAsync("schema_mismatch");
         var applied = await ChronicleafPostgresFixture.ReadTextAsync(
@@ -1066,9 +1068,10 @@ public sealed class ProjectsAndMilestonesTests(ChronicleafPostgresFixture postgr
         Assert.Contains(ChronicleafSchema.MilestoneEvidenceMigrationId, applied, StringComparison.Ordinal);
         Assert.Contains(ChronicleafSchema.CredentialVaultMigrationId, applied, StringComparison.Ordinal);
         Assert.Contains(ChronicleafSchema.VoiceProfilesMigrationId, applied, StringComparison.Ordinal);
+        Assert.Contains(ChronicleafSchema.GenerationPreviewsMigrationId, applied, StringComparison.Ordinal);
         Assert.Empty(ChronicleafSchema.MissingMigrationIds(applied.Split('|')));
 
-        // A database stopped at the access package's migration reports exactly the six later gaps,
+        // A database stopped at the access package's migration reports exactly the seven later gaps,
         // by name and in requirement order.
         Assert.Equal(
             [
@@ -1078,6 +1081,7 @@ public sealed class ProjectsAndMilestonesTests(ChronicleafPostgresFixture postgr
                 ChronicleafSchema.MilestoneEvidenceMigrationId,
                 ChronicleafSchema.CredentialVaultMigrationId,
                 ChronicleafSchema.VoiceProfilesMigrationId,
+                ChronicleafSchema.GenerationPreviewsMigrationId,
             ],
             ChronicleafSchema
                 .MissingMigrationIds([ChronicleafSchema.InitialMigrationId, ChronicleafSchema.OwnerAccessMigrationId])
@@ -1367,6 +1371,21 @@ internal sealed class OwnerClient : IDisposable
     /// <summary>A mutation with no revision, used for the actions and creations that do not take one.</summary>
     public Task<HttpRequestMessage> Post(string path, object? body) => Build(HttpMethod.Post, path, body);
 
+    /// <summary>
+    /// A mutation that carries a valid session and a valid antiforgery value but arrives from
+    /// another origin, which is what a cross-site request forgery attempt looks like.
+    /// </summary>
+    /// <remarks>
+    /// A fixture addition only, and additive: nothing existing changes and no existing scenario is
+    /// affected. Everything the delivered boundary inspects is produced by exactly the same code as
+    /// every other mutation here - the same sign-in exchange, the same session cookie, the same
+    /// per-mutation antiforgery value - and the single difference is the <c>Origin</c> header, which
+    /// is the thing under test. Without a way to send a foreign origin, the origin check can only be
+    /// exercised by dropping the cookie, which is a 401 and proves nothing about CSRF.
+    /// </remarks>
+    public Task<HttpRequestMessage> PostCrossOrigin(string path, object? body, string origin) =>
+        Build(HttpMethod.Post, path, body, revision: null, ifMatch: null, antiforgery: null, origin: origin);
+
     /// <summary>A mutation that must present the revision it is editing.</summary>
     public Task<HttpRequestMessage> Post(string path, object? body, long? revision) =>
         Build(HttpMethod.Post, path, body, revision);
@@ -1409,7 +1428,8 @@ internal sealed class OwnerClient : IDisposable
         object? body,
         long? revision = null,
         string? ifMatch = null,
-        string? antiforgery = null)
+        string? antiforgery = null,
+        string? origin = null)
     {
         var request = new HttpRequestMessage(method, path)
         {
@@ -1420,7 +1440,7 @@ internal sealed class OwnerClient : IDisposable
         };
 
         request.Headers.Add("Cookie", $"{CookieName}={_cookie}");
-        request.Headers.TryAddWithoutValidation("Origin", PublicOrigin);
+        request.Headers.TryAddWithoutValidation("Origin", origin ?? PublicOrigin);
 
         // A fresh antiforgery value per mutation, requested the way the delivered sign-out does it:
         // used once and dropped, never reused.

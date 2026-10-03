@@ -12,8 +12,8 @@ namespace Chronicleaf.Infrastructure.Persistence;
 /// The PostgreSQL context behind the Community data foundation: the singleton
 /// <c>installation</c> row, the append-only <c>audit_events</c> log, the durable
 /// <c>outbox</c>, the access package's <c>session</c>, <c>login_attempt</c> and
-/// <c>access_state</c> tables, and the <c>projects</c> and <c>milestones</c> tables that hold
-/// the owner's own records.
+/// <c>access_state</c> tables, and the <c>projects</c>, <c>milestones</c>, <c>media</c>,
+/// <c>evidence_bundles</c> and <c>evidence_items</c> tables that hold the owner's own records.
 /// </summary>
 /// <remarks>
 /// The three data-foundation tables are owned by their package and are not changed here; the
@@ -52,6 +52,10 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
     public DbSet<Operation> Operations => Set<Operation>();
 
     public DbSet<MediaRecord> Media => Set<MediaRecord>();
+
+    public DbSet<EvidenceBundle> EvidenceBundles => Set<EvidenceBundle>();
+
+    public DbSet<EvidenceItem> EvidenceItems => Set<EvidenceItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -451,7 +455,131 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_media_project_id");
         });
+
+        // MILESTONE-EVIDENCE-001/002: the immutable provenance snapshots. A bundle row is a revision
+        // and an item row is one collected fact inside it; both are written once and never written
+        // again, and the forward migration installs the triggers that refuse an update or a delete on
+        // either table. The mapping below is what makes that schema, and the constraints are part of
+        // the evidence argument rather than bookkeeping: the unique index is what decides a race
+        // between two appends, and the availability check is what makes an unavailable source unable
+        // to claim a payload or media.
+        modelBuilder.Entity<EvidenceBundle>(entity =>
+        {
+            entity.ToTable("evidence_bundles");
+            entity.HasKey(bundle => bundle.Id);
+            entity.Property(bundle => bundle.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(bundle => bundle.MilestoneId).HasColumnName("milestone_id").IsRequired();
+            entity.Property(bundle => bundle.Revision).HasColumnName("revision").IsRequired();
+            entity.Property(bundle => bundle.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            // The item set is not a navigation. A bundle is a snapshot assembled by the store's own
+            // SQL, read back in one statement, and the change tracker is never asked to walk from a
+            // bundle to its items - which is the only way this model can honestly say that evidence
+            // is never rewritten.
+            entity.Ignore(bundle => bundle.Items);
+
+            // One bundle per milestone per revision. This is the whole concurrency story: an append
+            // inserts at exactly expectedRevision + 1 and lets this index say whether it won.
+            entity.HasIndex(bundle => new { bundle.MilestoneId, bundle.Revision })
+                .IsUnique()
+                .HasDatabaseName("ux_evidence_bundles_milestone_id_revision");
+
+            // The list's own order - revision descending, id descending - is served by this index
+            // rather than by a sort over the milestone's whole history.
+            entity.HasIndex(bundle => new { bundle.MilestoneId, bundle.Revision, bundle.Id })
+                .HasDatabaseName("ix_evidence_bundles_milestone_revision_id");
+
+            entity.HasOne<Milestone>()
+                .WithMany()
+                .HasForeignKey(bundle => bundle.MilestoneId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_evidence_bundles_milestone_id");
+        });
+
+        modelBuilder.Entity<EvidenceItem>(entity =>
+        {
+            entity.ToTable("evidence_items");
+            entity.HasKey(item => item.Id);
+            entity.Property(item => item.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(item => item.BundleId).HasColumnName("bundle_id").IsRequired();
+            entity.Property(item => item.MilestoneId).HasColumnName("milestone_id").IsRequired();
+            entity.Property(item => item.Kind).HasColumnName("kind").HasMaxLength(EvidenceKindMaxLength).IsRequired();
+            entity.Property(item => item.SourceRef)
+                .HasColumnName("source_ref")
+                .HasMaxLength(EvidenceLimits.SourceRefMaxLength)
+                .IsRequired();
+            entity.Property(item => item.SourceRevision)
+                .HasColumnName("source_revision")
+                .HasMaxLength(EvidenceLimits.SourceRevisionMaxLength)
+                .IsRequired();
+            entity.Property(item => item.CapturedAt)
+                .HasColumnName("captured_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(item => item.PayloadSha256)
+                .HasColumnName("payload_sha256")
+                .HasMaxLength(64)
+                .IsRequired();
+            entity.Property(item => item.Text).HasColumnName("text").IsRequired();
+            entity.Property(item => item.MediaId).HasColumnName("media_id");
+            entity.Property(item => item.Redactions)
+                .HasColumnName("redactions")
+                .HasColumnType("text[]")
+                .IsRequired();
+            entity.Property(item => item.Availability)
+                .HasColumnName("availability")
+                .HasMaxLength(EvidenceAvailabilityMaxLength)
+                .IsRequired();
+            entity.Property(item => item.SupersedesId).HasColumnName("supersedes_id");
+
+            // The media reference checker's only query: "does anything still point at this media?".
+            // A partial index is not required - media ids are sparse - but the lookup has to be a
+            // single indexed probe rather than a scan of the evidence history.
+            entity.HasIndex(item => item.MediaId).HasDatabaseName("ix_evidence_items_media_id");
+
+            // The store reads a bundle's items back in id order, so this index is that read.
+            entity.HasIndex(item => new { item.BundleId, item.Id })
+                .HasDatabaseName("ix_evidence_items_bundle_id_id");
+
+            // The scope is carried on the item as well as on the bundle so a scope-bound lookup
+            // never has to trust a join. No cascade anywhere: evidence that has been collected is
+            // retained even if the milestone or the media row that owned it is later archived.
+            entity.HasOne<EvidenceBundle>()
+                .WithMany()
+                .HasForeignKey(item => item.BundleId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_evidence_items_bundle_id");
+
+            entity.HasOne<Milestone>()
+                .WithMany()
+                .HasForeignKey(item => item.MilestoneId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_evidence_items_milestone_id");
+
+            entity.HasOne<MediaRecord>()
+                .WithMany()
+                .HasForeignKey(item => item.MediaId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_evidence_items_media_id");
+
+            // A correction names the item it corrects, and that item is kept. The self-reference is
+            // restricted for the same reason the others are: nothing here is ever cascaded away.
+            entity.HasOne<EvidenceItem>()
+                .WithMany()
+                .HasForeignKey(item => item.SupersedesId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_evidence_items_supersedes_id");
+        });
     }
+
+    /// <summary>At most 16 characters; the longest evidence kind is <c>project-metadata</c>.</summary>
+    private const int EvidenceKindMaxLength = 16;
+
+    /// <summary>At most 12 characters; the longest availability is <c>unavailable</c>.</summary>
+    private const int EvidenceAvailabilityMaxLength = 12;
 
     /// <summary>At most 80 characters, matching the delivered outbox kind column.</summary>
     private const int OperationKindMaxLength = 80;

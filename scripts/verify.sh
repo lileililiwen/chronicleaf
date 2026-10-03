@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Chronicleaf native verification (SHELL-003, COMMUNITY-PERSISTENCE-001/002, COMMUNITY-ACCESS-001/002,
-# PROJECTS-AND-MILESTONES-001/002, BACKGROUND-JOBS-001/002, LOCAL-MEDIA-STORAGE-001/002).
+# PROJECTS-AND-MILESTONES-001/002, BACKGROUND-JOBS-001/002, LOCAL-MEDIA-STORAGE-001/002,
+# MILESTONE-EVIDENCE-001/002).
 #
 # Required chain, in order:
 #   1. platform feed           - the committed packages/platform-feed is what the build resolves, from
@@ -88,6 +89,14 @@ else
   # an EF in-memory provider is refused here for the same reason it is above: the claim under test is
   # that bytes on a disk stay consistent with rows in a database, and neither half can be simulated.
   step "local media storage tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~LocalMediaStorageTests"
+  # MILESTONE-EVIDENCE-001/002. The immutable provenance snapshots, the idempotent append, the honest
+  # unavailable and partial records, the revision conflict, the media reference check that actually
+  # holds now, and the append-only triggers are proven against the same real disposable PostgreSQL AND
+  # a real temporary filesystem, through the real API host. A scripted reference checker, a stubbed
+  # store or an EF in-memory provider is refused here for the same reason it is above: the claim under
+  # test is that stored evidence keeps bytes referenced and cannot be rewritten, and neither half can
+  # be simulated.
+  step "milestone evidence tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~MilestoneEvidenceTests"
 fi
 
 step "frontend install" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm ci'
@@ -95,10 +104,11 @@ step "frontend build" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm run b
 
 if [ "${CHRONICLEAF_E2E:-0}" = "1" ]; then
   # Publishes the real application, starts a disposable PostgreSQL, applies the committed
-  # migrations, and drives the shell, access and projects-and-milestones fixtures in a real browser.
-  # The last of those is included by playwright.config.ts, which already matches tests/**/*.spec.ts;
-  # this stage therefore fails if the browser cannot record a project, confirm a candidate or refuse
-  # a stale edit against a real database.
+  # migrations, and drives the shell, access, projects-and-milestones, background-jobs and
+  # milestone-evidence fixtures in a real browser. The last two are included by
+  # playwright.config.ts, which already matches tests/**/*.spec.ts; this stage therefore fails if the
+  # browser cannot record a project, confirm a candidate, refuse a stale edit, or read a milestone's
+  # evidence and be told the truth by a 409 against a real database.
   step "browser fixtures" bash scripts/e2e.sh
 fi
 

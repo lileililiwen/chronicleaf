@@ -1042,8 +1042,11 @@ public sealed class ProjectsAndMilestonesTests(ChronicleafPostgresFixture postgr
         // migration this build requires, nothing is missing, and a database stopped at the access
         // package's migration reports exactly the remaining gaps, by name and in requirement order.
         // Only the id it names is this build's newest rather than this package's.
+        // MILESTONE-EVIDENCE-001 moved it on once more, for the same reason, and this scenario now
+        // also requires the evidence migration to be applied and to be named when it is missing.
         Assert.Contains(ChronicleafSchema.LocalMediaMigrationId, ChronicleafSchema.RequiredMigrationIds);
-        Assert.Equal(ChronicleafSchema.LocalMediaMigrationId, ChronicleafSchema.ExpectedMigrationId);
+        Assert.Contains(ChronicleafSchema.MilestoneEvidenceMigrationId, ChronicleafSchema.RequiredMigrationIds);
+        Assert.Equal(ChronicleafSchema.MilestoneEvidenceMigrationId, ChronicleafSchema.ExpectedMigrationId);
 
         var database = await ProvisionedDatabaseAsync("schema_mismatch");
         var applied = await ChronicleafPostgresFixture.ReadTextAsync(
@@ -1054,15 +1057,17 @@ public sealed class ProjectsAndMilestonesTests(ChronicleafPostgresFixture postgr
         Assert.Contains(ChronicleafSchema.ProjectsAndMilestonesMigrationId, applied, StringComparison.Ordinal);
         Assert.Contains(ChronicleafSchema.BackgroundOperationsMigrationId, applied, StringComparison.Ordinal);
         Assert.Contains(ChronicleafSchema.LocalMediaMigrationId, applied, StringComparison.Ordinal);
+        Assert.Contains(ChronicleafSchema.MilestoneEvidenceMigrationId, applied, StringComparison.Ordinal);
         Assert.Empty(ChronicleafSchema.MissingMigrationIds(applied.Split('|')));
 
-        // A database stopped at the access package's migration reports exactly the three later gaps,
+        // A database stopped at the access package's migration reports exactly the four later gaps,
         // by name and in requirement order.
         Assert.Equal(
             [
                 ChronicleafSchema.ProjectsAndMilestonesMigrationId,
                 ChronicleafSchema.BackgroundOperationsMigrationId,
                 ChronicleafSchema.LocalMediaMigrationId,
+                ChronicleafSchema.MilestoneEvidenceMigrationId,
             ],
             ChronicleafSchema
                 .MissingMigrationIds([ChronicleafSchema.InitialMigrationId, ChronicleafSchema.OwnerAccessMigrationId])

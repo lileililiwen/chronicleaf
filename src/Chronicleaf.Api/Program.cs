@@ -8,10 +8,12 @@
 using Chronicleaf.Api;
 using Chronicleaf.Api.Access;
 using Chronicleaf.Api.Common;
+using Chronicleaf.Api.Evidence;
 using Chronicleaf.Api.Media;
 using Chronicleaf.Api.Operations;
 using Chronicleaf.Api.Projects;
 using Chronicleaf.Infrastructure.Access;
+using Chronicleaf.Infrastructure.Evidence;
 using Chronicleaf.Infrastructure.Media;
 using Chronicleaf.Infrastructure.Operations;
 using Chronicleaf.Infrastructure.Persistence;
@@ -59,6 +61,13 @@ builder.Services.AddChronicleafMedia(
     builder.Configuration,
     builder.Environment.ContentRootPath,
     webAssets.WebRootPath);
+
+// MILESTONE-EVIDENCE-001/002. Private, append-only provenance snapshots over real PostgreSQL. It
+// also replaces the media package's default media-reference checker with the real one, because the
+// evidence tables are what references now exist in - so the 409 media_in_use the media package
+// already answered becomes a statement about stored evidence rather than about a stub. Registration
+// order does not matter: it removes and replaces rather than trying to add first.
+builder.Services.AddMilestoneEvidence();
 
 // The rotation guard is applied once at start-up, so an access token that was changed since the
 // last run revokes every existing session before this process serves anything.
@@ -116,6 +125,11 @@ app.MapOperationEndpoints();
 // package's default-deny boundary already covers every one of them and the public allow-list stays
 // exactly as the design fixed it - there is no public media route and no directory listing.
 app.MapMediaEndpoints();
+
+// MILESTONE-EVIDENCE-001/002: the private evidence routes. Neither is marked public, so the access
+// package's default-deny boundary already covers both and the public allow-list stays exactly as the
+// access package fixed it - evidence is readable only by the owner it belongs to.
+app.MapMilestoneEvidenceEndpoints();
 
 // SHELL-001/SHELL-002: every unmatched path is either an unknown API path, an unknown
 // static asset, or a client route. Only the last one falls back to the SPA entry point. This

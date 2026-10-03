@@ -8,6 +8,7 @@ import {
   getProject,
   listMilestones,
 } from './api';
+import { MilestoneEvidencePanel } from '../milestone-evidence/MilestoneEvidencePanel';
 import { milestoneTypeLabel, type Milestone, type MilestoneStatus, type Project } from './types';
 import { useMilestones, useProject } from './useRecords';
 
@@ -306,6 +307,13 @@ function MilestoneRow({
           </ul>
         </div>
       ) : null}
+
+      {/* What was actually collected for this milestone, read from the server on its own route. */}
+      <MilestoneEvidencePanel
+        milestoneId={milestone.id}
+        milestoneTitle={milestone.title}
+        archived={archived}
+      />
 
       {archived ? null : (
         <div className="milestone__actions">

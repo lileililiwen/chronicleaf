@@ -47,6 +47,15 @@ public static class ChronicleafSchema
     /// </summary>
     public const string LocalMediaMigrationId = "20261003111500_AddLocalMediaStorage";
 
+    /// <summary>
+    /// The forward migration that adds the <c>evidence_bundles</c> and <c>evidence_items</c> tables and
+    /// the triggers that make them append-only (MILESTONE-EVIDENCE-001/002). A database that has never
+    /// applied it has nowhere to record what was actually collected for a milestone, so its evidence
+    /// routes would fail against missing tables; readiness says so by name rather than answering 200
+    /// and failing on the first read.
+    /// </summary>
+    public const string MilestoneEvidenceMigrationId = "20261003121500_AddMilestoneEvidence";
+
     /// <summary>Every migration a database must carry before this build calls itself ready.</summary>
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
@@ -55,6 +64,7 @@ public static class ChronicleafSchema
         ProjectsAndMilestonesMigrationId,
         BackgroundOperationsMigrationId,
         LocalMediaMigrationId,
+        MilestoneEvidenceMigrationId,
     ];
 
     /// <summary>
@@ -62,7 +72,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = LocalMediaMigrationId;
+    public const string ExpectedMigrationId = MilestoneEvidenceMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

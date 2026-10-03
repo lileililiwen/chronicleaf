@@ -4,7 +4,7 @@ current_spec: milestone-evidence
 
 ## Current state — 2026-10-03
 
-Six changes implemented, verified and archived, each with exactly two commits (implementation/
+Seven changes implemented, verified and archived, each with exactly two commits (implementation/
 tests/archive, then this HANDOFF-only pointer):
 
 | # | Change | Implementation commit | Canonical spec |
@@ -15,9 +15,11 @@ tests/archive, then this HANDOFF-only pointer):
 | 4 | `projects-and-milestones` | `065dd8e` | `openspec/specs/projects-and-milestones/spec.md` |
 | 5 | `background-jobs` | `5154b26` | `openspec/specs/background-jobs/spec.md` |
 | 6 | `local-media-storage` | `77fa203` | `openspec/specs/local-media-storage/spec.md` |
+| 7 | `platform-jobs-adoption` | `b1ff0f6` | `openspec/specs/platform-jobs-adoption/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
-ever used.
+ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
+after the `background-jobs` deviation below was found, and validated before implementation.
 
 ## Platform packages — read this before touching any Platform.* dependency
 
@@ -43,12 +45,24 @@ fresh `/tmp` copy with no `.git`, no `bin`/`obj`, no sibling and an empty `NUGET
 with 0 warnings and 0 errors, and fails `NU1301` exit 1 when only `packages/platform-feed` is
 removed.
 
-**Open deviation to reconcile:** that same feed also contains `Platform.Jobs` and
-`Platform.Jobs.Hangfire` 0.1.0. The background-jobs change (commit `5154b26`) used raw
-`Hangfire.Core`/`Hangfire.PostgreSql` with a Chronicleaf-owned `IOperationDispatcher`, because it
-was told `Platform.Jobs` was unavailable. Its design said to adopt the platform contracts, so
-adopting `Platform.Jobs`/`Platform.Jobs.Hangfire` (which pin Hangfire 1.8.23, against the 1.8.21
-in use) is a real follow-up, and is a decision for the owner rather than a silent refactor.
+**Resolved deviation — `platform-jobs-adoption` (commit `b1ff0f6`, owner-authorized 2026-10-03).**
+`background-jobs` had used raw `Hangfire.Core`/`Hangfire.PostgreSql` with a Chronicleaf-owned
+dispatcher because it was told `Platform.Jobs` was unavailable. The same feed also contains
+`Platform.Jobs` and `Platform.Jobs.Hangfire` 0.1.0, so a dedicated change adopted them: enqueue is now
+`Platform.Jobs.IJobDispatcher` via the adapter's `HangfireJobDispatcher`, routing is
+`IJobPayloadHandler` invoked by `HangfireJobExecutor`, and time is `Platform.Core.Time.IClock`. The
+commit's primary oracle was that **both** `BackgroundJobsTests.cs` and `BackgroundJobsApiHost.cs` are
+byte-unchanged — 12/12 passing on three consecutive runs against the platform adapter, with no
+assertion edited. Operation state stays Chronicleaf-owned, no migration was added, and Hangfire moved
+1.8.21 → 1.8.23 with no observable default change. Two design statements are corrected in that
+commit: the operation id arrives as a `string`, not a `JsonElement`, and `AddPlatformHangfireJobs`
+**does** support Chronicleaf's PostgreSQL schema.
+
+Known artifacts to expect, not chase: `git diff --check` reports a trailing blank line for
+OpenSpec-generated canonical specs — all seven of `openspec/specs/*/spec.md` end that way, so it is
+the tool's archive output, not a hand-editing defect. `dotnet ef database update` cannot run in this
+environment (its design-time graph wants an uncached `Dapper.AOT` 1.0.48), so container smokes
+migrate through the application's own `ChronicleafDbContext` in a `/tmp` project.
 
 Delivered: the .NET 10 runtime shell with a real React/TypeScript/Vite client; the
 Core/Application/Infrastructure layering over EF Core + Npgsql with installation, audit_events and
@@ -67,17 +81,18 @@ Evidence, all re-run by the parent session rather than taken on report: `CHRONIC
 scripts/verify.sh` exit 0 with the platform-feed stage, 15/15 shell, 24/24 persistence, 23/23 access,
 19/19 project and milestone, 12/12 jobs, 9/9 media, `npm ci`, `tsc` + `vite build` and 21/21
 Playwright against the published app with a real PostgreSQL; `BackgroundJobsTests` 12/12 on three
-consecutive runs (39s, 40s, 39s) to show the lease and two-worker scenarios are not flaky; the
-isolated no-sibling build proven in both directions; `scripts/media-smoke.sh` container run exit 0;
-name preflight exit 0; `openspec validate --all --strict --no-interactive` 53/53 before and after
-every archive.
+consecutive runs before and after the platform swap (41s, 41s, 41s) to show the lease and two-worker
+scenarios are not flaky; the feed check exits 0 and exits 1 with the feed removed; the isolated
+no-sibling build proven in both directions; container smokes for media and jobs; name preflight exit
+0; `openspec validate --all --strict --no-interactive` 53/53, then 54/54 after
+`platform-jobs-adoption` was authored, before and after every archive.
 
-A real defect was caught by that independent verification and fixed before its commit:
-`LeaseHeartbeat` disposed both of its cancellation sources when `StartAsync` returned, which
-threw `ObjectDisposedException` on every worker exit path and left a transient failure stuck in
-`running` forever. It reproduced as 8 of 12 job tests failing. The lifetime rule is now explicit
-and the heartbeat hands out its own lease-lost token, so the documented cooperative cancellation
-is actually reachable. No test was edited to make it pass.
+Two real defects were caught by that independent verification and fixed before their commits:
+`LeaseHeartbeat` disposed both of its cancellation sources when `StartAsync` returned, which threw
+`ObjectDisposedException` on every worker exit path and left a transient failure stuck in `running`
+forever (8 of 12 job tests failing); and the platform-jobs swap initially let the adapter create its
+own PostgreSQL storage, which leaked an undisposable pool and broke 19 unrelated project/milestone
+tests with `53300 sorry, too many clients already`. Neither was worked around by editing a test.
 
 Remaining verification gaps, stated rather than implied: mobile-viewport capture, TLS
 termination, a second process against the same Community database, destructive `Down` migrations,

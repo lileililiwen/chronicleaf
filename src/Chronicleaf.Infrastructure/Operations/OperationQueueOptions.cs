@@ -49,6 +49,12 @@ public sealed class OperationQueueOptions
     /// The name this process's workers report themselves under. It appears in the queue's own tables
     /// and in the engine's logs; it carries no secret and is not shown to a client.
     /// </summary>
+    /// <remarks>
+    /// The engine does not take this from the application: the scheduling adapter's registration gives
+    /// an application no way to set a server name, so the engine reports its own host-and-process
+    /// identity instead. The setting is kept so an existing configuration is still accepted and
+    /// documented rather than silently unknown, but it no longer changes what the engine writes.
+    /// </remarks>
     public string ServerName { get; set; } = "chronicleaf";
 }
 

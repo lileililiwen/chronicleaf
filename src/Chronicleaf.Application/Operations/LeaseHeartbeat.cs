@@ -1,24 +1,6 @@
 namespace Chronicleaf.Application.Operations;
 
 /// <summary>
-/// Schedules the next attempt of an operation.
-/// </summary>
-/// <remarks>
-/// This is the worker's own enqueue path, kept separate from the outbox dispatcher on purpose. The
-/// outbox is how work is <em>requested</em> and is written once, in the creating transaction, so a
-/// request cannot be lost. A retry is a consequence of an attempt that already happened, so it is
-/// queued at the moment the attempt is recorded, against the same engine and the same payload shape -
-/// an operation id and nothing else. Keeping them apart means the retry bound is enforced by the
-/// claim rather than by the number of enqueues, so a replayed enqueue can never produce a fourth
-/// attempt.
-/// </remarks>
-public interface IOperationDispatcher
-{
-    /// <summary>Queues a run no earlier than <paramref name="delay"/> from now.</summary>
-    Task ScheduleAsync(Guid operationId, TimeSpan delay, CancellationToken cancellationToken = default);
-}
-
-/// <summary>
 /// Keeps a claimed operation's lease alive while its handler runs.
 /// </summary>
 /// <remarks>

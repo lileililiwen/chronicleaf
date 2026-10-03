@@ -1,5 +1,6 @@
 using Chronicleaf.Application.Operations;
 using Chronicleaf.Application.Outbox;
+using Platform.Jobs;
 
 namespace Chronicleaf.Infrastructure.Operations;
 
@@ -22,7 +23,8 @@ namespace Chronicleaf.Infrastructure.Operations;
 /// </para>
 /// <para>
 /// The payload is read for one field. An event with no operation id, or with a schema version this
-/// build does not implement, is refused rather than executed.
+/// build does not implement, is refused rather than executed. The dispatcher itself is the
+/// platform's, so this handler hands the payload over and holds no engine knowledge at all.
 /// </para>
 /// </remarks>
 public sealed class OperationOutboxHandler(IJobDispatcher dispatcher) : IOutboxEventHandler
@@ -36,6 +38,6 @@ public sealed class OperationOutboxHandler(IJobDispatcher dispatcher) : IOutboxE
         var operationId = payload.OperationId
             ?? throw new InvalidOperationException($"An {Kind} event must carry an operation id.");
 
-        return dispatcher.EnqueueAsync(JobPayload.ForOperation(operationId), cancellationToken);
+        return dispatcher.EnqueueAsync(OperationJobPayload.ForOperation(operationId), cancellationToken);
     }
 }

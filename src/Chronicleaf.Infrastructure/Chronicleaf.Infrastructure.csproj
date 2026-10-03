@@ -40,10 +40,38 @@
       Newtonsoft.Json is pinned to a patched 13.0.3. Hangfire.PostgreSql's own transitive floor is
       11.0.1, which carries a known high-severity advisory (GHSA-5crp-9r3c-p9vr); without this
       reference restore emits NU1903 and the build would carry a known-vulnerable serializer.
+
+      Hangfire.Core moves 1.8.21 -> 1.8.23, the version Platform.Jobs.Hangfire pins, so the adapter and
+    this project never hold two copies of the engine. Hangfire.PostgreSql stays at 1.21.1 and is kept
+    as a direct reference because the queue's storage is PostgreSQL and that choice is Chronicleaf's,
+    not the platform adapter's. The dashboard integration (Hangfire.AspNetCore/Hangfire.NetCore) is
+    still NOT referenced: BackgroundJobsTests asserts this assembly's referenced set, so a dashboard
+    that cannot be mapped is a stronger property than a dashboard that is merely switched off.
     -->
-    <PackageReference Include="Hangfire.Core" Version="1.8.21" />
+    <PackageReference Include="Hangfire.Core" Version="1.8.23" />
     <PackageReference Include="Hangfire.PostgreSql" Version="1.21.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Adopted durable scheduling (PLATFORM-JOBS-ADOPTION-001/002). The dispatcher contract, the
+      payload record and the Hangfire adapter are the shared platform's, taken by exact version from
+      the .nupkg files committed under packages/platform-feed (Ruling 12), for the same reason the
+      storage packages below are: no sibling checkout, no absolute path, no environment-variable feed.
+
+      Platform.Jobs 0.1.0 owns IJobDispatcher, JobPayload and the IJobPayloadHandler's payload shape.
+      Platform.Jobs.Hangfire 0.1.0 owns the engine wiring - HangfireJobDispatcher, HangfireJobExecutor,
+      ScopedJobActivator and the storage health check - reached through AddPlatformHangfireJobs. Its
+      Hangfire 1.8.23/PostgreSql 1.21.1 pins are the versions adopted above. Platform.Core arrives
+      transitively and supplies Platform.Core.Time.IClock.
+
+      This remains the ONLY project that needs the feed: Core, Application and Api compile without it,
+      which is why the operation state machine in Application keeps its own narrow retry seam while
+      every platform-typed seam - dispatcher, payload handler, executor, clock, server - lives here.
+    -->
+    <PackageReference Include="Platform.Jobs" Version="0.1.0" />
+    <PackageReference Include="Platform.Jobs.Hangfire" Version="0.1.0" />
   </ItemGroup>
 
   <ItemGroup>

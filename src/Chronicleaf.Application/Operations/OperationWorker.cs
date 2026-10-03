@@ -34,7 +34,7 @@ public sealed class OperationWorker(
     IOperationStore store,
     IOperationQuery query,
     IOperationHandlerRegistry handlers,
-    IOperationDispatcher dispatcher,
+    IOperationRetryScheduler retryScheduler,
     TimeProvider clock)
 {
     /// <summary>What one attempt did, for the caller's log and for the tests' assertions.</summary>
@@ -280,7 +280,7 @@ public sealed class OperationWorker(
 
         // The schedule is recorded before the job is queued, so the recorded due time is the truth
         // even if the enqueue is lost, and the claim - not the enqueue - is what bounds the count.
-        await dispatcher.ScheduleAsync(claimed.Id, delay, cancellationToken).ConfigureAwait(false);
+        await retryScheduler.ScheduleAsync(claimed.Id, delay, cancellationToken).ConfigureAwait(false);
 
         return new AttemptResult(AttemptOutcome.Retrying, await ReloadAsync(claimed, cancellationToken), failure.ErrorCode);
     }

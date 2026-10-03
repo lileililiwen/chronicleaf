@@ -29,13 +29,19 @@ FEED_DIR="${FEED_DIR:-$repo_root/packages/platform-feed}"
 
 # The whole transitive closure Chronicleaf needs: Platform.Storage carries the IObjectStorage
 # contract and the key validation, Platform.Storage.Local is the filesystem adapter, and
-# Platform.Core is Platform.Storage's own dependency. Nothing else is copied - a feed that
-# carries the sibling's whole catalogue would make a version bump in an unrelated package look
-# like a Chronicleaf change.
+# Platform.Core is Platform.Storage's own dependency. Platform.Jobs carries the IJobDispatcher
+# contract and the JobPayload shape, Platform.Jobs.Hangfire is the durable scheduling adapter, and
+# Platform.Core is Platform.Jobs's dependency too. The whole closure is listed because a feed
+# that carries only the direct references is a feed that fails to restore on a cold cache, which
+# is the whole failure this stage exists to catch. Nothing else is copied - a feed that carries
+# the sibling's whole catalogue would make a version bump in an unrelated package look like a
+# Chronicleaf change.
 PACKAGES=(
   Platform.Core
   Platform.Storage
   Platform.Storage.Local
+  Platform.Jobs
+  Platform.Jobs.Hangfire
 )
 
 if [[ ! -d "$PLATFORM_ROOT/src" ]]; then

@@ -27,13 +27,17 @@ feed="packages/platform-feed"
 platform_version="0.1.0"
 
 # Platform.Storage.Local is the filesystem adapter this package is scoped to, Platform.Storage is the
-# contract and the key validation, and Platform.Core is Platform.Storage's own dependency. The whole
-# transitive closure is listed because a feed that carries only the two direct references is a feed
-# that fails to restore on a cold cache, which is the whole failure this stage exists to catch.
+# contract and the key validation, Platform.Core is Platform.Storage's own dependency. Platform.Jobs
+# is the dispatcher contract, Platform.Jobs.Hangfire is the durable scheduling adapter, and
+# Platform.Core is Platform.Jobs's dependency too. The whole transitive closure is listed because a
+# feed that carries only the direct references is a feed that fails to restore on a cold cache,
+# which is the whole failure this stage exists to catch.
 expected=(
   "Platform.Core"
   "Platform.Storage"
   "Platform.Storage.Local"
+  "Platform.Jobs"
+  "Platform.Jobs.Hangfire"
 )
 
 fail() {
@@ -69,7 +73,7 @@ fi
 echo "    ok: the only platform source is ${feed}, by relative path"
 
 echo "== 3. referenced versions match the committed feed"
-for package in Platform.Storage Platform.Storage.Local; do
+for package in Platform.Storage Platform.Storage.Local Platform.Jobs Platform.Jobs.Hangfire; do
   referenced="$(sed -n "s|.*Include=\"${package}\" Version=\"\([^\"]*\)\".*|\1|p" "$infrastructure")"
   [ -n "$referenced" ] || fail "${infrastructure} does not reference ${package}"
   [ "$referenced" = "$platform_version" ] \
@@ -78,7 +82,9 @@ for package in Platform.Storage Platform.Storage.Local; do
 done
 
 # Nothing outside Infrastructure may need the feed: Core, Application and Api have to compile against
-# the platform's contract without the platform's artifacts being on offer.
+# the platform's contract without the platform's artifacts being on offer. This is what keeps the
+# operation state machine free of platform types while every platform-typed seam - dispatcher, payload
+# handler, executor, clock, server - lives in the one project that may name them.
 for project in src/Chronicleaf.Core src/Chronicleaf.Application src/Chronicleaf.Api; do
   if grep -qE 'PackageReference Include="Platform\.' "$project"/*.csproj; then
     fail "$project references a Platform package; only Infrastructure may need the feed"

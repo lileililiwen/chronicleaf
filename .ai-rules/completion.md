@@ -7,3 +7,5 @@ Each completed OpenSpec spec/change requires exactly two commits: first the impl
 Both commits are required for completed implementation; do not request conversational confirmation when authorized. Stop after the HANDOFF-only commit. No push. Exactly one active current_spec; remove when no active work remains.
 
 Publication requires full LICENSE, chosen visibility, credential-safe metadata, verified remote and explicit publication scope. Documentation UI evidence requires a real screenshot and revision-bound capture plan; unavailable UI/capture is recorded, not fabricated.
+
+Completion requires requirements and scenarios verified, migrated callers reviewed, required tests passing, the project verification command passing, the shared governance check passing, and the original impact surface rechecked. Build/test/skeleton success is not runtime or release evidence.

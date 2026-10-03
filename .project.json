@@ -1,7 +1,9 @@
 {
   "schema_version": 1,
   "id": "chronicleaf",
-  "kind": "product",
+  "kind": "dotnet-product",
+  "role": "product",
+  "stack": "dotnet",
   "profile": "dotnet-product",
   "lifecycle": "active",
   "verification": {

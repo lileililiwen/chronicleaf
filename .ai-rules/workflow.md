@@ -11,3 +11,5 @@ Commit 1 includes related implementation, tests, archive and canonical specs; co
 Check command: node scripts/check-openspec-change-names.mjs. Validate: openspec validate --all --strict --no-interactive. Build: dotnet build. Meaningful product tests must be added with implementation; dotnet test on this skeleton proves no behavior. CI is a second layer, never the first local check.
 
 Use global shot-scraper/playwright-cli for documentation captures after UI exists, record real source/revision/privacy evidence, and never pass off a mockup as runtime capture.
+
+Work directly on `main` by default; do not create a branch or worktree unless the user asks for one or designates one.

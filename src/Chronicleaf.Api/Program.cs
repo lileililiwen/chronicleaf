@@ -8,9 +8,11 @@
 using Chronicleaf.Api;
 using Chronicleaf.Api.Access;
 using Chronicleaf.Api.Common;
+using Chronicleaf.Api.Media;
 using Chronicleaf.Api.Operations;
 using Chronicleaf.Api.Projects;
 using Chronicleaf.Infrastructure.Access;
+using Chronicleaf.Infrastructure.Media;
 using Chronicleaf.Infrastructure.Operations;
 using Chronicleaf.Infrastructure.Persistence;
 using Chronicleaf.Infrastructure.Projects;
@@ -47,6 +49,16 @@ builder.Services.AddProjectMilestones();
 // process cannot honour what this package promises. A database without the background-operations
 // migration reports schema_mismatch at /api/ready.
 builder.Services.AddChronicleafOperationQueue(builder.Configuration);
+
+// LOCAL-MEDIA-STORAGE-001/002. Private, scoped filesystem media over the adopted shared storage
+// package. The MediaRoot is resolved once at start-up from Chronicleaf__MediaRoot, defaults to
+// runtime/media and is refused outright if it is the published wwwroot or inside it - stored images
+// must never become static assets. Keys are generated here, so no request can choose a path. A
+// database without the local-media-storage migration reports schema_mismatch at /api/ready.
+builder.Services.AddChronicleafMedia(
+    builder.Configuration,
+    builder.Environment.ContentRootPath,
+    webAssets.WebRootPath);
 
 // The rotation guard is applied once at start-up, so an access token that was changed since the
 // last run revokes every existing session before this process serves anything.
@@ -99,6 +111,11 @@ app.MapProjectMilestoneEndpoints();
 // package's default-deny boundary already covers every one of them and the public allow-list stays
 // exactly as the design fixed it.
 app.MapOperationEndpoints();
+
+// LOCAL-MEDIA-STORAGE-001/002: the private media routes. None is marked public, so the access
+// package's default-deny boundary already covers every one of them and the public allow-list stays
+// exactly as the design fixed it - there is no public media route and no directory listing.
+app.MapMediaEndpoints();
 
 // SHELL-001/SHELL-002: every unmatched path is either an unknown API path, an unknown
 // static asset, or a client route. Only the last one falls back to the SPA entry point. This

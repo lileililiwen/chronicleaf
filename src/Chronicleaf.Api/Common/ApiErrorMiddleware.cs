@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Chronicleaf.Application.Access;
 using Chronicleaf.Application.Common;
+using Chronicleaf.Application.Media;
 using Chronicleaf.Application.Milestones;
 using Chronicleaf.Application.Operations;
 // `ApiError` also names the runtime shell's compact not_found/web_assets_unavailable record in
@@ -157,6 +158,45 @@ public sealed class ApiErrorMiddleware(
                             ["status"] = [Core.OperationStatuses.ToWire(notCancellable.Status)],
                         }),
                     LogLevel.Information);
+
+            // LOCAL-MEDIA-STORAGE-001/002. Written here for the same reason as the refusals above: the
+            // feature package raises them and this middleware is still the only place an envelope is
+            // written. The order matters - MediaOutsideRootException derives from the not-found, and
+            // both produce the identical envelope on purpose, so a caller cannot tell a refused key
+            // from an absent record. Every message is authored in the media package and names no
+            // provider, no key, no path and no filesystem location.
+            case MediaOutsideRootException:
+            case MediaNotFoundException:
+                return (
+                    Envelope.Create(MediaError.NotFound, "No such media.", traceId),
+                    LogLevel.Information);
+
+            case UnsupportedMediaTypeException unsupportedType:
+                return (
+                    Envelope.Create(MediaError.UnsupportedMediaType, unsupportedType.Message, traceId),
+                    LogLevel.Information);
+
+            case MediaImageTooLargeException imageTooLarge:
+                return (
+                    Envelope.Create(
+                        MediaError.ImageTooLarge,
+                        imageTooLarge.Message,
+                        traceId,
+                        imageTooLarge.FieldErrors),
+                    LogLevel.Information);
+
+            case MediaTooLargeException mediaTooLarge:
+                return (
+                    Envelope.Create(MediaError.PayloadTooLarge, mediaTooLarge.Message, traceId),
+                    LogLevel.Information);
+
+            case MediaInUseException inUse:
+                return (Envelope.Create(MediaError.MediaInUse, inUse.Message, traceId), LogLevel.Information);
+
+            case MediaStorageUnavailableException storageUnavailable:
+                return (
+                    Envelope.Create(MediaError.StorageUnavailable, storageUnavailable.Message, traceId),
+                    LogLevel.Warning);
 
             case MalformedJsonException malformed:
                 return (Envelope.Create(Envelope.MalformedJson, malformed.Message, traceId), LogLevel.Information);

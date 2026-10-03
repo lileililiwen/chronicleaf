@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # Chronicleaf native verification (SHELL-003, COMMUNITY-PERSISTENCE-001/002, COMMUNITY-ACCESS-001/002,
-# PROJECTS-AND-MILESTONES-001/002).
+# PROJECTS-AND-MILESTONES-001/002, BACKGROUND-JOBS-001/002, LOCAL-MEDIA-STORAGE-001/002).
 #
 # Required chain, in order:
-#   1. dotnet build            - .NET 10 Core/Application/Infrastructure/Api and test projects
-#   2. dotnet test             - shell contract assertions, then the real-PostgreSQL integration
+#   1. platform feed           - the committed packages/platform-feed is what the build resolves, from
+#                                an empty package folder, with no sibling checkout involved
+#   2. dotnet build            - .NET 10 Core/Application/Infrastructure/Api and test projects
+#   3. dotnet test             - shell contract assertions, then the real-PostgreSQL integration
 #                                tests of tests/Chronicleaf.Integration.Tests, one stage per package
 #                                so a failure names the package that broke
-#   3. npm ci                  - locked frontend dependencies
-#   4. npm run build           - tsc then vite build
+#   4. npm ci                  - locked frontend dependencies
+#   5. npm run build           - tsc then vite build
 #
 # Any failing step records its own failure and exits nonzero. Restore, NuGet and npm
 # network failures are reported as failures; they are never skipped or tolerated.
@@ -52,6 +54,11 @@ require_docker() {
   fi
 }
 
+# Ruling 12 of the workspace ARCHITECTURE.md: the adopted shared storage is consumed from .nupkg files
+# committed in this repository, never from a sibling checkout, an absolute path or an environment
+# variable. This stage proves that, and it is the FIRST one on purpose: a build that only succeeds on a
+# machine with a warm NuGet cache would otherwise look green here and fail on the next person's.
+step "platform feed" bash scripts/verify-platform-feed.sh
 step "api build" dotnet build Chronicleaf.sln --nologo
 step "shell tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~Chronicleaf.Api.Tests"
 
@@ -75,6 +82,12 @@ else
   # is for the stages above: this package's whole claim is that a result survives a restart, and only
   # a real queue and a real database can be evidence for that.
   step "background job tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~BackgroundJobsTests"
+  # LOCAL-MEDIA-STORAGE-001/002. Private scoped media, the two-phase upload, the traversal and symlink
+  # boundary and the retire rules are proven against the same real disposable PostgreSQL AND a real
+  # temporary filesystem, through the real API host. An in-memory storage provider, a stubbed store or
+  # an EF in-memory provider is refused here for the same reason it is above: the claim under test is
+  # that bytes on a disk stay consistent with rows in a database, and neither half can be simulated.
+  step "local media storage tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~LocalMediaStorageTests"
 fi
 
 step "frontend install" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm ci'

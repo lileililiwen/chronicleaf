@@ -41,6 +41,21 @@ public static class ApiErrorStatus
         Operations.OperationError.IdempotencyConflict => 409,
         Operations.OperationError.NotCancellable => 409,
 
+        // The local-media-storage package's codes. Additive in the same way, and the 404 is
+        // deliberately the already-delivered one: an absent media id, an id in another scope and a
+        // key that resolves outside the MediaRoot are all one answer, so a caller cannot probe for
+        // another installation's media by comparing codes. 415 for a type this package does not store,
+        // 413 for a body over the limit, 422 for a decoded image over the pixel limit, 409 for media
+        // something still references, 503 for a storage provider that cannot serve the request.
+        // MediaError.NotFound and MediaError.PayloadTooLarge deliberately reuse the delivered
+        // constants, so they are already mapped above - an absent id, an id in another scope and an
+        // oversized body mean the same thing here as anywhere else. Only the codes that are genuinely
+        // new get an arm.
+        Media.MediaError.UnsupportedMediaType => 415,
+        Media.MediaError.ImageTooLarge => 422,
+        Media.MediaError.MediaInUse => 409,
+        Media.MediaError.StorageUnavailable => 503,
+
         _ => 500,
     };
 }

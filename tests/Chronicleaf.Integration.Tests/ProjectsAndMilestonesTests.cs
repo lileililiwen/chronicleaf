@@ -1036,12 +1036,14 @@ public sealed class ProjectsAndMilestonesTests(ChronicleafPostgresFixture postgr
         // earlier build is a mismatch that says which migration is missing.
         Assert.Contains(ChronicleafSchema.ProjectsAndMilestonesMigrationId, ChronicleafSchema.RequiredMigrationIds);
 
-        // BACKGROUND-JOBS-001 added a later forward migration, so the newest required id moved on.
-        // What this scenario asserts is unchanged: the schema's own identity is the newest required
-        // migration, the applied history carries it, nothing is missing, and a database stopped at the
-        // access package's migration reports exactly the remaining gaps, by name. Only the id it names
-        // is this build's newest rather than this package's.
-        Assert.Equal(ChronicleafSchema.BackgroundOperationsMigrationId, ChronicleafSchema.ExpectedMigrationId);
+        // LOCAL-MEDIA-STORAGE-001 added a later forward migration, so the newest required id moved on
+        // again. What this scenario asserts is unchanged and is in fact wider than before: the
+        // schema's own identity is the newest required migration, the applied history carries every
+        // migration this build requires, nothing is missing, and a database stopped at the access
+        // package's migration reports exactly the remaining gaps, by name and in requirement order.
+        // Only the id it names is this build's newest rather than this package's.
+        Assert.Contains(ChronicleafSchema.LocalMediaMigrationId, ChronicleafSchema.RequiredMigrationIds);
+        Assert.Equal(ChronicleafSchema.LocalMediaMigrationId, ChronicleafSchema.ExpectedMigrationId);
 
         var database = await ProvisionedDatabaseAsync("schema_mismatch");
         var applied = await ChronicleafPostgresFixture.ReadTextAsync(
@@ -1051,12 +1053,17 @@ public sealed class ProjectsAndMilestonesTests(ChronicleafPostgresFixture postgr
         Assert.NotNull(applied);
         Assert.Contains(ChronicleafSchema.ProjectsAndMilestonesMigrationId, applied, StringComparison.Ordinal);
         Assert.Contains(ChronicleafSchema.BackgroundOperationsMigrationId, applied, StringComparison.Ordinal);
+        Assert.Contains(ChronicleafSchema.LocalMediaMigrationId, applied, StringComparison.Ordinal);
         Assert.Empty(ChronicleafSchema.MissingMigrationIds(applied.Split('|')));
 
-        // A database stopped at the access package's migration reports exactly the two later gaps,
+        // A database stopped at the access package's migration reports exactly the three later gaps,
         // by name and in requirement order.
         Assert.Equal(
-            [ChronicleafSchema.ProjectsAndMilestonesMigrationId, ChronicleafSchema.BackgroundOperationsMigrationId],
+            [
+                ChronicleafSchema.ProjectsAndMilestonesMigrationId,
+                ChronicleafSchema.BackgroundOperationsMigrationId,
+                ChronicleafSchema.LocalMediaMigrationId,
+            ],
             ChronicleafSchema
                 .MissingMigrationIds([ChronicleafSchema.InitialMigrationId, ChronicleafSchema.OwnerAccessMigrationId])
                 .ToArray());
@@ -1316,6 +1323,31 @@ internal sealed class OwnerClient : IDisposable
 
     /// <summary>Sends a request built by <see cref="Post"/>, <see cref="Patch"/> or <see cref="Archive"/>.</summary>
     public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request) => _client.SendAsync(request);
+
+    /// <summary>
+    /// A mutation whose body is raw bytes with its own content type, rather than JSON.
+    /// </summary>
+    /// <remarks>
+    /// Added for the media upload, which takes the image itself as the request body. It is a fixture
+    /// addition only: the sign-in, the cookie, the origin and the antiforgery value are produced by
+    /// exactly the same code as every other mutation here, so a scenario that uses it is exercising
+    /// the delivered boundary and not a way around it. The declared content type is the caller's
+    /// claim and nothing more; the API decides what the bytes are.
+    /// </remarks>
+    public async Task<HttpRequestMessage> PostBytes(string path, byte[] body, string contentType)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, path)
+        {
+            Content = new ByteArrayContent(body),
+        };
+
+        request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        request.Headers.Add("Cookie", $"{CookieName}={_cookie}");
+        request.Headers.TryAddWithoutValidation("Origin", PublicOrigin);
+        request.Headers.Add(AntiforgeryHeader, await ReadAntiforgeryAsync());
+
+        return request;
+    }
 
     /// <summary>A mutation with no revision, used for the actions and creations that do not take one.</summary>
     public Task<HttpRequestMessage> Post(string path, object? body) => Build(HttpMethod.Post, path, body);

@@ -47,6 +47,30 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+      Adopted shared storage (LOCAL-MEDIA-STORAGE-001/002). Ruling 12 of the workspace
+      ARCHITECTURE.md is what makes these two references legitimate: the versions are pinned
+      exactly, and the artifacts they resolve from are the .nupkg files committed under
+      packages/platform-feed, reached through the repo-relative `chronicleaf-platform-feed`
+      source in nuget.config. There is no ProjectReference to a sibling checkout, no absolute
+      path and no environment-variable feed, so `dotnet build` succeeds on a clone that has no
+      sibling at all. scripts/pack-platform.sh re-packs the feed and is never part of the build.
+
+      Platform.Storage 0.1.0 owns IObjectStorage, StorageObjectKey (which already refuses
+      traversal, empty segments, control characters and an over-long key), StorageOptions,
+      StorageOutcome and the provider status contract. Platform.Storage.Local 0.1.0 is the
+      filesystem adapter this package is scoped to; Platform.Core arrives transitively and is
+      therefore committed to the feed but not referenced here.
+
+      This is the ONLY project that needs the feed. Core, Application and Api compile without
+      it, which is what keeps the layering honest: the storage interface belongs to the shared
+      platform, and only the adapter that implements it is an Infrastructure concern.
+    -->
+    <PackageReference Include="Platform.Storage" Version="0.1.0" />
+    <PackageReference Include="Platform.Storage.Local" Version="0.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Design-time only: required by `dotnet ef` but never referenced by the runtime. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.4">
       <PrivateAssets>all</PrivateAssets>

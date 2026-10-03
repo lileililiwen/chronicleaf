@@ -181,6 +181,78 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.ToTable("installation", (string)null);
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.Media", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("ByteLength")
+                        .HasColumnType("bigint")
+                        .HasColumnName("byte_length");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("MediaType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("media_type");
+
+                    b.Property<Guid?>("OwnerOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_operation_id");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("sha256");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("storage_key");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("StorageKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_media_storage_key");
+
+                    b.HasIndex("Status", "CreatedAt")
+                        .HasDatabaseName("ix_media_status_created_at");
+
+                    b.HasIndex("ScopeId", "CreatedAt", "Id")
+                        .HasDatabaseName("ix_media_scope_id_created_at_id");
+
+                    b.ToTable("media", (string)null);
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.Milestone", b =>
                 {
                     b.Property<Guid>("Id")
@@ -466,6 +538,16 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_projects_scope_id_name");
 
                     b.ToTable("projects", (string)null);
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.Media", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_media_project_id");
                 });
 #pragma warning restore 612, 618
         }

@@ -24,6 +24,17 @@
 #   Chronicleaf__PublicOrigin        REQUIRED for mutations, e.g. "https://chronicleaf.example".
 #                                    A mutation whose Origin is anything else is refused with 403,
 #                                    so an unset value fails closed rather than open.
+#   Chronicleaf__MediaRoot           Optional. The single directory stored images live under,
+#                                    defaulting to runtime/media relative to the working
+#                                    directory. It must NOT be the published wwwroot or
+#                                    anywhere inside it: stored images are private, the static
+#                                    file middleware serves that directory without an owner
+#                                    session, and a start-up is refused outright rather than
+#                                    quietly publishing every image. Mount a volume here to
+#                                    keep images across container replacements, e.g.
+#                                      -v chronicleaf-media:/app/runtime/media
+#                                    The volume must be writable by the runtime user; a
+#                                    named volume is, a host bind mount may not be.
 #   ASPNETCORE_ENVIRONMENT           Optional. Only "Development" relaxes one rule, and only on a
 #                                    loopback public origin: the session cookie may then omit
 #                                    Secure. Every other value keeps Secure on and still requires
@@ -34,6 +45,7 @@
 #     -e ConnectionStrings__Chronicleaf="$CHRONICLEAF_CONNECTION" \
 #     -e Chronicleaf__AccessTokenHash="$CHRONICLEAF_ACCESS_TOKEN_HASH" \
 #     -e Chronicleaf__PublicOrigin="https://chronicleaf.example" \
+#     -v chronicleaf-media:/app/runtime/media \
 #     chronicleaf:latest
 ARG NODE_IMAGE=node:24.18.0-bookworm-slim
 ARG DOTNET_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0.400
@@ -49,6 +61,13 @@ RUN npm run build
 FROM ${DOTNET_SDK_IMAGE} AS build
 WORKDIR /src
 COPY global.json Directory.Build.props ./
+# The adopted shared storage is restored from .nupkg files committed in this repository, reached
+# through the repository-relative `chronicleaf-platform-feed` source in nuget.config. Nothing here
+# names a sibling checkout, an absolute path or an environment variable, which is Ruling 12 of the
+# workspace ARCHITECTURE.md and is what lets this image build on a machine that has never seen
+# dotnet-platform-libs. scripts/pack-platform.sh re-packs the feed and is never part of a build.
+COPY nuget.config ./
+COPY packages/platform-feed/ ./packages/platform-feed/
 # Core -> Application -> Infrastructure -> Api, the layering the composition root depends on.
 COPY src/Chronicleaf.Core/Chronicleaf.Core.csproj src/Chronicleaf.Core/
 COPY src/Chronicleaf.Application/Chronicleaf.Application.csproj src/Chronicleaf.Application/
@@ -65,6 +84,11 @@ COPY --from=web /web/dist/ /out/wwwroot/
 FROM ${DOTNET_ASPNET_IMAGE} AS runtime
 WORKDIR /app
 COPY --from=build /out ./
+# The default MediaRoot. Created here and handed to the runtime user, because the image runs
+# non-root and would otherwise fail its first start trying to create it under a root-owned /app.
+# A deployment that mounts its own volume at this path overrides it and the operator keeps the
+# images across container replacements.
+RUN mkdir -p /app/runtime/media && chown -R $APP_UID /app/runtime
 # Required configuration. Supply it at run time; the image carries no credential.
 ENV ASPNETCORE_HTTP_PORTS=8080
 EXPOSE 8080

@@ -1,5 +1,8 @@
 using Chronicleaf.Core;
 using Chronicleaf.Core.Access;
+
+// The Core record is addressed through an alias because a sibling namespace is also called Media.
+using MediaRecord = Chronicleaf.Core.Media;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -47,6 +50,8 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
     public DbSet<Milestone> Milestones => Set<Milestone>();
 
     public DbSet<Operation> Operations => Set<Operation>();
+
+    public DbSet<MediaRecord> Media => Set<MediaRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -373,6 +378,78 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
             // from `queued` would still scan the running rows of the scope.
             entity.HasIndex(operation => new { operation.Status, operation.LeaseExpiresAt })
                 .HasDatabaseName("ix_operations_status_lease_expires_at");
+        });
+
+        // LOCAL-MEDIA-STORAGE-001/002: one private image, addressed by a server-generated scoped key.
+        // The row is the only description of the object: it names the key, the decoded type, the
+        // verified length, the digest of exactly those bytes and the status that decides whether the
+        // object may be served at all.
+        modelBuilder.Entity<MediaRecord>(entity =>
+        {
+            entity.ToTable("media");
+            entity.HasKey(media => media.Id);
+            entity.Property(media => media.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(media => media.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(media => media.ProjectId).HasColumnName("project_id").IsRequired();
+
+            // The key is generated here and is the only thing that reaches the storage provider. There
+            // is no absolute path column, so a disclosure of this table cannot disclose where the
+            // operator's bytes live.
+            entity.Property(media => media.StorageKey)
+                .HasColumnName("storage_key")
+                .HasMaxLength(MediaLimits.MaximumKeyLength)
+                .IsRequired();
+            entity.Property(media => media.MediaType)
+                .HasColumnName("media_type")
+                .HasMaxLength(MediaRecord.MediaTypeMaxLength)
+                .IsRequired();
+            entity.Property(media => media.ByteLength).HasColumnName("byte_length").IsRequired();
+            entity.Property(media => media.Sha256)
+                .HasColumnName("sha256")
+                .HasMaxLength(MediaRecord.Sha256HexLength)
+                .IsRequired();
+            entity.Property(media => media.Status)
+                .HasColumnName("status")
+                .HasMaxLength(MediaRecord.StatusMaxLength)
+                .IsRequired();
+            entity.Property(media => media.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            // The operation that produced the image, or null for one the owner uploaded. Deliberately
+            // not a foreign key: operations are the jobs package's table and this package must not
+            // decide what happens to an operation that outlives the image it produced.
+            entity.Property(media => media.OwnerOperationId).HasColumnName("owner_operation_id");
+            entity.Property(media => media.Revision).HasColumnName("revision").IsRequired();
+
+            // A stale write is a conflict, never an overwrite, for the same reason the projects and
+            // milestones tables carry a token.
+            entity.Property(media => media.Revision).IsConcurrencyToken();
+
+            // Every read is scoped, and a key is globally unique because the media id in it is.
+            entity.HasIndex(media => new { media.ScopeId, media.CreatedAt, media.Id })
+                .HasDatabaseName("ix_media_scope_id_created_at_id");
+
+            // One object per key, enforced by the database. The key is generated from the id, so this
+            // is what makes a second row able to claim bytes that already exist impossible.
+            entity.HasIndex(media => media.StorageKey)
+                .IsUnique()
+                .HasDatabaseName("ux_media_storage_key");
+
+            // The purge's only query: staged rows older than a cutoff, oldest first.
+            entity.HasIndex(media => new { media.Status, media.CreatedAt })
+                .HasDatabaseName("ix_media_status_created_at");
+
+            // The project is the owner of the image, enforced by the database rather than only by the
+            // service's lookup. No cascade: a project is archived rather than deleted, and a row of
+            // evidence that has been stored must not be removed by a change to the project that
+            // happened to own it.
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(media => media.ProjectId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_media_project_id");
         });
     }
 

@@ -39,6 +39,14 @@ public static class ChronicleafSchema
     /// </summary>
     public const string BackgroundOperationsMigrationId = "20261002112221_AddBackgroundOperations";
 
+    /// <summary>
+    /// The forward migration that adds the <c>media</c> table (LOCAL-MEDIA-STORAGE-001/002). A database
+    /// that has never applied it has nowhere to record a stored image, so its media routes would fail
+    /// against a missing table; readiness says so by name rather than answering 200 and failing on
+    /// the first upload.
+    /// </summary>
+    public const string LocalMediaMigrationId = "20261003111500_AddLocalMediaStorage";
+
     /// <summary>Every migration a database must carry before this build calls itself ready.</summary>
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
@@ -46,6 +54,7 @@ public static class ChronicleafSchema
         OwnerAccessMigrationId,
         ProjectsAndMilestonesMigrationId,
         BackgroundOperationsMigrationId,
+        LocalMediaMigrationId,
     ];
 
     /// <summary>
@@ -53,7 +62,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = BackgroundOperationsMigrationId;
+    public const string ExpectedMigrationId = LocalMediaMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

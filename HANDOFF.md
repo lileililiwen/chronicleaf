@@ -1,10 +1,10 @@
-current_spec: credential-vault
+current_spec: voice-profiles
 
 # Chronicleaf handoff
 
 ## Current state — 2026-10-03
 
-Eight changes implemented, verified and archived, each with exactly two commits (implementation/
+Nine changes implemented, verified and archived, each with exactly two commits (implementation/
 tests/archive, then this HANDOFF-only pointer):
 
 | # | Change | Implementation commit | Canonical spec |
@@ -17,6 +17,7 @@ tests/archive, then this HANDOFF-only pointer):
 | 6 | `local-media-storage` | `77fa203` | `openspec/specs/local-media-storage/spec.md` |
 | 7 | `platform-jobs-adoption` | `b1ff0f6` | `openspec/specs/platform-jobs-adoption/spec.md` |
 | 8 | `milestone-evidence` | `70419de` | `openspec/specs/milestone-evidence/spec.md` |
+| 9 | `credential-vault` | `9d1e3c8` | `openspec/specs/credential-vault/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -79,6 +80,16 @@ server-generated keys, two-phase upload/promote, traversal and symlink containme
 `media_in_use`; and immutable, revisioned Evidence Bundles where append-only and honesty are
 enforced by the database itself.
 
+**Credential safety is structural.** Credentials are AES-256-GCM sealed with a 32-byte key read
+per operation from an operator-mounted file that exists in neither the database, the repository nor
+the image, with associated data binding scope, provider, credential id and key version. A row moved
+to another scope or opened under an older key version does not decrypt. The absence of plaintext is
+proven by reading the raw `bytea` columns and searching for the sentinel **unaligned**, because a
+secret need not be aligned inside a ciphertext. The panel cannot issue a write until the read that
+publishes the credential's revision has landed, so a save can never be constructed against a state
+the client has not read - which is the defect that left a 41-character secret sitting in a DOM input
+after a refused write.
+
 **What the database now guarantees, not just the code.** Evidence is append-only by PostgreSQL
 triggers that refuse `UPDATE`/`DELETE` on bundles and items from any writer, and a collected fact
 cannot be claimed because four check constraints refuse an `unavailable` item with no reason, an
@@ -92,9 +103,10 @@ seam, so `media_in_use` now actually holds for referenced media.
 
 Evidence, all re-run by the parent session rather than taken on report: `CHRONICLEAF_E2E=1 bash
 scripts/verify.sh` exit 0 with the platform-feed stage, 15/15 shell, 24/24 persistence, 23/23 access,
-19/19 project and milestone, 12/12 jobs, 9/9 media, 14/14 evidence, `npm ci`, `tsc` + `vite build`
-and 24/24 Playwright across two database-isolated browser suites against the published app with a real
-PostgreSQL; `BackgroundJobsTests` 12/12 on three
+19/19 project and milestone, 12/12 jobs, 9/9 media, 14/14 evidence, 32/32 credential vault, `npm ci`,
+`tsc` + `vite build` and 30/30 Playwright across three database-isolated browser suites against the
+published app with a real PostgreSQL; `scripts/e2e.sh` 4/4 clean here after 5/5 by the implementer -
+nine consecutive green runs of a suite that had been failing about half the time; `BackgroundJobsTests` 12/12 on three
 consecutive runs before and after the platform swap (41s, 41s, 41s) to show the lease and two-worker
 scenarios are not flaky; the feed check exits 0 and exits 1 with the feed removed; the isolated
 no-sibling build proven in both directions; container smokes for media and jobs; name preflight exit
@@ -115,9 +127,9 @@ test waits long enough for a 15s beat to fire), no upload UI for media, no sched
 orphan reconciler, and `media-smoke.sh` not exercised in CI. Deployment stays `deployable: false`;
 there is no remote, no push and no publication.
 
-Next: implement `credential-vault` only. It is ready (`community-access` is archived) and it is one
-of the two remaining prerequisites for `llm-provider-contract`; `voice-profiles` is the other, and
-both are already in the agreed batch. After those two, the unblocked set is `github-evidence` and
+Next: implement `voice-profiles` only. It is ready (`projects-and-milestones` is archived) and it is the last prerequisite for
+`llm-provider-contract` besides `credential-vault`, which is now archived. Once it lands, the
+unblocked set is `github-evidence` and
 `screenshot-capture` (both need `milestone-evidence`, now archived) and then
 `llm-provider-contract` → `llm-openai-adapter` → `grounded-markdown-drafts` →
 `screenshot-curation` → `markdown-review-export` → `community-compose-release`, which is the first

@@ -1,7 +1,7 @@
 # platform-jobs-adoption Specification
 
 ## Purpose
-TBD - created by archiving change platform-jobs-adoption. Update Purpose after archive.
+Consumption of the published Platform.Jobs and Platform.Jobs.Hangfire packages for the durable scheduling boundary, replacing Chronicleaf's private dispatcher while Chronicleaf keeps ownership of operation state and its guarantees. Delivered by platform-jobs-adoption.
 ## Requirements
 ### Requirement: PLATFORM-JOBS-ADOPTION-001 Platform-owned dispatch
 Background operation dispatch SHALL use the published Platform.Jobs and Platform.Jobs.Hangfire packages from the committed repository feed, and Chronicleaf SHALL hold no private dispatcher contract.

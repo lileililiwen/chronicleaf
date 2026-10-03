@@ -1,7 +1,7 @@
 # local-media-storage Specification
 
 ## Purpose
-TBD - created by archiving change local-media-storage. Update Purpose after archive.
+Private media storage for the Community edition: server-generated scoped keys on the published Platform.Storage contract, two-phase upload and promotion, traversal and symlink containment, and a delete that refuses while evidence still references the bytes. Delivered by local-media-storage.
 ## Requirements
 ### Requirement: LOCAL-MEDIA-STORAGE-001 Private verified media
 Media SHALL be stored under server-generated scoped keys and served only to authorized owners.

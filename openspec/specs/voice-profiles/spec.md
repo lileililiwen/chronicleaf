@@ -1,7 +1,7 @@
 # voice-profiles Specification
 
 ## Purpose
-TBD - created by archiving change voice-profiles. Update Purpose after archive.
+Owner-controlled voice for the Community edition: explicit profile values override preset values per field, a draft's voice is a value snapshot that later edits cannot reach, and forbidden terms and structural constraints are reported as actionable text spans without ever editing the owner's words. Delivered by voice-profiles.
 ## Requirements
 ### Requirement: VOICE-PROFILES-001 Voice override precedence
 Explicit user Voice Profile values SHALL override every preset value and be snapshotted for generation.

@@ -1,10 +1,10 @@
-current_spec: voice-profiles
+current_spec: llm-provider-contract
 
 # Chronicleaf handoff
 
 ## Current state — 2026-10-03
 
-Nine changes implemented, verified and archived, each with exactly two commits (implementation/
+Ten changes implemented, verified and archived, each with exactly two commits (implementation/
 tests/archive, then this HANDOFF-only pointer):
 
 | # | Change | Implementation commit | Canonical spec |
@@ -18,6 +18,7 @@ tests/archive, then this HANDOFF-only pointer):
 | 7 | `platform-jobs-adoption` | `b1ff0f6` | `openspec/specs/platform-jobs-adoption/spec.md` |
 | 8 | `milestone-evidence` | `70419de` | `openspec/specs/milestone-evidence/spec.md` |
 | 9 | `credential-vault` | `9d1e3c8` | `openspec/specs/credential-vault/spec.md` |
+| 10 | `voice-profiles` | `fd4a6bd` | `openspec/specs/voice-profiles/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -90,6 +91,20 @@ publishes the credential's revision has landed, so a save can never be construct
 the client has not read - which is the defect that left a 41-character secret sitting in a DOM input
 after a refused write.
 
+**The gate can no longer lie by matching nothing.** `dotnet test --filter` with a pattern that
+selects no tests exits 0, so a mistyped filter turns a whole suite into a silent no-op reporting
+success — it already happened with `VoiceProfileTests` (the class is `VoiceProfilesTests`;
+singular matched 0, plural matches 22). `scripts/verify.sh` now asserts every filtered stage selects
+at least one test and fails loudly otherwise, and each stage prints its own count. This closes the
+failure class, not the one instance.
+
+**A voice finding never edits text.** Forbidden terms, emoji, title length and language script are
+checked deterministically with per-cluster NFC folding and case-insensitive comparison, and each
+finding carries `{rule, field, start, length, excerpt, term, normalizedTerm, message}` — a span into
+the caller's own text, not a boolean. A draft's voice is a value snapshot written in the same INSERT
+that creates it, so editing a profile later cannot reach it. Approval is refused while findings
+remain, and the owner's bytes are proven identical before and after the check.
+
 **What the database now guarantees, not just the code.** Evidence is append-only by PostgreSQL
 triggers that refuse `UPDATE`/`DELETE` on bundles and items from any writer, and a collected fact
 cannot be claimed because four check constraints refuse an `unavailable` item with no reason, an
@@ -104,8 +119,9 @@ seam, so `media_in_use` now actually holds for referenced media.
 Evidence, all re-run by the parent session rather than taken on report: `CHRONICLEAF_E2E=1 bash
 scripts/verify.sh` exit 0 with the platform-feed stage, 15/15 shell, 24/24 persistence, 23/23 access,
 19/19 project and milestone, 12/12 jobs, 9/9 media, 14/14 evidence, 32/32 credential vault, `npm ci`,
-`tsc` + `vite build` and 30/30 Playwright across three database-isolated browser suites against the
-published app with a real PostgreSQL; `scripts/e2e.sh` 4/4 clean here after 5/5 by the implementer -
+`tsc` + `vite build` and 34/34 Playwright across four database-isolated browser suites against the
+published app with a real PostgreSQL; `scripts/e2e.sh` green on seven runs, five of them on the exact
+final code of the last package, whose first run exposed three real UI bugs; `scripts/e2e.sh` 4/4 clean here after 5/5 by the implementer -
 nine consecutive green runs of a suite that had been failing about half the time; `BackgroundJobsTests` 12/12 on three
 consecutive runs before and after the platform swap (41s, 41s, 41s) to show the lease and two-worker
 scenarios are not flaky; the feed check exits 0 and exits 1 with the feed removed; the isolated
@@ -127,9 +143,10 @@ test waits long enough for a 15s beat to fire), no upload UI for media, no sched
 orphan reconciler, and `media-smoke.sh` not exercised in CI. Deployment stays `deployable: false`;
 there is no remote, no push and no publication.
 
-Next: implement `voice-profiles` only. It is ready (`projects-and-milestones` is archived) and it is the last prerequisite for
-`llm-provider-contract` besides `credential-vault`, which is now archived. Once it lands, the
-unblocked set is `github-evidence` and
+Next: implement `llm-provider-contract` only. All four of its dependencies — `credential-vault`, `background-jobs`,
+`voice-profiles` and `milestone-evidence` — are now archived, so it is the next
+ready package and the keystone for the provider layer. Once it lands, the unblocked
+set is `github-evidence` and
 `screenshot-capture` (both need `milestone-evidence`, now archived) and then
 `llm-provider-contract` → `llm-openai-adapter` → `grounded-markdown-drafts` →
 `screenshot-curation` → `markdown-review-export` → `community-compose-release`, which is the first

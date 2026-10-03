@@ -158,6 +158,57 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.ToTable("audit_events", (string)null);
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.Credential", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<byte[]>("Ciphertext")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("ciphertext");
+
+                    b.Property<int>("KeyVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("key_version");
+
+                    b.Property<byte[]>("Nonce")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("nonce");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("provider");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ScopeId", "Provider")
+                        .IsUnique()
+                        .HasDatabaseName("ux_credentials_scope_id_provider");
+
+                    b.HasIndex("ScopeId", "Provider", "Id")
+                        .HasDatabaseName("ix_credentials_scope_id_provider_id");
+
+                    b.ToTable("credentials", (string)null);
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.EvidenceBundle", b =>
                 {
                     b.Property<Guid>("Id")

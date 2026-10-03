@@ -56,6 +56,14 @@ public static class ChronicleafSchema
     /// </summary>
     public const string MilestoneEvidenceMigrationId = "20261003121500_AddMilestoneEvidence";
 
+    /// <summary>
+    /// The forward migration that adds the <c>credentials</c> table (CREDENTIAL-VAULT-001/002). A
+    /// database that has never applied it has nowhere to record a sealed credential, so its settings
+    /// routes would fail against a missing table; readiness says so by name rather than answering 200
+    /// and failing on the first save.
+    /// </summary>
+    public const string CredentialVaultMigrationId = "20261003124600_AddCredentialVaultCredentials";
+
     /// <summary>Every migration a database must carry before this build calls itself ready.</summary>
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
@@ -65,6 +73,7 @@ public static class ChronicleafSchema
         BackgroundOperationsMigrationId,
         LocalMediaMigrationId,
         MilestoneEvidenceMigrationId,
+        CredentialVaultMigrationId,
     ];
 
     /// <summary>
@@ -72,7 +81,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = MilestoneEvidenceMigrationId;
+    public const string ExpectedMigrationId = CredentialVaultMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

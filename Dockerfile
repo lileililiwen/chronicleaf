@@ -35,6 +35,24 @@
 #                                      -v chronicleaf-media:/app/runtime/media
 #                                    The volume must be writable by the runtime user; a
 #                                    named volume is, a host bind mount may not be.
+#   Chronicleaf__EncryptionKeyFile   REQUIRED for anything to do with a provider credential, and
+#                                    deliberately absent from this image. It is a path to a 32-byte
+#                                    AES-256 key the operator generates, keeps outside the
+#                                    repository and outside any image, and mounts at run time:
+#                                      openssl rand -out /run/chronicleaf/encryption.key 32
+#                                      chmod 600 /run/chronicleaf/encryption.key
+#                                      docker run ... \
+#                                        -e Chronicleaf__EncryptionKeyFile=/run/chronicleaf/encryption.key \
+#                                        -v /run/chronicleaf:/run/chronicleaf:ro \
+#                                        chronicleaf:latest
+#                                    A key baked into a layer is a key anybody with the image can
+#                                    read, so none is generated here and none is defaulted to. The
+#                                    file is read per credential operation, so mounting or replacing
+#                                    it takes effect without a restart. Until it is configured, every
+#                                    credential route refuses with credential_vault_unavailable and
+#                                    nothing is stored in the clear; liveness and readiness are
+#                                    unaffected, because a missing key is an operator's pending
+#                                    configuration rather than a reason to serve a broken boundary.
 #   ASPNETCORE_ENVIRONMENT           Optional. Only "Development" relaxes one rule, and only on a
 #                                    loopback public origin: the session cookie may then omit
 #                                    Secure. Every other value keeps Secure on and still requires
@@ -89,7 +107,9 @@ COPY --from=build /out ./
 # A deployment that mounts its own volume at this path overrides it and the operator keeps the
 # images across container replacements.
 RUN mkdir -p /app/runtime/media && chown -R $APP_UID /app/runtime
-# Required configuration. Supply it at run time; the image carries no credential.
+# Required configuration. Supply it at run time; the image carries no credential. The encryption key
+# in particular is never generated, copied or defaulted here: Chronicleaf__EncryptionKeyFile names a
+# file the operator mounts, and a key inside this image would be a key inside every copy of it.
 ENV ASPNETCORE_HTTP_PORTS=8080
 EXPOSE 8080
 USER $APP_UID

@@ -56,6 +56,16 @@ public static class ApiErrorStatus
         Media.MediaError.MediaInUse => 409,
         Media.MediaError.StorageUnavailable => 503,
 
+        // The credential-vault package's codes. Additive in the same way, and both 503s for the same
+        // reason: a save that cannot be sealed and a resolve that cannot be opened are the same class
+        // of condition - the operator's key is not usable right now, or the stored bytes no longer
+        // authenticate - and both are answerable once that is fixed. Neither is a 500, because a 500
+        // would tell the caller the server is broken, and neither is a 404, because the credential
+        // does exist. credential_missing deliberately has no arm: it is a job's error code, not an
+        // envelope code, and no route resolves a secret.
+        Secrets.CredentialVaultError.VaultUnavailable => 503,
+        Secrets.CredentialVaultError.Undecryptable => 503,
+
         _ => 500,
     };
 }

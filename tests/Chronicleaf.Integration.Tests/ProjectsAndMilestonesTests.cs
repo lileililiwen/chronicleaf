@@ -1044,9 +1044,11 @@ public sealed class ProjectsAndMilestonesTests(ChronicleafPostgresFixture postgr
         // Only the id it names is this build's newest rather than this package's.
         // MILESTONE-EVIDENCE-001 moved it on once more, for the same reason, and this scenario now
         // also requires the evidence migration to be applied and to be named when it is missing.
+        // CREDENTIAL-VAULT-001/002 moved it on again, and the same is now required of its migration.
         Assert.Contains(ChronicleafSchema.LocalMediaMigrationId, ChronicleafSchema.RequiredMigrationIds);
         Assert.Contains(ChronicleafSchema.MilestoneEvidenceMigrationId, ChronicleafSchema.RequiredMigrationIds);
-        Assert.Equal(ChronicleafSchema.MilestoneEvidenceMigrationId, ChronicleafSchema.ExpectedMigrationId);
+        Assert.Contains(ChronicleafSchema.CredentialVaultMigrationId, ChronicleafSchema.RequiredMigrationIds);
+        Assert.Equal(ChronicleafSchema.CredentialVaultMigrationId, ChronicleafSchema.ExpectedMigrationId);
 
         var database = await ProvisionedDatabaseAsync("schema_mismatch");
         var applied = await ChronicleafPostgresFixture.ReadTextAsync(
@@ -1058,9 +1060,10 @@ public sealed class ProjectsAndMilestonesTests(ChronicleafPostgresFixture postgr
         Assert.Contains(ChronicleafSchema.BackgroundOperationsMigrationId, applied, StringComparison.Ordinal);
         Assert.Contains(ChronicleafSchema.LocalMediaMigrationId, applied, StringComparison.Ordinal);
         Assert.Contains(ChronicleafSchema.MilestoneEvidenceMigrationId, applied, StringComparison.Ordinal);
+        Assert.Contains(ChronicleafSchema.CredentialVaultMigrationId, applied, StringComparison.Ordinal);
         Assert.Empty(ChronicleafSchema.MissingMigrationIds(applied.Split('|')));
 
-        // A database stopped at the access package's migration reports exactly the four later gaps,
+        // A database stopped at the access package's migration reports exactly the five later gaps,
         // by name and in requirement order.
         Assert.Equal(
             [
@@ -1068,6 +1071,7 @@ public sealed class ProjectsAndMilestonesTests(ChronicleafPostgresFixture postgr
                 ChronicleafSchema.BackgroundOperationsMigrationId,
                 ChronicleafSchema.LocalMediaMigrationId,
                 ChronicleafSchema.MilestoneEvidenceMigrationId,
+                ChronicleafSchema.CredentialVaultMigrationId,
             ],
             ChronicleafSchema
                 .MissingMigrationIds([ChronicleafSchema.InitialMigrationId, ChronicleafSchema.OwnerAccessMigrationId])
@@ -1367,6 +1371,18 @@ internal sealed class OwnerClient : IDisposable
     /// reads no body from it.
     /// </summary>
     public Task<HttpRequestMessage> PostWithoutBody(string path) => Build(HttpMethod.Post, path, null);
+
+    /// <summary>
+    /// A mutation that replaces a stored value in full, such as a sealed provider credential.
+    /// </summary>
+    /// <remarks>
+    /// A fixture addition only: the sign-in, the cookie, the origin, the per-mutation antiforgery
+    /// value and the <c>If-Match</c> header are produced by exactly the same code as every other
+    /// mutation here, so a scenario that uses it is exercising the delivered boundary and not a way
+    /// around it.
+    /// </remarks>
+    public Task<HttpRequestMessage> Put(string path, object? body, long? revision = null) =>
+        Build(HttpMethod.Put, path, body, revision);
 
     public Task<HttpRequestMessage> Patch(
         string path,

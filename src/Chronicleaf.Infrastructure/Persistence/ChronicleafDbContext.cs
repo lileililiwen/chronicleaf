@@ -13,7 +13,8 @@ namespace Chronicleaf.Infrastructure.Persistence;
 /// <c>installation</c> row, the append-only <c>audit_events</c> log, the durable
 /// <c>outbox</c>, the access package's <c>session</c>, <c>login_attempt</c> and
 /// <c>access_state</c> tables, and the <c>projects</c>, <c>milestones</c>, <c>media</c>,
-/// <c>evidence_bundles</c> and <c>evidence_items</c> tables that hold the owner's own records.
+/// <c>evidence_bundles</c> and <c>evidence_items</c> tables that hold the owner's own records, and
+/// the <c>credentials</c> table that holds sealed provider credentials and no plaintext.
 /// </summary>
 /// <remarks>
 /// The three data-foundation tables are owned by their package and are not changed here; the
@@ -56,6 +57,8 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
     public DbSet<EvidenceBundle> EvidenceBundles => Set<EvidenceBundle>();
 
     public DbSet<EvidenceItem> EvidenceItems => Set<EvidenceItem>();
+
+    public DbSet<Credential> Credentials => Set<Credential>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -572,6 +575,55 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .HasForeignKey(item => item.SupersedesId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_evidence_items_supersedes_id");
+        });
+
+        // CREDENTIAL-VAULT-001: a provider credential, and the only place a secret is stored. There is
+        // no plaintext column because there is no plaintext value to write: what is here is the
+        // sealed body with its tag, the nonce it was sealed with, and the key version the ciphertext
+        // is bound to. The unique (scope_id, provider) index is what makes "this scope's credential
+        // for this provider" a single row, and what turns two concurrent first saves into one row and
+        // one conflict instead of two rows.
+        modelBuilder.Entity<Credential>(entity =>
+        {
+            entity.ToTable("credentials");
+            entity.HasKey(credential => credential.Id);
+            entity.Property(credential => credential.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(credential => credential.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(credential => credential.Provider)
+                .HasColumnName("provider")
+                .HasMaxLength(CredentialProviders.MaxLength)
+                .IsRequired();
+            entity.Property(credential => credential.Ciphertext)
+                .HasColumnName("ciphertext")
+                .HasColumnType("bytea")
+                .IsRequired();
+            entity.Property(credential => credential.Nonce)
+                .HasColumnName("nonce")
+                .HasColumnType("bytea")
+                .IsRequired();
+            entity.Property(credential => credential.KeyVersion)
+                .HasColumnName("key_version")
+                .IsRequired();
+            entity.Property(credential => credential.UpdatedAt)
+                .HasColumnName("updated_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(credential => credential.Revision)
+                .HasColumnName("revision")
+                .IsRequired();
+
+            // The same reason the projects and milestones revisions carry a token: a stale write is a
+            // conflict, never an overwrite. In practice the store's compare-and-set decides, and this
+            // keeps an accidental SaveChanges from turning a lost race into a silent one.
+            entity.Property(credential => credential.Revision).IsConcurrencyToken();
+
+            entity.HasIndex(credential => new { credential.ScopeId, credential.Provider })
+                .IsUnique()
+                .HasDatabaseName("ux_credentials_scope_id_provider");
+
+            // The order a scope-bound list reads, so the page position is an index walk.
+            entity.HasIndex(credential => new { credential.ScopeId, credential.Provider, credential.Id })
+                .HasDatabaseName("ix_credentials_scope_id_provider_id");
         });
     }
 

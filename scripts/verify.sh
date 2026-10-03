@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Chronicleaf native verification (SHELL-003, COMMUNITY-PERSISTENCE-001/002, COMMUNITY-ACCESS-001/002,
 # PROJECTS-AND-MILESTONES-001/002, BACKGROUND-JOBS-001/002, LOCAL-MEDIA-STORAGE-001/002,
-# MILESTONE-EVIDENCE-001/002).
+# MILESTONE-EVIDENCE-001/002, CREDENTIAL-VAULT-001/002).
 #
 # Required chain, in order:
 #   1. platform feed           - the committed packages/platform-feed is what the build resolves, from
@@ -97,15 +97,25 @@ else
   # test is that stored evidence keeps bytes referenced and cannot be rewritten, and neither half can
   # be simulated.
   step "milestone evidence tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~MilestoneEvidenceTests"
+  # CREDENTIAL-VAULT-001/002. That a stored credential's plaintext is absent from the raw bytea
+  # columns, that a missing, wrong-length or unreadable key file fails closed with no key path in the
+  # response or the log, that a row moved between scopes or providers no longer opens, that a stale
+  # revision is a 409 which preserves the stored bytes, and that a queued job whose credential was
+  # deleted fails credential_missing, are all proven against the same real disposable PostgreSQL AND a
+  # real temporary operator key file, through the real API host and the real operation queue. A stubbed
+  # cipher, an in-memory database or a simulated provider is refused here for the same reason it is
+  # refused everywhere above: the claim under test is that a secret cannot be recovered from what was
+  # stored, and a simulated key would prove nothing about that.
+  step "credential vault tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~CredentialVaultTests"
 fi
 
 step "frontend install" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm ci'
 step "frontend build" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm run build'
 
 if [ "${CHRONICLEAF_E2E:-0}" = "1" ]; then
-  # Publishes the real application, starts a disposable PostgreSQL, applies the committed
-  # migrations, and drives the shell, access, projects-and-milestones, background-jobs and
-  # milestone-evidence fixtures in a real browser. The last two are included by
+  # Publishes the real application, starts a disposable PostgreSQL per suite, applies the committed
+  # migrations, and drives the shell, access, projects-and-milestones, background-jobs,
+  # milestone-evidence and credential-vault fixtures in a real browser. The last three are included by
   # playwright.config.ts, which already matches tests/**/*.spec.ts; this stage therefore fails if the
   # browser cannot record a project, confirm a candidate, refuse a stale edit, or read a milestone's
   # evidence and be told the truth by a 409 against a real database.

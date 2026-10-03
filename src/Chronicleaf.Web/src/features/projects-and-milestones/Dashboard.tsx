@@ -14,12 +14,14 @@ export function Dashboard({
   onOpen,
   onCreate,
   onList,
+  onCredentials,
 }: {
   readonly projects: ProjectPage | null;
   readonly loading: boolean;
   readonly onOpen: (projectId: string) => void;
   readonly onCreate: () => void;
   readonly onList: () => void;
+  readonly onCredentials: () => void;
 }) {
   const items = projects?.items ?? [];
 
@@ -69,6 +71,16 @@ export function Dashboard({
           </p>
         </>
       )}
+
+      {/*
+        The credential surface is settings, not a project, so it is reachable from the dashboard in
+        both states rather than only once a project exists.
+      */}
+      <p className="view__actions">
+        <button type="button" className="action" onClick={onCredentials} data-testid="dashboard-credentials">
+          Provider credentials
+        </button>
+      </p>
     </section>
   );
 }

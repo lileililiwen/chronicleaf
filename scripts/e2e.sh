@@ -14,22 +14,48 @@
 # The plaintext token is written to a file inside the publish directory, is never echoed, and is
 # handed to the fixtures through the environment.
 #
-# Two fixtures groups run, each against its own published instance and its own disposable database,
-# because one of them asserts something the other one changes. tests/projects-and-milestones.spec.ts
+# Three fixtures groups run, each against its own published instance and its own disposable database,
+# because one of them asserts something another one changes. tests/projects-and-milestones.spec.ts
 # states that its installation starts with an empty project list - that is the claim it is making
 # about a new installation - and a project cannot be removed once it exists, because archiving is
 # the product's own answer. A milestone cannot exist without a project, so a fixture that needs a
 # milestone cannot share that database with a fixture that is asserting nothing has been recorded.
-# Two databases is the smallest way to keep both claims honest, and it means neither group is run
-# against state the other one left behind.
+# The credential fixture is the third because it is about a new installation too: it asserts that
+# every provider reads as unconfigured before anything is stored, and a credential that was stored by
+# an earlier fixture would make that claim false.
+# Three databases is the smallest way to keep each claim honest, and it means no group is run against
+# state another one left behind.
+#
+# The credential vault reads a real operator key from a real file, generated for this run only, in a
+# temporary directory that is removed when the run ends. The key is never written into the repository,
+# into the published output or into a container image, is never echoed, and is passed to the
+# application the way a deployment passes it: as Chronicleaf__EncryptionKeyFile.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 publish_dir="${CHRONICLEAF_PUBLISH_DIR:-dist/e2e}"
 base_url="${CHRONICLEAF_BASE_URL:-http://127.0.0.1:5081}"
 evidence_base_url="${CHRONICLEAF_EVIDENCE_BASE_URL:-http://127.0.0.1:5082}"
+credentials_base_url="${CHRONICLEAF_CREDENTIALS_BASE_URL:-http://127.0.0.1:5083}"
 log_file="$repo_root/$publish_dir/server.log"
 evidence_log_file="$repo_root/$publish_dir/server-evidence.log"
+credentials_log_file="$repo_root/$publish_dir/server-credentials.log"
+key_file=""
+
+# The operator key for this run: 32 random bytes in a temporary file outside the repository and
+# outside the published output, so a leak has nowhere to land.
+create_key_file() {
+  key_file="$(mktemp -d)/chronicleaf-encryption.key"
+  ( umask 077 && head -c 32 /dev/urandom >"$key_file" )
+}
+
+remove_key_file() {
+  if [ -n "$key_file" ]; then
+    rm -f "$key_file"
+    rmdir "$(dirname "$key_file")" 2>/dev/null || true
+    key_file=""
+  fi
+}
 
 # The image is pinned; a floating tag would make this run unreproducible.
 postgres_image="postgres:17.6-alpine"
@@ -41,7 +67,10 @@ cleanup() {
   local exit_status=$?
   stop_suite
   # The tokens are secrets for the lifetime of this run and must not survive it.
-  rm -f "$repo_root/$publish_dir/access-token" "$repo_root/$publish_dir/access-token-evidence"
+  rm -f "$repo_root/$publish_dir/access-token" "$repo_root/$publish_dir/access-token-evidence" \
+    "$repo_root/$publish_dir/access-token-credentials"
+  # So is the encryption key: it is removed whether the run passed or failed.
+  remove_key_file
   exit "$exit_status"
 }
 trap cleanup EXIT
@@ -145,6 +174,7 @@ start_suite() {
       ConnectionStrings__Chronicleaf="$connection_string" \
       Chronicleaf__AccessTokenHash="$access_token_hash" \
       Chronicleaf__PublicOrigin="$origin" \
+      Chronicleaf__EncryptionKeyFile="$key_file" \
       dotnet Chronicleaf.Api.dll >"$log" 2>&1
   ) &
   server_pid=$!
@@ -191,6 +221,10 @@ run_suite() {
 }
 
 bash "$repo_root/scripts/publish.sh" "$publish_dir" Release
+
+# The vault's key is generated here, before any application is started, so every suite is configured
+# the same way a deployment configures it.
+create_key_file
 
 # ---------------------------------------------------------------------------------------------
 # The operations panel can only report operations that exist, and the only honest way to give the
@@ -266,4 +300,17 @@ start_suite evidence "$evidence_base_url" "$evidence_log_file" "$repo_root/$publ
 echo "==> npm run test:e2e (real browser against $evidence_base_url)"
 run_suite "$evidence_base_url" "$evidence_log_file" "$repo_root/$publish_dir/access-token-evidence" \
   tests/milestone-evidence.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 3: the credential settings surface. It asserts that a new installation reads as
+# unconfigured for every provider, and a stored credential cannot be un-stored by the UI, so it needs
+# its own installation and its own published instance.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a third disposable PostgreSQL and published application at $credentials_base_url"
+start_suite credentials "$credentials_base_url" "$credentials_log_file" "$repo_root/$publish_dir/access-token-credentials"
+
+echo "==> npm run test:e2e (real browser against $credentials_base_url)"
+run_suite "$credentials_base_url" "$credentials_log_file" "$repo_root/$publish_dir/access-token-credentials" \
+  tests/credential-vault.spec.ts
 stop_suite

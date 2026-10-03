@@ -4,6 +4,7 @@ using Chronicleaf.Application.Common;
 using Chronicleaf.Application.Media;
 using Chronicleaf.Application.Milestones;
 using Chronicleaf.Application.Operations;
+using Chronicleaf.Application.Secrets;
 // `ApiError` also names the runtime shell's compact not_found/web_assets_unavailable record in
 // namespace Chronicleaf.Api, which wins the lookup from inside this namespace. The alias keeps the
 // envelope type unambiguous: the shell record is a different, shipped contract.
@@ -196,6 +197,29 @@ public sealed class ApiErrorMiddleware(
             case MediaStorageUnavailableException storageUnavailable:
                 return (
                     Envelope.Create(MediaError.StorageUnavailable, storageUnavailable.Message, traceId),
+                    LogLevel.Warning);
+
+            // CREDENTIAL-VAULT-001/002. Written here for the same reason as every other feature
+            // package's refusals: the vault raises them and this middleware is still the only place an
+            // envelope is written. A 404 for a credential that is not this owner's is the already
+            // delivered not-found, so a caller cannot probe another installation by comparing codes.
+            // The two 503s say the operator's key is unusable and that stored bytes no longer
+            // authenticate; both messages are authored in the secrets package, name no key file, no
+            // path, no provider and no value, and are logged as warnings because they are conditions
+            // an operator has to fix rather than bugs in the request.
+            case CredentialNotFoundException credentialNotFound:
+                return (
+                    Envelope.Create(Envelope.NotFound, credentialNotFound.Message, traceId),
+                    LogLevel.Information);
+
+            case SecretVaultUnavailableException vaultUnavailable:
+                return (
+                    Envelope.Create(CredentialVaultError.VaultUnavailable, vaultUnavailable.Message, traceId),
+                    LogLevel.Warning);
+
+            case CredentialUndecryptableException undecryptable:
+                return (
+                    Envelope.Create(CredentialVaultError.Undecryptable, undecryptable.Message, traceId),
                     LogLevel.Warning);
 
             case MalformedJsonException malformed:

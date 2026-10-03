@@ -3,6 +3,7 @@ import { MilestoneEditor } from './MilestoneEditor';
 import { ProjectDetail } from './ProjectDetail';
 import { ProjectEditor } from './ProjectEditor';
 import { OperationsArea } from '../background-jobs/OperationsArea';
+import { CredentialsArea } from '../credential-vault/CredentialsArea';
 import { getMilestone, getProject, listProjects } from './api';
 import { useMilestone, useProject, useProjects } from './useRecords';
 import { segmentsOf, useRoute } from './useRoute';
@@ -29,6 +30,7 @@ import { segmentsOf, useRoute } from './useRoute';
  * - `/projects/{id}/milestones/{milestoneId}` editing a milestone
  * - `/operations` the background jobs panel (BACKGROUND-JOBS-001/002)
  * - `/operations/{id}` one background job
+ * - `/settings/credentials` the credential settings surface (CREDENTIAL-VAULT-001/002)
  */
 export function ProjectArea() {
   const { path, navigate } = useRoute();
@@ -40,6 +42,10 @@ export function ProjectArea() {
 
   if (segments[0] === 'operations') {
     return <OperationsArea path={segments.join('/')} onNavigate={navigate} />;
+  }
+
+  if (segments[0] === 'settings') {
+    return <CredentialsArea path={segments.join('/')} onNavigate={navigate} />;
   }
 
   if (segments[0] === 'projects') {
@@ -120,6 +126,7 @@ function DashboardRoute({ onNavigate }: { readonly onNavigate: (to: string) => v
       onOpen={(projectId) => onNavigate(`/projects/${projectId}`)}
       onCreate={() => onNavigate('/projects/new')}
       onList={() => onNavigate('/projects')}
+      onCredentials={() => onNavigate('/settings/credentials')}
     />
   );
 }

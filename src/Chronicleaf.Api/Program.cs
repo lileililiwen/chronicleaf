@@ -12,12 +12,14 @@ using Chronicleaf.Api.Evidence;
 using Chronicleaf.Api.Media;
 using Chronicleaf.Api.Operations;
 using Chronicleaf.Api.Projects;
+using Chronicleaf.Api.Secrets;
 using Chronicleaf.Infrastructure.Access;
 using Chronicleaf.Infrastructure.Evidence;
 using Chronicleaf.Infrastructure.Media;
 using Chronicleaf.Infrastructure.Operations;
 using Chronicleaf.Infrastructure.Persistence;
 using Chronicleaf.Infrastructure.Projects;
+using Chronicleaf.Infrastructure.Secrets;
 using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -68,6 +70,13 @@ builder.Services.AddChronicleafMedia(
 // already answered becomes a statement about stored evidence rather than about a stub. Registration
 // order does not matter: it removes and replaces rather than trying to add first.
 builder.Services.AddMilestoneEvidence();
+
+// CREDENTIAL-VAULT-001/002. Sealed provider credentials over the same PostgreSQL, unit of work,
+// audit trail and operation queue the packages above delivered. The key is read from the operator's
+// Chronicleaf__EncryptionKeyFile, which is deliberately not a start-up gate: until it is configured,
+// every credential route refuses with credential_vault_unavailable and nothing is ever stored in the
+// clear. A database without the credential-vault migration reports schema_mismatch at /api/ready.
+builder.Services.AddCredentialVault(builder.Configuration);
 
 // The rotation guard is applied once at start-up, so an access token that was changed since the
 // last run revokes every existing session before this process serves anything.
@@ -130,6 +139,12 @@ app.MapMediaEndpoints();
 // package's default-deny boundary already covers both and the public allow-list stays exactly as the
 // access package fixed it - evidence is readable only by the owner it belongs to.
 app.MapMilestoneEvidenceEndpoints();
+
+// CREDENTIAL-VAULT-001/002: the private settings routes for provider credentials. None of them is
+// marked public, so the access package's default-deny boundary already covers every one of them and
+// the public allow-list stays exactly as the access package fixed it. No route here returns a secret,
+// on success or on failure.
+app.MapCredentialEndpoints();
 
 // SHELL-001/SHELL-002: every unmatched path is either an unknown API path, an unknown
 // static asset, or a client route. Only the last one falls back to the SPA entry point. This

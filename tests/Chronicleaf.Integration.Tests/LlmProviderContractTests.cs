@@ -69,11 +69,23 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
     /// <summary>The secret stored under <see cref="CredentialId"/>. Never leaves this file.</summary>
     private const string StoredSecret = "sk-chronicleaf-llm-contract-sentinel-9c1f4a7e2b8d";
 
-    /// <summary>A model the test double declares it accepts. The contract has no model list of its own.</summary>
-    private const string KnownModel = "test-model-r1";
+    /// <summary>
+    /// The provider slot this suite's double serves.
+    /// </summary>
+    /// <remarks>
+    /// <b>Anthropic, not openai.</b> llm-openai-adapter registered a real adapter for the
+    /// <c>openai</c> slot in the production composition root, and the resolver is built from whatever
+    /// the composition root supplied. A double claiming <c>openai</c> would therefore be shadowed by the
+    /// real adapter on any host built from production, and a scenario expecting its scripted answer would
+    /// get a real transport instead - which is a test that silently stopped testing.
+    ///
+    /// The four slots with no adapter yet are the ones this suite can serve a double on, because a double
+    /// that is actually resolved is the only kind that can exercise the contract's behaviour at all.
+    /// </remarks>
+    private const string ProviderId = GenerationProviderIds.Anthropic;
 
-    /// <summary>The provider slot the double serves.</summary>
-    private const string ProviderId = GenerationProviderIds.OpenAI;
+    /// <summary>A model the double declares it accepts. The contract has no model list of its own.</summary>
+    private const string KnownModel = "test-model-r1";
 
     /// <summary>A completed answer that satisfies the milestone story schema exactly.</summary>
     private const string CompliantDraft =
@@ -1559,16 +1571,30 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
         Assert.Equal([ProviderId], configured.Select(slot => slot.GetProperty("id").GetString()!).ToArray());
         Assert.Equal(1, configured[0].GetProperty("credentialRevision").GetInt64());
 
-        // One slot is usable: it has an adapter and a credential. The other four are supported by the
-        // contract and not reachable, and they say which of the two reasons applies.
+        // Exactly one slot is usable: this host's double, which has an adapter and a credential. The
+        // other four are supported by the contract and not reachable, and each says which of the two
+        // reasons applies.
         Assert.Equal([ProviderId], usable.Select(slot => slot.GetProperty("id").GetString()!).ToArray());
 
         foreach (var slot in supported.Where(slot => slot.GetProperty("id").GetString() != ProviderId))
         {
+            if (slot.GetProperty("id").GetString() == GenerationProviderIds.OpenAI)
+            {
+                // The one slot that is different on every host built from the production composition
+                // root, because llm-openai-adapter registered a real adapter for it. Its capability is
+                // therefore present here, copied verbatim from that adapter and not from this host's
+                // double - which is the delivered rule, and the reason this assertion is written as an
+                // exception rather than as a blanket "every other slot is empty".
+                Assert.True(slot.GetProperty("adapterInstalled").GetBoolean());
+                Assert.Equal(
+                    GenerationProviderIds.OpenAI,
+                    slot.GetProperty("capability").GetProperty("id").GetString());
+                continue;
+            }
+
+            // The three slots no package has implemented yet. Each is supported by the contract and not
+            // reachable, and each says which of the two reasons applies.
             Assert.False(slot.GetProperty("adapterInstalled").GetBoolean());
-            Assert.Equal(
-                JsonValueKind.Null,
-                slot.GetProperty("capability").ValueKind);
 
             // An absent descriptor is not a descriptor of all-false: the slot reports that nothing is
             // known about its provider, which is a different fact from a provider that cannot.
@@ -1577,13 +1603,15 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
     }
 
     [Fact]
-    public async Task Production_registration_contains_no_adapter_and_no_settings_value_can_reach_one()
+    public async Task Production_registration_contains_no_adapter_for_an_unimplemented_slot_and_no_settings_value_can_reach_one()
     {
         var database = await ProvisionedDatabaseAsync("llm_production");
         using var keyFile = OperatorKeyFile.Create();
 
-        // The production composition root: every service this package registers, and no
-        // ILLMProvider at all. The five real adapters are separate roadmap packages.
+        // The production composition root: every service this package registers, plus whatever adapters
+        // later packages added. Anthropic is still a separate roadmap package, so this host has none for
+        // it - and the openai slot is asserted below to have one, which is what makes this a claim about
+        // one slot rather than about the registry being empty.
         await using var host = LlmProviderApiHost.StartProduction(database, new FixedTimeProvider(Clock), keyFile.FilePath);
         using var owner = await OwnerClient.CreateAsync(host);
 
@@ -1591,7 +1619,8 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
         var credentialId = await SaveCredentialAsync(owner);
         var evidenceId = (await ReadEvidenceAsync(owner, milestoneId)).Items[0].Id;
 
-        // The catalogue is honest: the slots exist, a credential is configured, and no adapter does.
+        // The catalogue is honest: the slots exist, a credential is configured, and the unimplemented one
+        // has no adapter.
         using var catalogue = await ReadJsonAsync(await owner.GetAsync("/api/ai/providers"));
         var slot = catalogue.RootElement.GetProperty("supported")
             .EnumerateArray()
@@ -1601,6 +1630,24 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
         Assert.False(slot.GetProperty("adapterInstalled").GetBoolean());
         Assert.Equal(JsonValueKind.Null, slot.GetProperty("capability").ValueKind);
         Assert.Empty(catalogue.RootElement.GetProperty("usable").EnumerateArray());
+
+        // The registry is no longer empty, and this is the assertion that says so. It is stated here
+        // rather than left implicit because a future reader who finds openai installed must be able to
+        // tell whether that was intended: it was, by llm-openai-adapter, and the four remaining slots
+        // are the ones still to come.
+        var installed = catalogue.RootElement.GetProperty("supported")
+            .EnumerateArray()
+            .Where(entry => entry.GetProperty("adapterInstalled").GetBoolean())
+            .Select(entry => entry.GetProperty("id").GetString()!)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal([GenerationProviderIds.OpenAI], installed);
+        Assert.Equal(
+            4,
+            catalogue.RootElement.GetProperty("supported")
+                .EnumerateArray()
+                .Count(entry => !entry.GetProperty("adapterInstalled").GetBoolean()));
 
         // A settings value cannot reach an adapter, because there is nothing to reach. The same
         // request that a double-serving host answers 200 for is refused here.

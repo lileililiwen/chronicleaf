@@ -2,7 +2,7 @@
 # Chronicleaf native verification (SHELL-003, COMMUNITY-PERSISTENCE-001/002, COMMUNITY-ACCESS-001/002,
 # PROJECTS-AND-MILESTONES-001/002, BACKGROUND-JOBS-001/002, LOCAL-MEDIA-STORAGE-001/002,
 # MILESTONE-EVIDENCE-001/002, CREDENTIAL-VAULT-001/002, VOICE-PROFILES-001/002,
-# LLM-PROVIDER-CONTRACT-001/002, GITHUB-EVIDENCE-001/002).
+# LLM-PROVIDER-CONTRACT-001/002, GITHUB-EVIDENCE-001/002, LLM-OPENAI-ADAPTER-001/002).
 #
 # Required chain, in order:
 #   1. platform feed           - the committed packages/platform-feed is what the build resolves, from
@@ -171,6 +171,30 @@ else
   # composition root answers 422, because no configuration value can reach a double that was never
   # registered.
   step "llm provider contract tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~LlmProviderContractTests"
+  # LLM-OPENAI-ADAPTER-001/002. That a valid nonstreaming response maps text, finish state and whatever
+  # usage the provider reported; that a refusal, a content-filtered answer, a truncation, a tool call in
+  # a text-only contract, an empty answer and three malformed bodies are each distinguishable and none of
+  # them is ever a draft; that absent or nonsensical token counts are reported unknown rather than
+  # fabricated; that the outbound request is exactly the consented payload at the fixed origin with no
+  # member asking for tools or for a stored conversation; that a 401 and a 403 are the same
+  # credential_rejected answer and neither the envelope nor the adapter's own log lines carry the key or
+  # the provider's error prose; that a 429 and a 5xx are two different codes; that a 302 is refused
+  # rather than followed; that a model outside the allowlist and an empty allowlist are both refused
+  # before a credential is leased and before a socket is opened; that a cancelled call throws and stores
+  # nothing; that a response over the 2 MiB cap is refused while its bytes are arriving; and that the
+  # adapter is registered in production and published verbatim, and is unreachable when it is not
+  # registered - all proven against the same real disposable PostgreSQL, the real operator key file and
+  # the real API host, with the real OpenAIProvider over a stub at the far end of its HttpClient.
+  #
+  # One substitution, and it is the package's own declared boundary: the message handler underneath the
+  # adapter's HttpClient. Everything above the socket is production's own code, including the adapter,
+  # the vault lease, the header, the status mapping and the consent handshake - so a double
+  # implementing ILLMProvider (as the stage above needs) could not have asserted any of this. No stage
+  # here may be read as evidence that OpenAI works, that a named model exists or is available to any
+  # owner, or that a paid call is cheap: the response bodies are transcribed from the provider's
+  # published reference, which is a fact about a document rather than about a service, and the
+  # credential-gated live smoke the design names is NOT performed and NOT claimed.
+  step "llm openai adapter tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~LlmOpenaiAdapterTests"
   # GITHUB-EVIDENCE-001/002. That a collection resolves the selected refs to immutable revisions and
   # appends bounded evidence naming each source; that a repository that is absent or not public fails
   # with repository_unavailable rather than with invented material; that a binary or excluded file is

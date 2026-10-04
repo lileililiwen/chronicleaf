@@ -25,6 +25,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chronicleaf.GitHub", "src\C
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chronicleaf.Capture", "src\Chronicleaf.Capture\Chronicleaf.Capture.csproj", "{0867E9C4-CE09-4B34-80E8-870D2C9932D0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chronicleaf.AI.OpenAI", "src\Chronicleaf.AI\Providers\OpenAI\Chronicleaf.AI.OpenAI.csproj", "{BDAA85D8-B5F5-463E-B727-05358848A3F1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -143,6 +145,18 @@ Global
 		{0867E9C4-CE09-4B34-80E8-870D2C9932D0}.Release|x64.Build.0 = Release|Any CPU
 		{0867E9C4-CE09-4B34-80E8-870D2C9932D0}.Release|x86.ActiveCfg = Release|Any CPU
 		{0867E9C4-CE09-4B34-80E8-870D2C9932D0}.Release|x86.Build.0 = Release|Any CPU
+		{BDAA85D8-B5F5-463E-B727-05358848A3F1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BDAA85D8-B5F5-463E-B727-05358848A3F1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BDAA85D8-B5F5-463E-B727-05358848A3F1}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{BDAA85D8-B5F5-463E-B727-05358848A3F1}.Debug|x64.Build.0 = Debug|Any CPU
+		{BDAA85D8-B5F5-463E-B727-05358848A3F1}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{BDAA85D8-B5F5-463E-B727-05358848A3F1}.Debug|x86.Build.0 = Debug|Any CPU
+		{BDAA85D8-B5F5-463E-B727-05358848A3F1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BDAA85D8-B5F5-463E-B727-05358848A3F1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BDAA85D8-B5F5-463E-B727-05358848A3F1}.Release|x64.ActiveCfg = Release|Any CPU
+		{BDAA85D8-B5F5-463E-B727-05358848A3F1}.Release|x64.Build.0 = Release|Any CPU
+		{BDAA85D8-B5F5-463E-B727-05358848A3F1}.Release|x86.ActiveCfg = Release|Any CPU
+		{BDAA85D8-B5F5-463E-B727-05358848A3F1}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -157,5 +171,6 @@ Global
 		{9B738771-A14D-4412-8049-B628B637CD1D} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{70C3D330-AC0D-4644-94BB-26895055AC16} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{0867E9C4-CE09-4B34-80E8-870D2C9932D0} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{BDAA85D8-B5F5-463E-B727-05358848A3F1} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

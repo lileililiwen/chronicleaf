@@ -8,6 +8,18 @@
     <AssemblyName>Chronicleaf.AI</AssemblyName>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!--
+      Providers/ holds the five adapter packages, and each one is a project of its own rather than a
+      folder in this one. The default glob would otherwise compile an adapter's sources into this
+      assembly as well, which would quietly give an adapter a second home and put Microsoft.Extensions
+      types on a project whose whole guarantee is that it has no dependencies at all. Excluding the
+      subtree is what keeps "this project references nothing" true after the first adapter lands, and
+      it is why the adapter project can sit at the path the design names.
+    -->
+    <Compile Remove="Providers/**/*.cs" />
+  </ItemGroup>
+
   <!--
     Deliberately empty, and that is the package's structural guarantee rather than an oversight.
 

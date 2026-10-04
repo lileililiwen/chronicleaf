@@ -455,7 +455,7 @@ public sealed class GithubEvidenceTests(ChronicleafPostgresFixture postgres)
         // A comparison with nothing in it is a real answer, so exactly one GitHub item is recorded:
         // the repository, its two revisions and the endpoints that were read. The bundle is a
         // snapshot, so the owner's own note is in it too and is not this run's to claim.
-        var repository = Assert.Single(head.Items.Where(item => item.SourceRef.StartsWith("github:", StringComparison.Ordinal)));
+        var repository = Assert.Single(head.Items, item => item.SourceRef.StartsWith("github:", StringComparison.Ordinal));
         Assert.Equal(EvidenceKinds.ProjectMetadata, repository.Kind);
         Assert.Equal(EvidenceAvailability.Complete, repository.Availability);
         Assert.Contains("Head revision: " + HeadSha, repository.Text, StringComparison.Ordinal);

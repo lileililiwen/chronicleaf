@@ -17,6 +17,7 @@ using Chronicleaf.Api.Operations;
 using Chronicleaf.Api.Projects;
 using Chronicleaf.Api.Secrets;
 using Chronicleaf.Api.Voice;
+using Chronicleaf.AI.OpenAI;
 using Chronicleaf.Infrastructure.Access;
 using Chronicleaf.Infrastructure.AI;
 using Chronicleaf.Infrastructure.Capture;
@@ -102,6 +103,18 @@ builder.Services.AddVoiceProfiles();
 // rather than assumes. A database without the generation-previews migration reports schema_mismatch
 // at /api/ready.
 builder.Services.AddAIGeneration();
+
+// LLM-OPENAI-ADAPTER-001/002. The first real transport behind the generation contract: one
+// ILLMProvider for the `openai` slot, a fixed HTTPS origin with redirects refused, and a leased
+// key that is used for one header and returned. This is the only registration in the repository that
+// makes a provider reachable, and it is also the only lever that un-installs one - there is no flag
+// that removes it at runtime, so "which providers can this deployment call" is answered by what was
+// built and deployed rather than by a value. The accepted-model allowlist is configuration and is
+// empty unless an operator filled it in, so an untouched deployment refuses every model before a
+// credential is leased; that is the honest state of a transport nobody has pointed at anything. The
+// four remaining slots are still separate roadmap packages and stay unclaimed.
+builder.Services.AddSingleton<IOpenAIApiKeySource, VaultOpenAIApiKeySource>();
+builder.Services.AddOpenAIProvider(builder.Configuration);
 
 // GITHUB-EVIDENCE-001/002. The read-only GitHub transport, pinned to the API host with redirects
 // refused, plus the two stores, the service and the one job handler that appends collected evidence

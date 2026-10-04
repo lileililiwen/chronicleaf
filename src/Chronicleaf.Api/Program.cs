@@ -18,6 +18,7 @@ using Chronicleaf.Api.Media;
 using Chronicleaf.Api.Operations;
 using Chronicleaf.Api.Projects;
 using Chronicleaf.Api.Secrets;
+using Chronicleaf.Api.Timeline;
 using Chronicleaf.Api.Voice;
 using Chronicleaf.AI.OpenAI;
 using Chronicleaf.Infrastructure.Access;
@@ -59,6 +60,11 @@ builder.Services.AddChronicleafAccess(builder.Configuration, builder.Environment
 // own to fall back on: a database without the projects-and-milestones migration reports
 // schema_mismatch at /api/ready rather than serving an empty installation.
 builder.Services.AddProjectMilestones();
+
+// MILESTONE-TIMELINE-001/002. The private chronological read over the milestone records above.
+// It keeps no table of its own: the projects-and-milestones migration is its schema, and a
+// database without it reports schema_mismatch at /api/ready.
+builder.Services.AddTimeline();
 
 // BACKGROUND-JOBS-001/002. Durable operation execution: the same PostgreSQL database as everything
 // else, in its own schema, with no in-memory fallback. Registration refuses to start when there is no
@@ -198,6 +204,12 @@ app.MapAccessEndpoints();
 // marked public, so the access package's default-deny boundary already covers every one of them
 // and the public allow-list stays exactly as the design fixed it.
 app.MapProjectMilestoneEndpoints();
+
+// MILESTONE-TIMELINE-001/002: the private chronological timeline of one project. It is not marked
+// public, so the access package's default-deny boundary already covers it and the public allow-list
+// stays exactly as the access package fixed it - a timeline is readable only by the owner it
+// belongs to, and an archived project's history stays readable.
+app.MapTimelineEndpoints();
 
 // BACKGROUND-JOBS-001/002: the private operation routes. None is marked public, so the access
 // package's default-deny boundary already covers every one of them and the public allow-list stays

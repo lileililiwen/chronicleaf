@@ -3,7 +3,8 @@
 # PROJECTS-AND-MILESTONES-001/002, BACKGROUND-JOBS-001/002, LOCAL-MEDIA-STORAGE-001/002,
 # MILESTONE-EVIDENCE-001/002, CREDENTIAL-VAULT-001/002, VOICE-PROFILES-001/002,
 # LLM-PROVIDER-CONTRACT-001/002, GITHUB-EVIDENCE-001/002, LLM-OPENAI-ADAPTER-001/002,
-# SCREENSHOT-CAPTURE-001/002, SCREENSHOT-CURATION-001/002, GROUNDED-MARKDOWN-DRAFTS-001/002).
+# SCREENSHOT-CAPTURE-001/002, SCREENSHOT-CURATION-001/002, GROUNDED-MARKDOWN-DRAFTS-001/002,
+# MILESTONE-TIMELINE-001/002).
 #
 # Required chain, in order:
 #   1. platform feed           - the committed packages/platform-feed is what the build resolves, from
@@ -283,6 +284,15 @@ else
   # draft bodies come from fixtures, and the grounding, citation, provenance and supersede claims are
   # about this system's handling of them.
   step "grounded markdown draft tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~GroundedMarkdownDraftsTests"
+  # MILESTONE-TIMELINE-001/002. That 52 confirmed records across equal timestamps page oldest first
+  # with no duplicated id and read identically twice; that candidates stay hidden until asked for
+  # and then arrive labeled without promoting anything; that dismissed records are omitted in both
+  # views; that a cursor from another project, another filter or the milestone list is refused with
+  # a 422 naming cursor and no foreign record; that a backdated edit moves its row on the next
+  # fresh read; and that an archived project's history stays readable - all proven against the same
+  # real disposable PostgreSQL through the real API host. No new table is migrated: the timeline
+  # is a projection of the milestone records the projects-and-milestones migration already holds.
+  step "milestone timeline tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~MilestoneTimelineTests"
 fi
 
 step "frontend install" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm ci'
@@ -292,7 +302,7 @@ if [ "${CHRONICLEAF_E2E:-0}" = "1" ]; then
   # Publishes the real application, starts a disposable PostgreSQL per suite, applies the committed
   # migrations, and drives the shell, access, projects-and-milestones, background-jobs,
   # milestone-evidence, credential-vault, voice-profiles, llm-provider-contract, github-evidence,
-  # screenshot-capture, grounded-markdown-drafts and screenshot-curation fixtures in a real browser.
+  # screenshot-capture, grounded-markdown-drafts, screenshot-curation and milestone-timeline fixtures in a real browser.
   # The suites after the shell are included by scripts/e2e.sh, which names each fixture file, so a
   # file that stops being matched shows up as a Playwright "no tests found" failure rather than as
   # a suite quietly passing with nothing in it; this stage

@@ -107,6 +107,53 @@ public sealed class PostgresMilestoneStore(ChronicleafDbContext dbContext) : IMi
         return ChronicleafSql.QueryAsync(dbContext, sql, parameters, MilestoneRowReader.Read, cancellationToken);
     }
 
+    public Task<IReadOnlyList<Milestone>> ListChronologicalAsync(
+        Guid scopeId,
+        Guid projectId,
+        bool includeCandidates,
+        DateTimeOffset? occurredAfter,
+        Guid? idAfter,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        // occurredAt asc, id asc, and the cursor is the same ordering: the next page is the rows
+        // strictly after the last one this caller saw. Dismissed records are never part of the
+        // timeline; candidates join the confirmed history only when the owner asked for them.
+        var positioned = occurredAfter is not null && idAfter is not null;
+
+        var sql = $"""
+            SELECT {MilestoneRowReader.QualifiedColumns("m")}
+            FROM milestones AS m
+            INNER JOIN projects AS p ON p.id = m.project_id
+            WHERE p.scope_id = @p0 AND m.project_id = @p1
+              {(includeCandidates ? "AND m.status IN (@p2, @p6)" : "AND m.status = @p2")}
+              {(positioned ? "AND (m.occurred_at, m.id) > (@p3, @p4)" : string.Empty)}
+            ORDER BY m.occurred_at ASC, m.id ASC
+            LIMIT @p5
+            """;
+
+        var parameters = new List<SqlParameter>(7)
+        {
+            new("@p0", NpgsqlDbType.Uuid, scopeId),
+            new("@p1", NpgsqlDbType.Uuid, projectId),
+            new("@p2", NpgsqlDbType.Varchar, MilestoneStatus.Confirmed),
+            new("@p5", NpgsqlDbType.Integer, limit),
+        };
+
+        if (includeCandidates)
+        {
+            parameters.Add(new("@p6", NpgsqlDbType.Varchar, MilestoneStatus.Candidate));
+        }
+
+        if (positioned)
+        {
+            parameters.Add(new("@p3", NpgsqlDbType.TimestampTz, occurredAfter!.Value.ToUniversalTime()));
+            parameters.Add(new("@p4", NpgsqlDbType.Uuid, idAfter));
+        }
+
+        return ChronicleafSql.QueryAsync(dbContext, sql, parameters, MilestoneRowReader.Read, cancellationToken);
+    }
+
     public async Task<bool> InsertAsync(Milestone milestone, CancellationToken cancellationToken = default)
     {
         var inserted = await ChronicleafSql.ScalarAsync<Guid>(

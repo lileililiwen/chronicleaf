@@ -14,7 +14,7 @@
 # The plaintext token is written to a file inside the publish directory, is never echoed, and is
 # handed to the fixtures through the environment.
 #
-# Nine fixture groups run, each against its own published instance and its own disposable database,
+# Ten fixture groups run, each against its own published instance and its own disposable database,
 # because one of them asserts something another one changes. tests/projects-and-milestones.spec.ts
 # states that its installation starts with an empty project list - that is the claim it is making
 # about a new installation - and a project cannot be removed once it exists, because archiving is
@@ -37,7 +37,7 @@
 # false on the next run, because a credential cannot be un-stored through the UI either. It is also
 # the only suite that creates a milestone with recorded evidence, and an evidence bundle is append-only,
 # so sharing a database with any other suite would put a second bundle where one suite expects one.
-# Nine databases is the smallest way to keep each claim honest, and it means no group is run against
+# Ten databases is the smallest way to keep each claim honest, and it means no group is run against
 # state another one left behind.
 # A sixth is what the GitHub fixture needs, for the same reason again: it asserts that a project starts
 # with no repository connected, and a connection cannot be removed through the UI - there is no delete
@@ -57,6 +57,9 @@
 # through the UI - there is no undo for publishing a picture into evidence, because the bundle it
 # entered is append-only - and the suite selects, rejects and reorders one milestone's
 # pictures, which would leave a different choice behind for any suite that shared its database.
+# A tenth is what the timeline fixture needs, for the same reason again: it records milestones into
+# a project, and a project cannot be removed once it exists - so it reads its own installation
+# rather than the one any other suite asserted empty.
 # The credential vault reads a real operator key from a real file, generated for this run only, in a
 # temporary directory that is removed when the run ends. The key is never written into the repository,
 # into the published output or into a container image, is never echoed, and is passed to the
@@ -74,6 +77,7 @@ github_base_url="${CHRONICLEAF_GITHUB_BASE_URL:-http://127.0.0.1:5086}"
 capture_base_url="${CHRONICLEAF_CAPTURE_BASE_URL:-http://127.0.0.1:5087}"
 drafts_base_url="${CHRONICLEAF_DRAFTS_BASE_URL:-http://127.0.0.1:5088}"
 curation_base_url="${CHRONICLEAF_CURATION_BASE_URL:-http://127.0.0.1:5089}"
+timeline_base_url="${CHRONICLEAF_TIMELINE_BASE_URL:-http://127.0.0.1:5090}"
 log_file="$repo_root/$publish_dir/server.log"
 evidence_log_file="$repo_root/$publish_dir/server-evidence.log"
 credentials_log_file="$repo_root/$publish_dir/server-credentials.log"
@@ -83,6 +87,7 @@ github_log_file="$repo_root/$publish_dir/server-github.log"
 capture_log_file="$repo_root/$publish_dir/server-capture.log"
 drafts_log_file="$repo_root/$publish_dir/server-drafts.log"
 curation_log_file="$repo_root/$publish_dir/server-curation.log"
+timeline_log_file="$repo_root/$publish_dir/server-timeline.log"
 key_file=""
 
 # The operator key for this run: 32 random bytes in a temporary file outside the repository and
@@ -114,7 +119,7 @@ cleanup() {
     "$repo_root/$publish_dir/access-token-credentials" "$repo_root/$publish_dir/access-token-voice" \
     "$repo_root/$publish_dir/access-token-generation" "$repo_root/$publish_dir/access-token-github" \
     "$repo_root/$publish_dir/access-token-capture" "$repo_root/$publish_dir/access-token-drafts" \
-    "$repo_root/$publish_dir/access-token-curation"
+    "$repo_root/$publish_dir/access-token-curation" "$repo_root/$publish_dir/access-token-timeline"
   # So is the encryption key: it is removed whether the run passed or failed.
   remove_key_file
   exit "$exit_status"
@@ -862,4 +867,25 @@ seed_curation "$curation_base_url" "$(cat "$repo_root/$publish_dir/access-token-
 echo "==> npm run test:e2e (real browser against $curation_base_url)"
 run_suite "$curation_base_url" "$curation_log_file" "$repo_root/$publish_dir/access-token-curation" \
   tests/screenshot-curation.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 10: the private timeline. It needs a project with milestones it recorded itself, and a
+# project cannot be removed once it exists - so it has its own installation and its own published
+# instance for the same reason suites 1 to 9 each have one.
+#
+# Nothing here is seeded, unlike the operations, drafts and curation fixtures above: every
+# project and milestone is created by the same clicks an owner would make, and the one candidate
+# is created through the delivered intake route with the browser's own session, because no
+# product surface collects records from a source yet. A pass is evidence that the panel reads the
+# confirmed history oldest first under its own dates, hides candidates until asked, labels them
+# when shown, and opens a row's own milestone editor - and that the server says the same thing
+# the panel does.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a tenth disposable PostgreSQL and published application at $timeline_base_url"
+start_suite timeline "$timeline_base_url" "$timeline_log_file" "$repo_root/$publish_dir/access-token-timeline"
+
+echo "==> npm run test:e2e (real browser against $timeline_base_url)"
+run_suite "$timeline_base_url" "$timeline_log_file" "$repo_root/$publish_dir/access-token-timeline" \
+  tests/milestone-timeline.spec.ts
 stop_suite

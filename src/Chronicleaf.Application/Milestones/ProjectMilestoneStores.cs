@@ -116,6 +116,24 @@ public interface IMilestoneStore
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Reads the timeline of one project ordered <c>occurredAt asc, id asc</c>, starting after the
+    /// cursor position (MILESTONE-TIMELINE-001).
+    /// </summary>
+    /// <remarks>
+    /// The confirmed history is always included. Candidates join it only when
+    /// <paramref name="includeCandidates"/> is set; dismissed records are never included, because
+    /// the timeline narrates the history the owner stands behind rather than everything stored.
+    /// </remarks>
+    Task<IReadOnlyList<Milestone>> ListChronologicalAsync(
+        Guid scopeId,
+        Guid projectId,
+        bool includeCandidates,
+        DateTimeOffset? occurredAfter,
+        Guid? idAfter,
+        int limit,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Inserts a milestone, or reports that the project already holds one for the same upstream key.
     /// The decision is the database's, made atomically by the partial unique index, so two imports of
     /// the same key that race each other still produce exactly one row and both callers are told the

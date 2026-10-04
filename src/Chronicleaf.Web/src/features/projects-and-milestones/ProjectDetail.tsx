@@ -13,6 +13,7 @@ import { GitHubSyncPanel } from '../github-evidence/GitHubSyncPanel';
 import { GroundedMarkdownDraftPanel } from '../grounded-markdown-drafts/GroundedMarkdownDraftPanel';
 import { MilestoneEvidencePanel } from '../milestone-evidence/MilestoneEvidencePanel';
 import { LlmProviderArea } from '../llm-provider-contract/LlmProviderArea';
+import { ProjectTimeline } from '../milestone-timeline/ProjectTimeline';
 import { ScreenshotCapturePanel } from '../screenshot-capture/ScreenshotCapturePanel';
 import { ScreenshotPicker } from '../screenshot-curation/ScreenshotPicker';
 import { VoiceArea } from '../voice-profiles/VoiceArea';
@@ -257,6 +258,16 @@ export function ProjectDetail({
           ))}
         </ul>
       )}
+
+      {/*
+        MILESTONE-TIMELINE-001/002. The confirmed history oldest first, under the date each
+        record happened on. It reads the timeline route rather than re-sorting the list above,
+        because the list is newest first and filtered by status while this is chronology.
+        Selecting a row opens the milestone editor for that record.
+      */}
+      {record !== null ? (
+        <ProjectTimeline projectId={record.id} onEditMilestone={onEditMilestone} />
+      ) : null}
     </section>
   );
 }

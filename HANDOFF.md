@@ -1,10 +1,10 @@
-current_spec: screenshot-curation
+current_spec: milestone-timeline
 
 # Chronicleaf handoff
 
 ## Current state — 2026-10-04
 
-Fifteen changes implemented, verified and archived, each with exactly two commits (implementation/
+Sixteen changes implemented, verified and archived, each with exactly two commits (implementation/
 tests/archive, then this HANDOFF-only pointer):
 
 | # | Change | Implementation commit | Canonical spec |
@@ -24,6 +24,7 @@ tests/archive, then this HANDOFF-only pointer):
 | 13 | `screenshot-capture` | `e890e11` | `openspec/specs/screenshot-capture/spec.md` |
 | 14 | `llm-openai-adapter` | `777417f` | `openspec/specs/llm-openai-adapter/spec.md` |
 | 15 | `grounded-markdown-drafts` | `32f3e6f` | `openspec/specs/grounded-markdown-drafts/spec.md` |
+| 16 | `screenshot-curation` | `9c1ce4a` | `openspec/specs/screenshot-curation/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -318,12 +319,58 @@ statement that was no longer true either; both now derive their claim from the s
 catalogue, and the panel says what is actually installed — an adapter for `openai` with no credential
 stored.
 
-Next: implement `screenshot-curation` only. Its dependencies — `screenshot-capture`,
-`milestone-evidence` and `grounded-markdown-drafts` — are all archived, so a captured picture can now be
-selected against the same evidence bundle a draft is grounded in. After it: `markdown-review-export` →
-`community-compose-release`, which is the first complete workflow. Read the draft package's own boundary
-before you extend it: a draft is text a human acts on, so the local schema validator, the voice findings
-and the "draft only" framing are all load-bearing and none of them is decoration.
+**A choice is now a state, and a selection is a publication.** `screenshot-curation` moves the
+four columns capture left constant - status, caption, primary flag, display order - under a
+two-revision precondition: If-Match carries the screenshot revision and the body carries the
+evidence revision, and both must be current, because the candidate row and the bundle are written
+in one transaction. Selecting appends a screenshot item naming the picture's media and caption;
+editing the caption appends a correcting revision naming what it corrects; deselecting appends a
+revision that no longer carries the picture while earlier bundles keep their rows, so approved
+historical content still reads what it was approved against. One primary per milestone is a
+partial unique index with the old flag cleared before the new one is set in the same transaction;
+an order must name exactly the selected pictures once each and moves no bundle. A capture re-run
+still writes candidates only, so it can never promote, demote, recaption or reorder a human
+choice. The picker lives beside the capture panel rather than inside it, so the capture contract
+that panel asserts - no select control on an offered picture - is untouched.
+
+**Three defects this package found, none of them worked around in a test.** The milestone lock
+read a `scope_id` the milestones table never had - the scope arrives through the project join, so
+the lock does too. The primary switch set the new flag before clearing the old one, which the
+one-primary index refused with 23505: clearing first is what makes the switch atomic rather than
+impossible. And the promote-while-leaving check read the row's own flag when the request had not
+named one, so rejecting a primary was refused as its own promotion: only an explicit
+`isPrimary: true` on an unselected picture is a 422, and leaving the set clears the flag in the
+same write. The browser suite found two fixture defects of its own: row locators captured before
+a move were polled after it, so the retry watched whatever moved into the position, and a
+"stale" PATCH that happened to describe the stored state answered the correct no-op 200 - the
+assertions re-query inside the retry now, and the stale probe carries a nonce caption so it is
+always a change.
+
+Evidence, all run by the implementer rather than taken on report: `CHRONICLEAF_E2E=1 bash
+scripts/verify.sh` exit 0 - platform feed, build, fifteen filtered stages each asserted to select
+at least one test (15/15 shell, 24/24 persistence, 23/23 access, 19/19 projects, 12/12 jobs, 9/9
+media, 14/14 evidence, 32/32 vault, 22/22 voice, 26/26 provider contract, 23/23 OpenAI adapter,
+27/27 GitHub evidence, 52/52 capture, 18/18 curation, 30/30 drafts - 346 in total), `npm ci`,
+`tsc` + `vite build`, then 52/52 Playwright across nine database-isolated browser suites
+(21/21 shell/access/projects/jobs, 3/3 evidence, 6/6 vault, 4/4 voice, 4/4 providers, 3/3 GitHub,
+3/3 capture, 4/4 drafts, 4/4 curation); name preflight exit 0;
+`openspec validate --all --strict --no-interactive` 54/54 before and after the archive, which used
+no `--skip-specs`. The curation migration also drops the milestone-only candidate index the
+capture migration created but the model never described, and widens captions 500 → 1000 for the
+owner's words; the e2e seed's candidate rows name the two real capture jobs the suite requested
+(which refuse `capture_sandbox_unavailable` on this host and write nothing) and one real uploaded
+PNG behind all three. Deployment stays `deployable: false`; there is no remote, no push and no
+publication.
+
+Next: implement `milestone-timeline` only. Its dependency — `projects-and-milestones` — is
+archived, so a private chronological project view can now be built on confirmed records. After
+it: `markdown-review-export` → `community-compose-release`, which is the first complete workflow.
+`screenshot-curation` is archived (`9c1ce4a`, canonical spec
+`openspec/specs/screenshot-curation/spec.md`): a captured picture can now be selected against the
+same evidence bundle a draft is grounded in, with one primary, an explicit order and plain-text
+captions. Read the draft package's own boundary before extending it: a draft is text a human acts
+on, so the local schema validator, the voice findings and the "draft only" framing are all
+load-bearing and none of them is decoration.
 
 Two working notes for whoever picks this up. First, `github-evidence` was delivered across two
 worker passes because the first was **cancelled mid-flight rather than failed**, and it left a

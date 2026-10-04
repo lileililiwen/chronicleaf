@@ -1,10 +1,10 @@
-current_spec: grounded-markdown-drafts
+current_spec: screenshot-curation
 
 # Chronicleaf handoff
 
 ## Current state — 2026-10-04
 
-Fourteen changes implemented, verified and archived, each with exactly two commits (implementation/
+Fifteen changes implemented, verified and archived, each with exactly two commits (implementation/
 tests/archive, then this HANDOFF-only pointer):
 
 | # | Change | Implementation commit | Canonical spec |
@@ -23,6 +23,7 @@ tests/archive, then this HANDOFF-only pointer):
 | 12 | `github-evidence` | `429f2b2` | `openspec/specs/github-evidence/spec.md` |
 | 13 | `screenshot-capture` | `e890e11` | `openspec/specs/screenshot-capture/spec.md` |
 | 14 | `llm-openai-adapter` | `777417f` | `openspec/specs/llm-openai-adapter/spec.md` |
+| 15 | `grounded-markdown-drafts` | `32f3e6f` | `openspec/specs/grounded-markdown-drafts/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -276,13 +277,53 @@ anything, not a missing feature. Registration is the whole rollback lever and is
 is no flag that un-installs an adapter at runtime, because a provider that silently stops being
 reachable in the middle of an owner's workflow is a worse failure than one that was never there.
 
-Next: implement `grounded-markdown-drafts` only. Its dependencies — `llm-provider-contract`,
-`voice-profiles` and now `llm-openai-adapter` — are all archived, so this is the first package in the
-chain that can turn a consented, evidence-grounded call into a draft an owner reviews. After it:
-`screenshot-curation` → `markdown-review-export` → `community-compose-release`, which is the first
-complete workflow. Read the adapter's own boundary before you extend it: a draft is text a human acts
-on, so the local schema validator, the voice findings and the "draft only" framing are all load-bearing
-and none of them is decoration.
+**A draft is validated before it is prose.** `grounded-markdown-drafts` asks a provider for structure
+first — a strict JSON summary where every factual item names the evidence it came from — and validates
+that structure against the frozen snapshot *before* any Markdown exists, then asks for the prose from
+the accepted summary and the ids it fixed. The order is the requirement and it is also the only order
+that works: a model that invents something loses while the invention is still a field a validator can
+read, rather than becoming a sentence in a document an owner is about to believe. Phase 1 is bounded at
+one repair call and then `invalid_summary`; a grounding failure spends no repair call at all, because
+repairing a citation does not make a citation true. The 202 response is a job on the delivered queue,
+the outcome is committed as `draft` and there is no approve verb anywhere in the package — approval is
+`markdown-review-export`'s, bound to a revision and a body hash.
+
+**The database, not the code, holds the two invariants that matter.** `content_revisions` is
+append-only by trigger, and a revision and its asset head move in one statement, so a second generation
+appends rather than overwrites and a stale writer is a compare-and-set that loses instead of merging.
+Four check constraints refuse a row that is not a digest, that claims evidence revision zero, that
+rewrites itself, or that names an evidence item the bundle does not contain. Findings split by what can
+be settled locally: an evidence id outside the snapshot and a figure appearing in no evidence item are
+fatal, while an unreferenced claim or a claim resting only on unreadable evidence is *reported* against
+the stored revision. The read path recomputes the same rules, so what a reader is told cannot depend on
+whether they asked before or after the draft was written.
+
+**Three defects this package found, none of them worked around in a test.** A footnote label is `c1`,
+not `[^c1]` — the caret is Markdown's sigil, and putting it inside the identifier made every correct
+citation look like a reference to nothing. Extracting numerals from prose to check them against evidence
+read `[^c1]` as the number 1, which refused every honest body; the citation labels are stripped before
+the figures are read. And the browser fixture's seed was writing its `INSERT` through `docker exec`
+*without* `-i`, so the heredoc never reached `psql`: the seed reported success, the suite ran, and the
+database held no draft at all. That is the same failure class as the filter that matches nothing, one
+layer down — a green suite proving nothing — so the seed now reads its own rows back and refuses to
+continue unless the one revision it hashed is the one that is stored.
+
+**Three pre-existing assertions that only ever passed by hand.** Three migration-readiness scenarios
+each named the newest required migration by value, which is a value somebody has to remember to update
+and is why they went red every time a later package added one; they now assert the newest by its
+position in the required list and the applied set by membership, which cannot go stale. The provider
+fixture asserted that *no* slot reports an installed adapter, which stopped being true when
+`llm-openai-adapter` shipped, and the panel's "nothing can be called" notice had been asserting a
+statement that was no longer true either; both now derive their claim from the server's own `usable`
+catalogue, and the panel says what is actually installed — an adapter for `openai` with no credential
+stored.
+
+Next: implement `screenshot-curation` only. Its dependencies — `screenshot-capture`,
+`milestone-evidence` and `grounded-markdown-drafts` — are all archived, so a captured picture can now be
+selected against the same evidence bundle a draft is grounded in. After it: `markdown-review-export` →
+`community-compose-release`, which is the first complete workflow. Read the draft package's own boundary
+before you extend it: a draft is text a human acts on, so the local schema validator, the voice findings
+and the "draft only" framing are all load-bearing and none of them is decoration.
 
 Two working notes for whoever picks this up. First, `github-evidence` was delivered across two
 worker passes because the first was **cancelled mid-flight rather than failed**, and it left a

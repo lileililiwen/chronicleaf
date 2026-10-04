@@ -1,4 +1,4 @@
-current_spec: milestone-timeline
+current_spec: llm-gemini-adapter
 
 # Chronicleaf handoff
 
@@ -25,6 +25,7 @@ tests/archive, then this HANDOFF-only pointer):
 | 14 | `llm-openai-adapter` | `777417f` | `openspec/specs/llm-openai-adapter/spec.md` |
 | 15 | `grounded-markdown-drafts` | `32f3e6f` | `openspec/specs/grounded-markdown-drafts/spec.md` |
 | 16 | `screenshot-curation` | `9c1ce4a` | `openspec/specs/screenshot-curation/spec.md` |
+| 17 | `milestone-timeline` | `4cfa8c3` | `openspec/specs/milestone-timeline/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -362,9 +363,18 @@ owner's words; the e2e seed's candidate rows name the two real capture jobs the 
 PNG behind all three. Deployment stays `deployable: false`; there is no remote, no push and no
 publication.
 
-Next: implement `milestone-timeline` only. Its dependency — `projects-and-milestones` — is
-archived, so a private chronological project view can now be built on confirmed records. After
-it: `markdown-review-export` → `community-compose-release`, which is the first complete workflow.
+Next: implement `llm-gemini-adapter` only. Its dependency — `llm-provider-contract` — is
+archived, so the Gemini BYOK transport can now be built on the consented generation contract. After
+it: the remaining adapters (`llm-anthropic-adapter`, `llm-openrouter-adapter`, `llm-ollama-adapter`)
+stay independently deliverable, then `markdown-review-export` → `community-compose-release`, which
+is the first complete workflow.
+`milestone-timeline` is archived (`4cfa8c3`, canonical spec
+`openspec/specs/milestone-timeline/spec.md`): a project's confirmed history now reads oldest
+first on a private route with a cursor bound to scope, project and the candidate filter, and the
+project view shows it under its own dates with candidates hidden until asked for. Read the
+milestone package's own boundary before extending it: no route here writes anything, a dismissed
+record is omitted rather than narrated, and a cursor from another project, another filter or the
+milestone list is refused rather than applied to the wrong history.
 `screenshot-curation` is archived (`9c1ce4a`, canonical spec
 `openspec/specs/screenshot-curation/spec.md`): a captured picture can now be selected against the
 same evidence bundle a draft is grounded in, with one primary, an explicit order and plain-text

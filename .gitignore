@@ -20,3 +20,9 @@ chronicleaf-encryption.key
 TestResults/
 playwright-report/
 test-results/
+
+# Driftwatch local runtime state. This directory holds per-machine state
+# (state.db and local caches), never project configuration, so it must
+# never be committed. A root-level driftwatch.toml is different: that is
+# real project config and IS tracked.
+.driftwatch/

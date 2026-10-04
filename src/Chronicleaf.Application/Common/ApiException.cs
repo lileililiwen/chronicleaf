@@ -90,6 +90,20 @@ public static class ApiErrorStatus
         AI.AiError.ProviderInvalidResponse => 502,
         AI.AiError.ProviderUnavailable => 503,
 
+        // The github-evidence package's codes. Additive in the same way, and the choices are this
+        // package's failure policy rather than defaults. 422 for a repository that cannot be read and
+        // for a refused credential: both are answerable before anything is spent, and neither is a 404
+        // because a private repository does exist - what it is not is readable by this owner, and
+        // GitHub deliberately does not say which of the two cases this is. 422 for a project with no
+        // connection, which is again something the owner supplies. 503 for GitHub being unreachable,
+        // which is not a 500 because nothing here says this server is broken. RequestRefused
+        // deliberately has no arm: it is a job's error code, not an envelope code, and no route
+        // answers a call that GitHub refused.
+        GitHub.GitHubError.RepositoryUnavailable => 422,
+        GitHub.GitHubError.CredentialRejected => 422,
+        GitHub.GitHubError.ConnectionMissing => 422,
+        GitHub.GitHubError.Unreachable => 503,
+
         _ => 500,
     };
 }

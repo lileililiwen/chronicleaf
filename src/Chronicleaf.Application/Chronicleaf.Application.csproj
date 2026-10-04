@@ -9,6 +9,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!--
+      The GitHub transport (GITHUB-EVIDENCE-001/002). This is the same shape as the
+      llm-provider-contract reference above and for the same reason: the read-only contract lives in
+      its own leaf project that references nothing in this repository, and the service that owns the
+      limits, the exclusions and the append is here. The reference is one way - nothing in
+      Chronicleaf.GitHub depends on this assembly, so the transport can be replaced without any
+      product code changing.
+    -->
+    <ProjectReference Include="../Chronicleaf.GitHub/Chronicleaf.GitHub.csproj" />
     <ProjectReference Include="../Chronicleaf.AI/Chronicleaf.AI.csproj" />
     <ProjectReference Include="../Chronicleaf.Core/Chronicleaf.Core.csproj" />
   </ItemGroup>

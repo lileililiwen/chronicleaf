@@ -2,7 +2,7 @@
 # Chronicleaf native verification (SHELL-003, COMMUNITY-PERSISTENCE-001/002, COMMUNITY-ACCESS-001/002,
 # PROJECTS-AND-MILESTONES-001/002, BACKGROUND-JOBS-001/002, LOCAL-MEDIA-STORAGE-001/002,
 # MILESTONE-EVIDENCE-001/002, CREDENTIAL-VAULT-001/002, VOICE-PROFILES-001/002,
-# LLM-PROVIDER-CONTRACT-001/002).
+# LLM-PROVIDER-CONTRACT-001/002, GITHUB-EVIDENCE-001/002).
 #
 # Required chain, in order:
 #   1. platform feed           - the committed packages/platform-feed is what the build resolves, from
@@ -171,6 +171,30 @@ else
   # composition root answers 422, because no configuration value can reach a double that was never
   # registered.
   step "llm provider contract tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~LlmProviderContractTests"
+  # GITHUB-EVIDENCE-001/002. That a collection resolves the selected refs to immutable revisions and
+  # appends bounded evidence naming each source; that a repository that is absent or not public fails
+  # with repository_unavailable rather than with invented material; that a binary or excluded file is
+  # marked as missing or redacted diff evidence instead of being dropped; that a rate-limited answer
+  # waits on the job policy's own bounded delay; that a bundle which moved mid-import ends superseded
+  # without being overwritten; and that a compare past the documented cap marks truncation and stays
+  # inside every cap - are all proven against the same real disposable PostgreSQL and a real temporary
+  # operator key file, through the real API host and the real operation queue.
+  #
+  # A simulation is refused as evidence here, and the refusal is specific rather than general. GitHub
+  # itself is the one boundary that is faked in this file, and it is faked with a Fake HttpMessageHandler
+  # because the claim under test is never "GitHub works": it is that Chronicleaf records the resolved
+  # SHAs, bounds the diff, refuses a repository it cannot read, and leaves the stored bytes alone. A
+  # scripted or stubbed GitHub that ran inside the process would prove nothing about any of that and
+  # would be a way for a whole package to pass without a database, a host or a queue. The fake handler is
+  # not the same kind of thing and is accepted for a specific reason: it substitutes only the far end of
+  # the wire, so the pinned host, the real HttpClient, the real vault lease, the real conditional append
+  # and the real status mapping all still execute - and the scenario that would otherwise tempt the
+  # reading most, the one that describes a public repository, is the opt-in run that reports
+  # "prerequisite unavailable" unless CHRONICLEAF_GITHUB_REPOSITORY and CHRONICLEAF_GITHUB_TOKEN are
+  # both set, and that run uses the real transport. No stage here may be read as evidence that a real
+  # GitHub API was called, that a real repository was resolved, or that any specific GitHub response
+  # shape is supported beyond what the transport's own pinned version documents.
+  step "github evidence tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~GithubEvidenceTests"
 fi
 
 step "frontend install" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm ci'
@@ -179,13 +203,17 @@ step "frontend build" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm run b
 if [ "${CHRONICLEAF_E2E:-0}" = "1" ]; then
   # Publishes the real application, starts a disposable PostgreSQL per suite, applies the committed
   # migrations, and drives the shell, access, projects-and-milestones, background-jobs,
-  # milestone-evidence, credential-vault, voice-profiles and llm-provider-contract fixtures in a real
-  # browser. The last five
+  # milestone-evidence, credential-vault, voice-profiles, llm-provider-contract and github-evidence
+  # fixtures in a real browser. The last six
   # are included by playwright.config.ts, which already matches tests/**/*.spec.ts; this stage
   # therefore fails if the browser cannot record a project, confirm a candidate, refuse a stale edit,
   # read a milestone's evidence and be told the truth by a 409 against a real database, turn emoji
-  # off over a preset that asked for it and see the effective value change, or be shown every provider
-  # slot on a new installation with the truth about which of them can actually be called.
+  # off over a preset that asked for it and see the effective value change, be shown every provider
+  # slot on a new installation with the truth about which of them can actually be called, or see a
+  # project admit it has no repository connected, be told in the server's own words when one is
+  # refused, and follow a real collection job to the status the operations route reports. The last of
+  # those needs outbound network to api.github.com: nothing in the github suite is faked, so a
+  # deployment without that route out fails this stage rather than passing on a stub.
   step "browser fixtures" bash scripts/e2e.sh
 fi
 

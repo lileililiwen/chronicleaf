@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { EvidenceApiError, appendManualEvidence, listEvidence } from './api';
 import {
@@ -24,16 +24,34 @@ import { useEvidence } from './useEvidence';
  * records is a limitation or a next step and nothing else. The revision the form sends is the one
  * this panel read, so a 409 means somebody else appended first - and the refusal is shown with the
  * newer evidence re-read, never swallowed.
+ *
+ * <b>reloadToken is how an append by somebody else reaches this panel.</b> A bundle is append-only and
+ * this panel reads it once, so anything that appends outside the form below - a collection, a second
+ * tab, another person - leaves it showing a revision the server has moved past. The prop is a bare
+ * number for that reason. It carries no opinion about who appended or why, so this package learns
+ * nothing about the features that write bundles; absent leaves the panel reading once, as it always
+ * has; unchanged means nothing happened and nothing is re-read; changed means read the server's answer
+ * again. It is not polled, and the token this panel mounted with is not treated as a change, so no
+ * request is paid for on the way in.
  */
 export function MilestoneEvidencePanel({
   milestoneId,
   milestoneTitle,
   archived,
+  reloadToken,
 }: {
   readonly milestoneId: string;
   readonly milestoneTitle: string;
   /** An archived project's evidence cannot move, so the form is not offered at all. */
   readonly archived: boolean;
+  /**
+   * A number the owner of this panel changes when some other surface has appended to this milestone.
+   *
+   * Optional, and unchanged by default. A change re-reads the bundle and leaves what is on screen
+   * visible while it does, exactly as the form's own append does - the reload is this panel's existing
+   * one, not a second kind of read.
+   */
+  readonly reloadToken?: number;
 }) {
   const evidence = useEvidence(listEvidence, milestoneId);
   const [notes, setNotes] = useState('');
@@ -42,6 +60,24 @@ export function MilestoneEvidencePanel({
   const [busy, setBusy] = useState(false);
   const [appendFailure, setAppendFailure] = useState<EvidenceApiError | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // The token this panel has already reacted to, so the first one it is given is recorded rather than
+  // acted on: the bundle is read on mount, and re-reading it immediately would buy the same answer
+  // twice.
+  const seenReloadToken = useRef<number | null>(null);
+  const reload = evidence.reload;
+
+  useEffect(() => {
+    if (reloadToken === undefined) {
+      return;
+    }
+
+    if (seenReloadToken.current !== null && seenReloadToken.current !== reloadToken) {
+      reload();
+    }
+
+    seenReloadToken.current = reloadToken;
+  }, [reload, reloadToken]);
 
   const revision = evidence.data?.revision ?? 0;
   const bundles = evidence.data?.items ?? [];

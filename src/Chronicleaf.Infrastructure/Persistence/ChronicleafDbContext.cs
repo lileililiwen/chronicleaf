@@ -69,6 +69,10 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     public DbSet<GenerationPreview> GenerationPreviews => Set<GenerationPreview>();
 
+    public DbSet<GitHubConnection> GitHubConnections => Set<GitHubConnection>();
+
+    public DbSet<SyncSource> SyncSources => Set<SyncSource>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Installation>(entity =>
@@ -779,7 +783,169 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_generation_previews_milestone_id");
         });
+
+        // GITHUB-EVIDENCE-001: the repository a project collects evidence from. Two name columns
+        // and a scope, and no URL column at all - a host is a constant of this product, never a
+        // property of a stored row. `credential_ref` is the vault's own id, so this table cannot
+        // hold a token. One connection per project: the unique index is what makes a second
+        // POST for the same project replace the first instead of accumulating repositories.
+        modelBuilder.Entity<GitHubConnection>(entity =>
+        {
+            entity.ToTable("github_connections");
+            entity.HasKey(connection => connection.Id);
+            entity.Property(connection => connection.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(connection => connection.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(connection => connection.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(connection => connection.Owner)
+                .HasColumnName("owner")
+                .HasMaxLength(GitHubOwnerMaxLength)
+                .IsRequired();
+            entity.Property(connection => connection.Repo)
+                .HasColumnName("repo")
+                .HasMaxLength(GitHubRepoMaxLength)
+                .IsRequired();
+            entity.Property(connection => connection.CredentialRef).HasColumnName("credential_ref");
+            entity.Property(connection => connection.DefaultBranch)
+                .HasColumnName("default_branch")
+                .HasMaxLength(GitHubRefMaxLength);
+            entity.Property(connection => connection.RepositoryId).HasColumnName("repository_id");
+            entity.Property(connection => connection.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(connection => connection.UpdatedAt)
+                .HasColumnName("updated_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            entity.HasIndex(connection => new { connection.ScopeId, connection.ProjectId })
+                .IsUnique()
+                .HasDatabaseName("ux_github_connections_scope_id_project_id");
+
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(connection => connection.ProjectId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_github_connections_project_id");
+        });
+
+        // GITHUB-EVIDENCE-002: one row per collection run, written when the owner asks and completed
+        // by the job. The requested refs are here because a job payload carries an operation id and
+        // nothing else, so the words the owner typed have to be durable somewhere the worker can read
+        // them from. The resolved revisions, the endpoint list and the two limitation markers are
+        // filled in when the run finishes and stay null until then, so a row that was asked for and
+        // never collected says so instead of looking like a run that read nothing.
+        modelBuilder.Entity<SyncSource>(entity =>
+        {
+            entity.ToTable("sync_sources");
+            entity.HasKey(source => source.Id);
+            entity.Property(source => source.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(source => source.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(source => source.OperationId).HasColumnName("operation_id").IsRequired();
+            entity.Property(source => source.MilestoneId).HasColumnName("milestone_id").IsRequired();
+            entity.Property(source => source.ExpectedBundleRevision)
+                .HasColumnName("expected_bundle_revision")
+                .IsRequired();
+            entity.Property(source => source.Owner)
+                .HasColumnName("owner")
+                .HasMaxLength(GitHubOwnerMaxLength)
+                .IsRequired();
+            entity.Property(source => source.Repo)
+                .HasColumnName("repo")
+                .HasMaxLength(GitHubRepoMaxLength)
+                .IsRequired();
+            entity.Property(source => source.HeadRef)
+                .HasColumnName("head_ref")
+                .HasMaxLength(GitHubRefMaxLength)
+                .IsRequired();
+            entity.Property(source => source.BaseRef)
+                .HasColumnName("base_ref")
+                .HasMaxLength(GitHubRefMaxLength);
+            entity.Property(source => source.ReleaseTag)
+                .HasColumnName("release_tag")
+                .HasMaxLength(GitHubTagMaxLength);
+            entity.Property(source => source.IssueNumber).HasColumnName("issue_number");
+            entity.Property(source => source.PullRequestNumber).HasColumnName("pull_request_number");
+            entity.Property(source => source.BaseSha)
+                .HasColumnName("base_sha")
+                .HasMaxLength(GitHubShaMaxLength);
+            entity.Property(source => source.HeadSha)
+                .HasColumnName("head_sha")
+                .HasMaxLength(GitHubShaMaxLength);
+            entity.Property(source => source.Endpoints)
+                .HasColumnName("endpoints")
+                .HasMaxLength(GitHubEndpointsMaxLength);
+            entity.Property(source => source.FetchedAt)
+                .HasColumnName("fetched_at")
+                .HasColumnType("timestamp with time zone");
+            // The four count columns default to zero in the database, not only in the domain record. A
+            // run is inserted the moment an owner asks for it and filled in when it finishes, so the
+            // defaults are what make "asked for, not yet collected" a state the database can hold
+            // without this store having to invent numbers it has not read.
+            entity.Property(source => source.CommitCount)
+                .HasColumnName("commit_count")
+                .HasDefaultValue(0)
+                .IsRequired();
+            entity.Property(source => source.ChangedFileCount)
+                .HasColumnName("changed_file_count")
+                .HasDefaultValue(0)
+                .IsRequired();
+            entity.Property(source => source.Truncated)
+                .HasColumnName("truncated")
+                .HasDefaultValue(false)
+                .IsRequired();
+            entity.Property(source => source.ExcludedFileCount)
+                .HasColumnName("excluded_file_count")
+                .HasDefaultValue(0)
+                .IsRequired();
+            entity.Property(source => source.CompletedAt)
+                .HasColumnName("completed_at")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(source => source.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            // One run per operation, and the worker's lookup: it is handed an operation id and
+            // nothing else, so this index is the only way it can find the request it is collecting.
+            entity.HasIndex(source => new { source.ScopeId, source.OperationId })
+                .IsUnique()
+                .HasDatabaseName("ux_sync_sources_scope_id_operation_id");
+
+            // A milestone's runs are read newest first, so the index leads with the milestone and
+            // the time the run was asked for.
+            entity.HasIndex(source => new { source.ScopeId, source.MilestoneId, source.CreatedAt })
+                .HasDatabaseName("ix_sync_sources_scope_id_milestone_id_created_at");
+
+            entity.HasOne<Milestone>()
+                .WithMany()
+                .HasForeignKey(source => source.MilestoneId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_sync_sources_milestone_id");
+        });
     }
+
+    /// <summary>At most 39 characters; the longest owner segment GitHub accepts.</summary>
+    private const int GitHubOwnerMaxLength = 39;
+
+    /// <summary>At most 100 characters; the longest repository name GitHub accepts.</summary>
+    private const int GitHubRepoMaxLength = 100;
+
+    /// <summary>At most 255 characters; a ref is a branch or tag name, not a path.</summary>
+    private const int GitHubRefMaxLength = 255;
+
+    /// <summary>At most 100 characters; the longest release tag a request may name.</summary>
+    private const int GitHubTagMaxLength = 100;
+
+    /// <summary>At most 64 characters; a SHA-1 or SHA-256 revision is hex.</summary>
+    private const int GitHubShaMaxLength = 64;
+
+    /// <summary>
+    /// At most 2000 characters for the consulted path list. A run consults at most nine endpoints,
+    /// so this is generous rather than tight, and a run that somehow exceeds it is refused by the
+    /// column instead of being silently shortened.
+    /// </summary>
+    private const int GitHubEndpointsMaxLength = 2000;
 
     /// <summary>At most 12 characters; the longest draft status is <c>approved</c>.</summary>
     private const int VoiceDraftStatusMaxLength = 12;

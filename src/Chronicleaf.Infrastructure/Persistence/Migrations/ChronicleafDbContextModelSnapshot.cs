@@ -371,6 +371,64 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.ToTable("generation_previews", (string)null);
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.GitHubConnection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CredentialRef")
+                        .HasColumnType("uuid")
+                        .HasColumnName("credential_ref");
+
+                    b.Property<string>("DefaultBranch")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("default_branch");
+
+                    b.Property<string>("Owner")
+                        .IsRequired()
+                        .HasMaxLength(39)
+                        .HasColumnType("character varying(39)")
+                        .HasColumnName("owner");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("Repo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("repo");
+
+                    b.Property<long?>("RepositoryId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("repository_id");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("ScopeId", "ProjectId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_github_connections_scope_id_project_id");
+
+                    b.ToTable("github_connections", (string)null);
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.Installation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -753,6 +811,129 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.ToTable("projects", (string)null);
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.SyncSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BaseRef")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("base_ref");
+
+                    b.Property<string>("BaseSha")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("base_sha");
+
+                    b.Property<int>("ChangedFileCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("changed_file_count");
+
+                    b.Property<int>("CommitCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("commit_count");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Endpoints")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("endpoints");
+
+                    b.Property<int>("ExcludedFileCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("excluded_file_count");
+
+                    b.Property<long>("ExpectedBundleRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expected_bundle_revision");
+
+                    b.Property<DateTimeOffset?>("FetchedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fetched_at");
+
+                    b.Property<string>("HeadRef")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("head_ref");
+
+                    b.Property<string>("HeadSha")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("head_sha");
+
+                    b.Property<int?>("IssueNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("issue_number");
+
+                    b.Property<Guid>("MilestoneId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("milestone_id");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<string>("Owner")
+                        .IsRequired()
+                        .HasMaxLength(39)
+                        .HasColumnType("character varying(39)")
+                        .HasColumnName("owner");
+
+                    b.Property<int?>("PullRequestNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("pull_request_number");
+
+                    b.Property<string>("ReleaseTag")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("release_tag");
+
+                    b.Property<string>("Repo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("repo");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<bool>("Truncated")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("truncated");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MilestoneId");
+
+                    b.HasIndex("ScopeId", "OperationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_sync_sources_scope_id_operation_id");
+
+                    b.HasIndex("ScopeId", "MilestoneId", "CreatedAt")
+                        .HasDatabaseName("ix_sync_sources_scope_id_milestone_id_created_at");
+
+                    b.ToTable("sync_sources", (string)null);
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.VoiceDraft", b =>
                 {
                     b.Property<Guid>("Id")
@@ -908,6 +1089,16 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_generation_previews_milestone_id");
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.GitHubConnection", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_github_connections_project_id");
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.Media", b =>
                 {
                     b.HasOne("Chronicleaf.Core.Project", null)
@@ -916,6 +1107,16 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_media_project_id");
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.SyncSource", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Milestone", null)
+                        .WithMany()
+                        .HasForeignKey("MilestoneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sync_sources_milestone_id");
                 });
 
             modelBuilder.Entity("Chronicleaf.Core.VoiceDraft", b =>

@@ -1749,16 +1749,25 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
         // database without it is reported by name rather than failing on the first preview. This is
         // the real migration chain, applied by the same code the operator command runs.
         Assert.Contains(ChronicleafSchema.GenerationPreviewsMigrationId, ChronicleafSchema.RequiredMigrationIds);
-        Assert.Equal(ChronicleafSchema.GenerationPreviewsMigrationId, ChronicleafSchema.ExpectedMigrationId);
+        Assert.Contains(ChronicleafSchema.GitHubEvidenceMigrationId, ChronicleafSchema.RequiredMigrationIds);
+        Assert.Equal(ChronicleafSchema.GitHubEvidenceMigrationId, ChronicleafSchema.ExpectedMigrationId);
         Assert.True(ChronicleafSchema.IsCurrent([.. ChronicleafSchema.RequiredMigrationIds]));
 
-        // A database stopped at the voice-profiles migration is missing exactly this one.
+        // A database stopped at the voice-profiles migration is short of this one and the one after
+        // it. The applied set therefore stops before this package's own migration as well: leaving it
+        // in would report only one gap, which is the answer for a database that stopped at the
+        // generation-previews schema rather than the one this scenario is about.
         var missing = ChronicleafSchema.MissingMigrationIds(
             ChronicleafSchema.RequiredMigrationIds
                 .Where(id => id != ChronicleafSchema.GenerationPreviewsMigrationId)
+                .Where(id => id != ChronicleafSchema.GitHubEvidenceMigrationId)
                 .ToArray());
 
-        Assert.Equal([ChronicleafSchema.GenerationPreviewsMigrationId], missing);
+        // Two ids are missing now rather than one: GITHUB-EVIDENCE-001/002 added its own migration
+        // after this one, so a database stopped at the generation-previews schema is short of both.
+        Assert.Equal(
+            [ChronicleafSchema.GenerationPreviewsMigrationId, ChronicleafSchema.GitHubEvidenceMigrationId],
+            missing);
 
         // The table and its columns are the eight the package owns, with the milestone column
         // nullable because the generic route is expressible ahead of the extension that owns the

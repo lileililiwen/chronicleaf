@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Chronicleaf.GitHub</RootNamespace>
+    <AssemblyName>Chronicleaf.GitHub</AssemblyName>
+  </PropertyGroup>
+
+  <!--
+    Deliberately empty, and that is the package's structural guarantee rather than an oversight.
+
+    GITHUB-EVIDENCE-001/002 own one thing: the read-only transport contract under Evidence/. This
+    project references no other Chronicleaf project, so it cannot reach the vault that owns a
+    credential, the store that keeps a connection, the evidence bundles that receive what is
+    collected or the domain records at all. Everything on the Chronicleaf side of a GitHub call -
+    the limits, the exclusions, the operation, the append - lives in the product, and this assembly
+    is the only part of the repository that has to be replaced to change where the bytes come from.
+  -->
+
+</Project>

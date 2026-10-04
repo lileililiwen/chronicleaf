@@ -2,6 +2,7 @@ using System.Text.Json;
 using Chronicleaf.Application.Access;
 using Chronicleaf.Application.AI;
 using Chronicleaf.Application.Common;
+using Chronicleaf.Application.GitHub;
 using Chronicleaf.Application.Media;
 using Chronicleaf.Application.Milestones;
 using Chronicleaf.Application.Operations;
@@ -296,6 +297,33 @@ public sealed class ApiErrorMiddleware(
                     failed.Code is AiError.RateLimited or AiError.CredentialRejected
                         ? LogLevel.Warning
                         : LogLevel.Information);
+
+            // GITHUB-EVIDENCE-001/002. Written here for the same reason as the refusals above: this
+            // feature package raises them, and this middleware is still the only place an envelope is
+            // written. The messages are authored in the github-evidence package and name no host, no
+            // response body and no token - a repository that cannot be read says exactly that, because
+            // GitHub does not distinguish a private repository from one that does not exist and this
+            // package must not distinguish them either.
+            case GitHubRepositoryUnavailableException repositoryUnavailable:
+                return (
+                    Envelope.Create(GitHubError.RepositoryUnavailable, repositoryUnavailable.Message, traceId),
+                    LogLevel.Information);
+
+            case GitHubCredentialRejectedException credentialRejected:
+                // Something the owner has to act on, and never an error of this server's.
+                return (
+                    Envelope.Create(GitHubError.CredentialRejected, credentialRejected.Message, traceId),
+                    LogLevel.Warning);
+
+            case GitHubConnectionMissingException connectionMissing:
+                return (
+                    Envelope.Create(GitHubError.ConnectionMissing, connectionMissing.Message, traceId),
+                    LogLevel.Information);
+
+            case GitHubUnavailableException githubUnavailable:
+                return (
+                    Envelope.Create(GitHubError.Unreachable, githubUnavailable.Message, traceId),
+                    LogLevel.Warning);
 
             case BadHttpRequestException badRequest when badRequest.StatusCode == StatusCodes.Status413PayloadTooLarge:
                 return (

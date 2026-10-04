@@ -10,6 +10,7 @@ using Chronicleaf.Api.Access;
 using Chronicleaf.Api.AI;
 using Chronicleaf.Api.Common;
 using Chronicleaf.Api.Evidence;
+using Chronicleaf.Api.GitHub;
 using Chronicleaf.Api.Media;
 using Chronicleaf.Api.Operations;
 using Chronicleaf.Api.Projects;
@@ -18,6 +19,7 @@ using Chronicleaf.Api.Voice;
 using Chronicleaf.Infrastructure.Access;
 using Chronicleaf.Infrastructure.AI;
 using Chronicleaf.Infrastructure.Evidence;
+using Chronicleaf.Infrastructure.GitHub;
 using Chronicleaf.Infrastructure.Media;
 using Chronicleaf.Infrastructure.Operations;
 using Chronicleaf.Infrastructure.Persistence;
@@ -99,6 +101,14 @@ builder.Services.AddVoiceProfiles();
 // at /api/ready.
 builder.Services.AddAIGeneration();
 
+// GITHUB-EVIDENCE-001/002. The read-only GitHub transport, pinned to the API host with redirects
+// refused, plus the two stores, the service and the one job handler that appends collected evidence
+// to a milestone. There is no key to configure here: a token is optional, is stored by the delivered
+// vault under the `github` provider and is only ever a reference in this package. Nothing is ever
+// written to GitHub - the transport has no verb that could. A database without the github-evidence
+// migration reports schema_mismatch at /api/ready.
+builder.Services.AddGitHubEvidence();
+
 // The rotation guard is applied once at start-up, so an access token that was changed since the
 // last run revokes every existing session before this process serves anything.
 builder.Services.AddHostedService<AccessTokenRotationStartup>();
@@ -178,6 +188,12 @@ app.MapVoiceEndpoints();
 // secret, and no route returns provider prose: a provider failure becomes one of this package's own
 // authored codes and messages.
 app.MapAIGenerationEndpoints();
+
+// GITHUB-EVIDENCE-001/002: the private connection and collection routes. None of them is marked
+// public, so the access package's default-deny boundary already covers every one of them. No route
+// here accepts or returns a URL and none returns a credential: a repository is an owner and a name,
+// and the host is a constant of the transport.
+app.MapGitHubEvidenceEndpoints();
 
 // SHELL-001/SHELL-002: every unmatched path is either an unknown API path, an unknown
 // static asset, or a client route. Only the last one falls back to the SPA entry point. This

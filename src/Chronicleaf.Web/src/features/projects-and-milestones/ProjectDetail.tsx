@@ -8,6 +8,8 @@ import {
   getProject,
   listMilestones,
 } from './api';
+import { GitHubConnectionPanel } from '../github-evidence/GitHubConnectionPanel';
+import { GitHubSyncPanel } from '../github-evidence/GitHubSyncPanel';
 import { MilestoneEvidencePanel } from '../milestone-evidence/MilestoneEvidencePanel';
 import { LlmProviderArea } from '../llm-provider-contract/LlmProviderArea';
 import { VoiceArea } from '../voice-profiles/VoiceArea';
@@ -179,6 +181,15 @@ export function ProjectDetail({
             project was written, and the drafts it produced are kept.
           */}
           <VoiceArea projectId={record.id} />
+
+          {/*
+            GITHUB-EVIDENCE-001. Which repository this project collects from, and the one form that
+            changes it. It is here rather than under a milestone because a connection belongs to the
+            project: every milestone below asks the same repository, and a per-milestone connection
+            would be a second answer to a question the project has already been asked. An archived
+            project still shows what it collected, read-only.
+          */}
+          <GitHubConnectionPanel projectId={record.id} archived={archived} />
         </header>
       )}
 
@@ -262,6 +273,12 @@ function MilestoneRow({
   readonly onConfirm: () => void;
   readonly onDismiss: () => void;
 }) {
+  // How many collections this milestone has finished, and therefore how many times the evidence
+  // panel above has been told to read the bundle again. The count lives here because this row is the
+  // only place both panels are in the same scope: neither feature has to know the other exists, and
+  // the row is a plain number passed to one and a plain function passed to the other.
+  const [settledCollections, setSettledCollections] = useState(0);
+
   return (
     <li className="milestone" data-testid="milestone" data-status={milestone.status}>
       <div className="milestone__head">
@@ -319,11 +336,32 @@ function MilestoneRow({
         </div>
       ) : null}
 
-      {/* What was actually collected for this milestone, read from the server on its own route. */}
+      {/* What was actually collected for this milestone, read from the server on its own route. The
+          reload token is the one thing passed in from below: a collection that finishes appends a
+          revision this panel did not ask for, and a token that changed is how it hears about it. */}
       <MilestoneEvidencePanel
         milestoneId={milestone.id}
         milestoneTitle={milestone.title}
         archived={archived}
+        reloadToken={settledCollections}
+      />
+
+      {/* GITHUB-EVIDENCE-001/002. Asking this milestone's repository for a ref, and following the job
+          that does it. It goes directly under the evidence panel because the two are the same subject:
+          what is collected is appended to the bundle above, and the revision this form sends is the
+          revision that bundle is on. Above the draft below, because a draft is written from evidence
+          and a collection is how more of it arrives.
+
+          When the job reaches a status it will not leave, once, the evidence panel above is told to
+          read the bundle again - so an owner watching a collection land sees what the server holds
+          without reloading the page, and no panel here starts polling for a change this row is
+          already told about. */}
+      <GitHubSyncPanel
+        projectId={milestone.projectId}
+        milestoneId={milestone.id}
+        milestoneTitle={milestone.title}
+        archived={archived}
+        onSettled={() => setSettledCollections((value) => value + 1)}
       />
 
       {/* A bounded draft from exactly that evidence, through a provider the owner named. The panel is

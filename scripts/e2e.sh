@@ -14,7 +14,7 @@
 # The plaintext token is written to a file inside the publish directory, is never echoed, and is
 # handed to the fixtures through the environment.
 #
-# Four fixtures groups run, each against its own published instance and its own disposable database,
+# Six fixtures groups run, each against its own published instance and its own disposable database,
 # because one of them asserts something another one changes. tests/projects-and-milestones.spec.ts
 # states that its installation starts with an empty project list - that is the claim it is making
 # about a new installation - and a project cannot be removed once it exists, because archiving is
@@ -39,6 +39,11 @@
 # so sharing a database with any other suite would put a second bundle where one suite expects one.
 # Five databases is the smallest way to keep each claim honest, and it means no group is run against
 # state another one left behind.
+# A sixth is what the GitHub fixture needs, for the same reason again: it asserts that a project starts
+# with no repository connected, and a connection cannot be removed through the UI - there is no delete
+# route, because the collection history on a milestone is not a thing the UI may throw away. It also
+# needs outbound network to api.github.com, which is the one prerequisite in this file that is not a
+# container.
 #
 # The credential vault reads a real operator key from a real file, generated for this run only, in a
 # temporary directory that is removed when the run ends. The key is never written into the repository,
@@ -53,11 +58,13 @@ evidence_base_url="${CHRONICLEAF_EVIDENCE_BASE_URL:-http://127.0.0.1:5082}"
 credentials_base_url="${CHRONICLEAF_CREDENTIALS_BASE_URL:-http://127.0.0.1:5083}"
 voice_base_url="${CHRONICLEAF_VOICE_BASE_URL:-http://127.0.0.1:5084}"
 generation_base_url="${CHRONICLEAF_GENERATION_BASE_URL:-http://127.0.0.1:5085}"
+github_base_url="${CHRONICLEAF_GITHUB_BASE_URL:-http://127.0.0.1:5086}"
 log_file="$repo_root/$publish_dir/server.log"
 evidence_log_file="$repo_root/$publish_dir/server-evidence.log"
 credentials_log_file="$repo_root/$publish_dir/server-credentials.log"
 voice_log_file="$repo_root/$publish_dir/server-voice.log"
 generation_log_file="$repo_root/$publish_dir/server-generation.log"
+github_log_file="$repo_root/$publish_dir/server-github.log"
 key_file=""
 
 # The operator key for this run: 32 random bytes in a temporary file outside the repository and
@@ -87,7 +94,7 @@ cleanup() {
   # The tokens are secrets for the lifetime of this run and must not survive it.
   rm -f "$repo_root/$publish_dir/access-token" "$repo_root/$publish_dir/access-token-evidence" \
     "$repo_root/$publish_dir/access-token-credentials" "$repo_root/$publish_dir/access-token-voice" \
-    "$repo_root/$publish_dir/access-token-generation"
+    "$repo_root/$publish_dir/access-token-generation" "$repo_root/$publish_dir/access-token-github"
   # So is the encryption key: it is removed whether the run passed or failed.
   remove_key_file
   exit "$exit_status"
@@ -360,4 +367,26 @@ start_suite generation "$generation_base_url" "$generation_log_file" "$repo_root
 echo "==> npm run test:e2e (real browser against $generation_base_url)"
 run_suite "$generation_base_url" "$generation_log_file" "$repo_root/$publish_dir/access-token-generation" \
   tests/llm-provider-contract.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 6: the GitHub repository connection and the collection a milestone asks it for. It needs a
+# project with no connection to begin with, and a connection cannot be removed through the UI, so its
+# own installation, its own database and its own published instance - for the same reason suite 5 is
+# its own. It also asserts that a token this suite typed is nowhere in the delivered page afterwards,
+# which is only a claim about a run that stored one itself.
+#
+# Nothing about GitHub is faked here and nothing is seeded, unlike the operations panel above: the
+# connection is stored by the panel under test through the real route, and a real repository is read by
+# the real server from GitHub's own host. That makes this the one suite in the file with an outbound
+# prerequisite. Where api.github.com cannot be reached the collection scenario fails and says so, which
+# is recorded as a prerequisite failure rather than quietly passed - and it is never replaced by a stub
+# handler, because a fake GitHub would let a pass stand in for a result only a real one can give.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a sixth disposable PostgreSQL and published application at $github_base_url"
+start_suite github "$github_base_url" "$github_log_file" "$repo_root/$publish_dir/access-token-github"
+
+echo "==> npm run test:e2e (real browser against $github_base_url)"
+run_suite "$github_base_url" "$github_log_file" "$repo_root/$publish_dir/access-token-github" \
+  tests/github-evidence.spec.ts
 stop_suite

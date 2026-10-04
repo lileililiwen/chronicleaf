@@ -1153,11 +1153,12 @@ public sealed class VoiceProfilesTests(ChronicleafPostgresFixture postgres)
         // Readiness counts the voice migration among the ids this build requires, so a database
         // without it is reported by name rather than failing on the first read. The newest required
         // id has moved on since - the generation-previews migration follows the voice one, and the
-        // github-evidence migration follows that - so this scenario names the newest rather than
-        // assuming the voice migration is still it.
+        // github-evidence migration follows that, and the screenshot-capture migration follows that -
+        // so this scenario names the newest rather than assuming the voice migration is still it.
         Assert.Contains(ChronicleafSchema.VoiceProfilesMigrationId, ChronicleafSchema.RequiredMigrationIds);
         Assert.Contains(ChronicleafSchema.GitHubEvidenceMigrationId, ChronicleafSchema.RequiredMigrationIds);
-        Assert.Equal(ChronicleafSchema.GitHubEvidenceMigrationId, ChronicleafSchema.ExpectedMigrationId);
+        Assert.Contains(ChronicleafSchema.ScreenshotCaptureMigrationId, ChronicleafSchema.RequiredMigrationIds);
+        Assert.Equal(ChronicleafSchema.ScreenshotCaptureMigrationId, ChronicleafSchema.ExpectedMigrationId);
         Assert.True(ChronicleafSchema.IsCurrent(
         [
             .. ChronicleafSchema.RequiredMigrationIds,

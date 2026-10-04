@@ -8,6 +8,7 @@
 using Chronicleaf.Api;
 using Chronicleaf.Api.Access;
 using Chronicleaf.Api.AI;
+using Chronicleaf.Api.Capture;
 using Chronicleaf.Api.Common;
 using Chronicleaf.Api.Evidence;
 using Chronicleaf.Api.GitHub;
@@ -18,6 +19,7 @@ using Chronicleaf.Api.Secrets;
 using Chronicleaf.Api.Voice;
 using Chronicleaf.Infrastructure.Access;
 using Chronicleaf.Infrastructure.AI;
+using Chronicleaf.Infrastructure.Capture;
 using Chronicleaf.Infrastructure.Evidence;
 using Chronicleaf.Infrastructure.GitHub;
 using Chronicleaf.Infrastructure.Media;
@@ -109,6 +111,14 @@ builder.Services.AddAIGeneration();
 // migration reports schema_mismatch at /api/ready.
 builder.Services.AddGitHubEvidence();
 
+// SCREENSHOT-CAPTURE-001/002. The two stores, the service, the one job handler, and the production
+// browser - the sandbox-backed Playwright provider, which is registered here and nowhere else. The
+// provider refuses on a host that cannot confine a browser rather than falling back to unrestricted
+// networking, and there is no setting that changes that: the only configuration this reads is where the
+// packaged Chromium is and which deployment mode this is. A database without the screenshot-capture
+// migration reports schema_mismatch at /api/ready.
+builder.Services.AddScreenshotCapture(builder.Configuration);
+
 // The rotation guard is applied once at start-up, so an access token that was changed since the
 // last run revokes every existing session before this process serves anything.
 builder.Services.AddHostedService<AccessTokenRotationStartup>();
@@ -194,6 +204,13 @@ app.MapAIGenerationEndpoints();
 // here accepts or returns a URL and none returns a credential: a repository is an owner and a name,
 // and the host is a constant of the transport.
 app.MapGitHubEvidenceEndpoints();
+
+// SCREENSHOT-CAPTURE-001/002: the private capture and candidate routes. Neither is marked public, so
+// the access package's default-deny boundary already covers both. This is the one surface in the
+// repository whose body names a host the server will then connect to, and it is the URL policy rather
+// than this boundary that makes it safe: a forbidden destination is refused with 403 before a browser
+// is started, and the read route publishes candidate provenance without any storage key.
+app.MapCaptureEndpoints();
 
 // SHELL-001/SHELL-002: every unmatched path is either an unknown API path, an unknown
 // static asset, or a client route. Only the last one falls back to the SPA entry point. This

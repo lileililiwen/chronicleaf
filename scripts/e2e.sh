@@ -14,7 +14,7 @@
 # The plaintext token is written to a file inside the publish directory, is never echoed, and is
 # handed to the fixtures through the environment.
 #
-# Six fixtures groups run, each against its own published instance and its own disposable database,
+# Seven fixtures groups run, each against its own published instance and its own disposable database,
 # because one of them asserts something another one changes. tests/projects-and-milestones.spec.ts
 # states that its installation starts with an empty project list - that is the claim it is making
 # about a new installation - and a project cannot be removed once it exists, because archiving is
@@ -44,6 +44,12 @@
 # route, because the collection history on a milestone is not a thing the UI may throw away. It also
 # needs outbound network to api.github.com, which is the one prerequisite in this file that is not a
 # container.
+# A seventh is what the capture fixture needs, for the same reason again: it creates a milestone and
+# asserts what the capture panel reports for it, and a candidate cannot be removed through the UI
+# either - curation owns selection and this feature deliberately offers no control that could throw one
+# away. It needs no outbound network and no container beyond its own PostgreSQL, because a host that
+# cannot confine a browser refuses the capture before any connection is made, and that refusal is what
+# it asserts.
 #
 # The credential vault reads a real operator key from a real file, generated for this run only, in a
 # temporary directory that is removed when the run ends. The key is never written into the repository,
@@ -59,12 +65,14 @@ credentials_base_url="${CHRONICLEAF_CREDENTIALS_BASE_URL:-http://127.0.0.1:5083}
 voice_base_url="${CHRONICLEAF_VOICE_BASE_URL:-http://127.0.0.1:5084}"
 generation_base_url="${CHRONICLEAF_GENERATION_BASE_URL:-http://127.0.0.1:5085}"
 github_base_url="${CHRONICLEAF_GITHUB_BASE_URL:-http://127.0.0.1:5086}"
+capture_base_url="${CHRONICLEAF_CAPTURE_BASE_URL:-http://127.0.0.1:5087}"
 log_file="$repo_root/$publish_dir/server.log"
 evidence_log_file="$repo_root/$publish_dir/server-evidence.log"
 credentials_log_file="$repo_root/$publish_dir/server-credentials.log"
 voice_log_file="$repo_root/$publish_dir/server-voice.log"
 generation_log_file="$repo_root/$publish_dir/server-generation.log"
 github_log_file="$repo_root/$publish_dir/server-github.log"
+capture_log_file="$repo_root/$publish_dir/server-capture.log"
 key_file=""
 
 # The operator key for this run: 32 random bytes in a temporary file outside the repository and
@@ -94,7 +102,8 @@ cleanup() {
   # The tokens are secrets for the lifetime of this run and must not survive it.
   rm -f "$repo_root/$publish_dir/access-token" "$repo_root/$publish_dir/access-token-evidence" \
     "$repo_root/$publish_dir/access-token-credentials" "$repo_root/$publish_dir/access-token-voice" \
-    "$repo_root/$publish_dir/access-token-generation" "$repo_root/$publish_dir/access-token-github"
+    "$repo_root/$publish_dir/access-token-generation" "$repo_root/$publish_dir/access-token-github" \
+    "$repo_root/$publish_dir/access-token-capture"
   # So is the encryption key: it is removed whether the run passed or failed.
   remove_key_file
   exit "$exit_status"
@@ -389,4 +398,35 @@ start_suite github "$github_base_url" "$github_log_file" "$repo_root/$publish_di
 echo "==> npm run test:e2e (real browser against $github_base_url)"
 run_suite "$github_base_url" "$github_log_file" "$repo_root/$publish_dir/access-token-github" \
   tests/github-evidence.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 7: bounded screenshot capture for a milestone. It creates a project and a milestone and then
+# asserts what the capture panel reports, so it needs a milestone of its own - a milestone cannot
+# exist without a project, and a project is never removed - and it must not share a database with any
+# other suite. Its own installation, its own database and its own published instance, for the same
+# reason suite 6 is its own.
+#
+# What this suite claims is worth stating, because it is narrower than the feature. Capturing a page
+# means running a browser confined with no access to this machine's network. A host that cannot
+# provide that isolation - no user namespaces, no CAP_NET_ADMIN, no iptables and no nft - answers
+# capture_sandbox_unavailable before any browser is started, and the design treats native capture
+# outside that sandbox as unavailable rather than as a less-secure fallback. So where the host cannot
+# confine a browser, this suite asserts the refusal is VISIBLE: the panel names the code, says no page
+# was visited and no picture exists, draws no candidate and offers nothing that looks like a retry.
+# That is a real claim about the delivered product and it is what SCREENSHOT-CAPTURE-002 exists to
+# protect. It is not a claim that a screenshot was captured, and a candidate image is only asserted
+# when the server actually published one.
+#
+# The half that needs no browser at all is asserted unconditionally: a private destination is refused
+# by the server's URL policy before a job is created, so the panel is shown refusing a page without any
+# capture being attempted. Nothing here is seeded and nothing is faked - the candidate rows, the job
+# and its stored failure code are all written by the real server and read back through its own routes.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a seventh disposable PostgreSQL and published application at $capture_base_url"
+start_suite capture "$capture_base_url" "$capture_log_file" "$repo_root/$publish_dir/access-token-capture"
+
+echo "==> npm run test:e2e (real browser against $capture_base_url)"
+run_suite "$capture_base_url" "$capture_log_file" "$repo_root/$publish_dir/access-token-capture" \
+  tests/screenshot-capture.spec.ts
 stop_suite

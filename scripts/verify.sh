@@ -195,6 +195,29 @@ else
   # GitHub API was called, that a real repository was resolved, or that any specific GitHub response
   # shape is supported beyond what the transport's own pinned version documents.
   step "github evidence tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~GithubEvidenceTests"
+  # SCREENSHOT-CAPTURE-001/002. That a private, local, loopback or cloud-metadata destination is refused
+  # by the URL policy - including when the same address is written in IPv6 spelling as an
+  # IPv4-mapped literal such as ::ffff:10.0.0.5, which the IPv6 rules would otherwise judge a public
+  # page; that the policy is consulted before a job exists and again to the address the name resolves
+  # to before the browser is asked about anything, so a refused destination is refused before bytes are
+  # exchanged; that a job on a host which cannot confine a browser answers capture_sandbox_unavailable
+  # AND starts no browser process; that candidates are written as candidates and never selected, made
+  # primary, captioned or appended to evidence; and that a duplicate tuple retires the second run's
+  # media through the delivered status transition - all proven against the same real disposable
+  # PostgreSQL and a real temporary media root, through the real API host and the real operation queue.
+  #
+  # Two things this stage is NOT evidence for, and the comment says so because the temptation is real.
+  # First, the substituted IScreenshotProvider is a legitimate DI seam - the delivered
+  # IGitEvidenceSource substitutes its own far end the same way - but it means no browser is launched
+  # and no page is visited by these scenarios, so nothing here shows that a real page can be
+  # photographed, and the PNG bytes that exercise media storage, the candidate row, the PNG dimension
+  # check and the digest are a labelled synthesised fixture rather than a captured page. Second, the
+  # egress enforcement is a kernel mechanism: this host has no CAP_NET_ADMIN, no user namespaces, no
+  # iptables and no nft, so the decision function is tested directly and the kernel refusing a
+  # connection is NOT proven here. Chromium and Microsoft.Playwright are present, which is why the
+  # sandbox probe reports a real answer - it is the enforcement underneath it that this host cannot
+  # exercise.
+  step "screenshot capture tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~ScreenshotCaptureTests"
 fi
 
 step "frontend install" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm ci'
@@ -203,8 +226,8 @@ step "frontend build" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm run b
 if [ "${CHRONICLEAF_E2E:-0}" = "1" ]; then
   # Publishes the real application, starts a disposable PostgreSQL per suite, applies the committed
   # migrations, and drives the shell, access, projects-and-milestones, background-jobs,
-  # milestone-evidence, credential-vault, voice-profiles, llm-provider-contract and github-evidence
-  # fixtures in a real browser. The last six
+  # milestone-evidence, credential-vault, voice-profiles, llm-provider-contract, github-evidence and
+  # screenshot-capture fixtures in a real browser. The last seven
   # are included by playwright.config.ts, which already matches tests/**/*.spec.ts; this stage
   # therefore fails if the browser cannot record a project, confirm a candidate, refuse a stale edit,
   # read a milestone's evidence and be told the truth by a 409 against a real database, turn emoji
@@ -214,6 +237,13 @@ if [ "${CHRONICLEAF_E2E:-0}" = "1" ]; then
   # refused, and follow a real collection job to the status the operations route reports. The last of
   # those needs outbound network to api.github.com: nothing in the github suite is faked, so a
   # deployment without that route out fails this stage rather than passing on a stub.
+  #
+  # The capture fixture needs no outbound network, and that is deliberate rather than convenient: a
+  # capture that could reach a page is a capture whose isolation this host cannot demonstrate, so the
+  # suite asserts the honest reporting of the refusal - the panel names capture_sandbox_unavailable,
+  # says no page was visited and no picture exists, and draws nothing - and separately asserts the
+  # request-time refusal of a private destination, which is the half that never needed a browser. A
+  # pass is evidence that this host's refusal is visible, not evidence that a screenshot was captured.
   step "browser fixtures" bash scripts/e2e.sh
 fi
 

@@ -104,6 +104,19 @@ public static class ApiErrorStatus
         GitHub.GitHubError.ConnectionMissing => 422,
         GitHub.GitHubError.Unreachable => 503,
 
+        // The screenshot-capture package's codes. Additive in the same way, and the choices are this
+        // package's failure policy rather than defaults. 403 for a destination the URL policy will not
+        // photograph: the milestone is real and the request is well formed, and it is the destination
+        // that is refused, so 404 would be a lie and 422 would invite a client to resend an identical
+        // request. 503 for a host that cannot start the capture sandbox, which is a missing kernel
+        // capability rather than a broken product - and deliberately not a path that captures without
+        // it. TooLarge and Timeout deliberately reuse the delivered 413 and 504 constants, so an
+        // oversized ask and a page that never finished read the same as anywhere else. The four
+        // page_* and job_* codes deliberately have no arm: they are written to the operation row, and no
+        // route answers a capture that already failed.
+        Capture.CaptureError.TargetBlocked => 403,
+        Capture.CaptureError.SandboxUnavailable => 503,
+
         _ => 500,
     };
 }

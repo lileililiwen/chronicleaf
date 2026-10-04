@@ -12,6 +12,7 @@ import { GitHubConnectionPanel } from '../github-evidence/GitHubConnectionPanel'
 import { GitHubSyncPanel } from '../github-evidence/GitHubSyncPanel';
 import { MilestoneEvidencePanel } from '../milestone-evidence/MilestoneEvidencePanel';
 import { LlmProviderArea } from '../llm-provider-contract/LlmProviderArea';
+import { ScreenshotCapturePanel } from '../screenshot-capture/ScreenshotCapturePanel';
 import { VoiceArea } from '../voice-profiles/VoiceArea';
 import { milestoneTypeLabel, type Milestone, type MilestoneStatus, type Project } from './types';
 import { useMilestones, useProject } from './useRecords';
@@ -368,6 +369,19 @@ function MilestoneRow({
           absent for an archived milestone: a generation is a draft for a live record, and offering
           one for something that can no longer change would invite work nobody can finish. */}
       <LlmProviderArea
+        milestoneId={milestone.id}
+        milestoneTitle={milestone.title}
+        archived={archived}
+      />
+
+      {/* Bounded screenshots of one public page for that milestone, which are candidates and nothing
+          else. The panel asks for a job rather than producing a picture, and says so while it waits:
+          a capture is browser work in the delivered queue, so the owner is told the work was accepted
+          and nothing more. It offers no way to select a candidate or attach one to evidence, because
+          screenshot-curation owns that and consumes these rows. On a host that cannot confine a
+          browser the job answers capture_sandbox_unavailable before any browser starts, and the panel
+          reports that refusal as an answer rather than as a spinner that stopped. */}
+      <ScreenshotCapturePanel
         milestoneId={milestone.id}
         milestoneTitle={milestone.title}
         archived={archived}

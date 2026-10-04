@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Chronicleaf.Capture</RootNamespace>
+    <AssemblyName>Chronicleaf.Capture</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      The design names two files in this project - the Playwright provider and the sandbox - and names
+      the `IScreenshotProvider` seam in Chronicleaf.Application. Those two facts together fix the
+      direction of this reference: the provider implements an interface it cannot see otherwise, so this
+      project points at the product rather than the other way round, and Chronicleaf.Application knows
+      nothing about Playwright. That is what keeps the seam narrow - a test substitutes the interface,
+      and the browser driver is only ever loaded by the composition root.
+    -->
+    <ProjectReference Include="../Chronicleaf.Application/Chronicleaf.Application.csproj" />
+    <ProjectReference Include="../Chronicleaf.Core/Chronicleaf.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      The browser driver, pinned so a restore is reproducible: the Chromium build Playwright ships is
+      resolved and matched at runtime by the package itself, never by whatever happens to be in
+      ~/.cache on the machine. This is the one native dependency this package adds, and the design
+      requires it to be provisioned in the container image rather than found by searching PATH.
+    -->
+    <PackageReference Include="Microsoft.Playwright" Version="1.51.0" />
+  </ItemGroup>
+
+  <!--
+    What this project deliberately cannot reach is as important as what it can.
+
+    There is no reference to Chronicleaf.Infrastructure, so nothing here resolves a media key, a
+    connection string or a storage provider - a capture takes bytes, and the delivered media store
+    writes them. There is no reference to the credential vault, so a browser started from here has no
+    path to a token and therefore no way to photograph a logged-in page: the isolated context this
+    package requires (no saved cookies, no login, no secrets) is structural rather than a setting
+    somebody could turn off.
+  -->
+
+</Project>

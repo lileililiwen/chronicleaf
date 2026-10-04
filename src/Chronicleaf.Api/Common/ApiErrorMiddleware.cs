@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Chronicleaf.Application.Access;
 using Chronicleaf.Application.AI;
+using Chronicleaf.Application.Capture;
 using Chronicleaf.Application.Common;
 using Chronicleaf.Application.GitHub;
 using Chronicleaf.Application.Media;
@@ -323,6 +324,23 @@ public sealed class ApiErrorMiddleware(
             case GitHubUnavailableException githubUnavailable:
                 return (
                     Envelope.Create(GitHubError.Unreachable, githubUnavailable.Message, traceId),
+                    LogLevel.Warning);
+
+            // SCREENSHOT-CAPTURE-001/002. Written here for the same reason as the refusals above: this
+            // feature package raises them, and this middleware is still the only place an envelope is
+            // written. The messages are authored in the capture package and name no host, no address and
+            // no range, because a refusal that quoted what it refused would confirm to a caller that a
+            // host exists and holds something - which is the information this control withholds. The
+            // 503 is the design's refusal for a host that cannot confine a browser at all, and it is
+            // never a degraded path: there is no code that navigates a page without the sandbox.
+            case CaptureTargetBlockedException targetBlocked:
+                return (
+                    Envelope.Create(CaptureError.TargetBlocked, targetBlocked.Message, traceId),
+                    LogLevel.Information);
+
+            case CaptureSandboxUnavailableException sandboxUnavailable:
+                return (
+                    Envelope.Create(CaptureError.SandboxUnavailable, sandboxUnavailable.Message, traceId),
                     LogLevel.Warning);
 
             case BadHttpRequestException badRequest when badRequest.StatusCode == StatusCodes.Status413PayloadTooLarge:

@@ -1750,23 +1750,35 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
         // the real migration chain, applied by the same code the operator command runs.
         Assert.Contains(ChronicleafSchema.GenerationPreviewsMigrationId, ChronicleafSchema.RequiredMigrationIds);
         Assert.Contains(ChronicleafSchema.GitHubEvidenceMigrationId, ChronicleafSchema.RequiredMigrationIds);
-        Assert.Equal(ChronicleafSchema.GitHubEvidenceMigrationId, ChronicleafSchema.ExpectedMigrationId);
+        Assert.Contains(ChronicleafSchema.ScreenshotCaptureMigrationId, ChronicleafSchema.RequiredMigrationIds);
+        Assert.Equal(ChronicleafSchema.ScreenshotCaptureMigrationId, ChronicleafSchema.ExpectedMigrationId);
         Assert.True(ChronicleafSchema.IsCurrent([.. ChronicleafSchema.RequiredMigrationIds]));
 
-        // A database stopped at the voice-profiles migration is short of this one and the one after
+        // A database stopped at the voice-profiles migration is short of this one and every one after
         // it. The applied set therefore stops before this package's own migration as well: leaving it
-        // in would report only one gap, which is the answer for a database that stopped at the
+        // in would report only the later gaps, which is the answer for a database that stopped at the
         // generation-previews schema rather than the one this scenario is about.
+        //
+        // Every later id is filtered out here, not just the two that happened to exist when this
+        // scenario was written. SCREENSHOT-CAPTURE-001/002 added a third migration after the github one
+        // and a filter that named only the two would have let this package's own table be reported as
+        // present on a database that has never applied it - a passing assertion about a missing table.
         var missing = ChronicleafSchema.MissingMigrationIds(
             ChronicleafSchema.RequiredMigrationIds
                 .Where(id => id != ChronicleafSchema.GenerationPreviewsMigrationId)
                 .Where(id => id != ChronicleafSchema.GitHubEvidenceMigrationId)
+                .Where(id => id != ChronicleafSchema.ScreenshotCaptureMigrationId)
                 .ToArray());
 
-        // Two ids are missing now rather than one: GITHUB-EVIDENCE-001/002 added its own migration
-        // after this one, so a database stopped at the generation-previews schema is short of both.
+        // Three ids are missing now rather than one: GITHUB-EVIDENCE-001/002 added its own migration
+        // after this one and SCREENSHOT-CAPTURE-001/002 added another after that, so a database stopped
+        // at the generation-previews schema is short of all three.
         Assert.Equal(
-            [ChronicleafSchema.GenerationPreviewsMigrationId, ChronicleafSchema.GitHubEvidenceMigrationId],
+            [
+                ChronicleafSchema.GenerationPreviewsMigrationId,
+                ChronicleafSchema.GitHubEvidenceMigrationId,
+                ChronicleafSchema.ScreenshotCaptureMigrationId,
+            ],
             missing);
 
         // The table and its columns are the eight the package owns, with the milestone column

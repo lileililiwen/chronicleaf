@@ -73,6 +73,10 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     public DbSet<SyncSource> SyncSources => Set<SyncSource>();
 
+    public DbSet<ScreenshotCandidate> ScreenshotCandidates => Set<ScreenshotCandidate>();
+
+    public DbSet<CaptureRequestRow> CaptureRequests => Set<CaptureRequestRow>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Installation>(entity =>
@@ -923,7 +927,182 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_sync_sources_milestone_id");
         });
+
+        // -----------------------------------------------------------------------------------------
+        // screenshot-capture. Two tables and one uniqueness tuple between them: the request a job reads
+        // its work back from, and the candidates that job produces.
+        // -----------------------------------------------------------------------------------------
+
+        modelBuilder.Entity<CaptureRequestRow>(entity =>
+        {
+            entity.ToTable("capture_requests");
+            entity.HasKey(request => request.Id);
+            entity.Property(request => request.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(request => request.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(request => request.OperationId).HasColumnName("operation_id").IsRequired();
+            entity.Property(request => request.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(request => request.MilestoneId).HasColumnName("milestone_id").IsRequired();
+            entity.Property(request => request.Urls)
+                .HasColumnName("urls")
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    urls => CaptureColumnCodec.SerializeUrls(urls),
+                    json => CaptureColumnCodec.DeserializeUrls(json))
+                .IsRequired();
+            entity.Property(request => request.Viewports)
+                .HasColumnName("viewports")
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    viewports => CaptureColumnCodec.SerializeViewports(viewports),
+                    json => CaptureColumnCodec.DeserializeViewports(json))
+                .IsRequired();
+
+            // The comparers, set after the properties rather than in the fluent chain. Without one the
+            // mapper compares the two lists by reference, so an unchanged request looks changed to the
+            // change tracker and is written back on every read. Ordered and ordinal, because the order
+            // is the order the job walks and two lists holding the same strings in a different order
+            // are not the same capture.
+            entity.Metadata
+                .FindProperty(nameof(CaptureRequestRow.Urls))!
+                .SetValueComparer(StringListComparer.Instance);
+            entity.Metadata
+                .FindProperty(nameof(CaptureRequestRow.Viewports))!
+                .SetValueComparer(StringListComparer.Instance);
+            entity.Property(request => request.WaitSelector)
+                .HasColumnName("wait_selector")
+                .HasMaxLength(CaptureSelectorMaxLength);
+            entity.Property(request => request.WaitMilliseconds)
+                .HasColumnName("wait_milliseconds")
+                .IsRequired();
+            entity.Property(request => request.FullPage)
+                .HasColumnName("full_page")
+                .HasDefaultValue(false)
+                .IsRequired();
+            entity.Property(request => request.ExpectedBundleRevision)
+                .HasColumnName("expected_bundle_revision")
+                .IsRequired();
+            entity.Property(request => request.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            // One request per job. The worker is handed an operation id and nothing else, so this index
+            // is the only way it can find the words the owner typed - and a second request row for one
+            // job would mean a re-run could photograph something nobody asked for.
+            entity.HasIndex(request => new { request.ScopeId, request.OperationId })
+                .IsUnique()
+                .HasDatabaseName("ux_capture_requests_scope_id_operation_id");
+
+            entity.HasOne<Milestone>()
+                .WithMany()
+                .HasForeignKey(request => request.MilestoneId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_capture_requests_milestone_id");
+        });
+
+        modelBuilder.Entity<ScreenshotCandidate>(entity =>
+        {
+            entity.ToTable("screenshot_candidates");
+            entity.HasKey(candidate => candidate.Id);
+            entity.Property(candidate => candidate.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(candidate => candidate.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(candidate => candidate.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(candidate => candidate.MilestoneId).HasColumnName("milestone_id").IsRequired();
+            entity.Property(candidate => candidate.MediaId).HasColumnName("media_id").IsRequired();
+            entity.Property(candidate => candidate.OperationId).HasColumnName("operation_id").IsRequired();
+            entity.Property(candidate => candidate.SourceUrl)
+                .HasColumnName("source_url")
+                .HasMaxLength(CaptureUrlMaxLength)
+                .IsRequired();
+            entity.Property(candidate => candidate.FinalUrl)
+                .HasColumnName("final_url")
+                .HasMaxLength(CaptureUrlMaxLength)
+                .IsRequired();
+            entity.Property(candidate => candidate.Viewport)
+                .HasColumnName("viewport")
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    viewport => CaptureColumnCodec.SerializeViewport(viewport),
+                    // A stored object that names a viewport this package does not offer, or that carries
+                    // numbers other than that viewport's, reads as null. A candidate is still read; its
+                    // viewport is simply not one this build can claim was used.
+                    json => CaptureColumnCodec.DeserializeViewport(json) ?? CaptureViewport.Desktop)
+                .IsRequired();
+            entity.Property(candidate => candidate.CapturedAt)
+                .HasColumnName("captured_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            // The three curation fields. They are stored rather than derived, with the values this
+            // package writes, because screenshot-curation is the package that will move them: a column
+            // that does not exist cannot be constrained later without a migration, and a flag that was
+            // only ever computed has no history to curate.
+            entity.Property(candidate => candidate.Status)
+                .HasColumnName("status")
+                .HasMaxLength(CaptureStatusMaxLength)
+                .HasDefaultValue(ScreenshotCandidateStatus.Candidate)
+                .IsRequired();
+            entity.Property(candidate => candidate.Caption)
+                .HasColumnName("caption")
+                .HasMaxLength(CaptureCaptionMaxLength)
+                .HasDefaultValue(string.Empty)
+                .IsRequired();
+            entity.Property(candidate => candidate.IsPrimary)
+                .HasColumnName("is_primary")
+                .HasDefaultValue(false)
+                .IsRequired();
+            entity.Property(candidate => candidate.Revision)
+                .HasColumnName("revision")
+                .HasDefaultValue(1L)
+                .IsRequired();
+            entity.Property(candidate => candidate.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            // The design's tuple, as a database constraint rather than a convention: one candidate per
+            // (operation, source URL, viewport). A job may be retried, resumed or delivered twice, and
+            // without this a re-run would write a second copy of the same picture. jsonb has a btree
+            // equality operator, so the viewport is part of the key rather than filtered out of it -
+            // which is what lets one job capture the same URL at both viewports and get two candidates.
+            entity.HasIndex(candidate => new { candidate.OperationId, candidate.SourceUrl, candidate.Viewport })
+                .IsUnique()
+                .HasDatabaseName("ux_screenshot_candidates_operation_id_source_url_viewport");
+
+            // A milestone's candidates are read newest first, so the index leads with the milestone and
+            // the time the row was inserted.
+            entity.HasIndex(candidate => new { candidate.ScopeId, candidate.MilestoneId, candidate.CreatedAt })
+                .HasDatabaseName("ix_screenshot_candidates_scope_id_milestone_id_created_at");
+
+            entity.HasOne<Milestone>()
+                .WithMany()
+                .HasForeignKey(candidate => candidate.MilestoneId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_screenshot_candidates_milestone_id");
+
+            // The image is owned by the delivered media store, not by this table. The foreign key is
+            // what makes "a candidate without bytes is not a candidate" enforced rather than merely
+            // intended, and a restrictive delete means a media record cannot be removed out from under a
+            // row that points at it.
+            entity.HasOne<MediaRecord>()
+                .WithMany()
+                .HasForeignKey(candidate => candidate.MediaId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_screenshot_candidates_media_id");
+        });
     }
+
+    /// <summary>At most 512 characters for a wait selector, matching the application-side bound.</summary>
+    private const int CaptureSelectorMaxLength = 512;
+
+    /// <summary>At most 2048 characters for a stored URL, matching the Core record's own bound.</summary>
+    private const int CaptureUrlMaxLength = ScreenshotCandidateLimits.MaximumUrlLength;
+
+    /// <summary>At most 32 characters for a candidate status.</summary>
+    private const int CaptureStatusMaxLength = 32;
+
+    /// <summary>At most 500 characters for a caption. This package writes an empty one.</summary>
+    private const int CaptureCaptionMaxLength = 500;
 
     /// <summary>At most 39 characters; the longest owner segment GitHub accepts.</summary>
     private const int GitHubOwnerMaxLength = 39;

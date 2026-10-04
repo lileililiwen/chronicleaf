@@ -99,6 +99,18 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+      The capture browser and its sandbox (SCREENSHOT-CAPTURE-001/002). The direction is the reverse of
+      every other reference in this file and it is the design's own: `IScreenshotProvider` lives in
+      Chronicleaf.Application and `PlaywrightScreenshotProvider` implements it here, so the product
+      project - and therefore every project that depends on it, including the API - compiles without the
+      browser driver. It is the composition root that pulls it in, which is what keeps Microsoft.Playwright
+      a deployment fact rather than a dependency of the application layer.
+    -->
+    <ProjectReference Include="../Chronicleaf.Capture/Chronicleaf.Capture.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Design-time only: required by `dotnet ef` but never referenced by the runtime. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.4">
       <PrivateAssets>all</PrivateAssets>

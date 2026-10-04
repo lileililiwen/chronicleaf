@@ -158,6 +158,72 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.ToTable("audit_events", (string)null);
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.CaptureRequestRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("ExpectedBundleRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expected_bundle_revision");
+
+                    b.Property<bool>("FullPage")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("full_page");
+
+                    b.Property<Guid>("MilestoneId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("milestone_id");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<string>("Urls")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("urls");
+
+                    b.Property<string>("Viewports")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("viewports");
+
+                    b.Property<int>("WaitMilliseconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("wait_milliseconds");
+
+                    b.Property<string>("WaitSelector")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("wait_selector");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MilestoneId");
+
+                    b.HasIndex("ScopeId", "OperationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_capture_requests_scope_id_operation_id");
+
+                    b.ToTable("capture_requests", (string)null);
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.Credential", b =>
                 {
                     b.Property<Guid>("Id")
@@ -811,6 +877,101 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.ToTable("projects", (string)null);
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.ScreenshotCandidate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Caption")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasDefaultValue("")
+                        .HasColumnName("caption");
+
+                    b.Property<DateTimeOffset>("CapturedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("captured_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("FinalUrl")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("final_url");
+
+                    b.Property<bool>("IsPrimary")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_primary");
+
+                    b.Property<Guid>("MediaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("media_id");
+
+                    b.Property<Guid>("MilestoneId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("milestone_id");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<long>("Revision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L)
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<string>("SourceUrl")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("source_url");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("candidate")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Viewport")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("viewport");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MediaId");
+
+                    b.HasIndex("MilestoneId");
+
+                    b.HasIndex("OperationId", "SourceUrl", "Viewport")
+                        .IsUnique()
+                        .HasDatabaseName("ux_screenshot_candidates_operation_id_source_url_viewport");
+
+                    b.HasIndex("ScopeId", "MilestoneId", "CreatedAt")
+                        .HasDatabaseName("ix_screenshot_candidates_scope_id_milestone_id_created_at");
+
+                    b.ToTable("screenshot_candidates", (string)null);
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.SyncSource", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1041,6 +1202,16 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.ToTable("voice_profiles", (string)null);
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.CaptureRequestRow", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Milestone", null)
+                        .WithMany()
+                        .HasForeignKey("MilestoneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_capture_requests_milestone_id");
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.EvidenceBundle", b =>
                 {
                     b.HasOne("Chronicleaf.Core.Milestone", null)
@@ -1107,6 +1278,23 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_media_project_id");
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.ScreenshotCandidate", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Media", null)
+                        .WithMany()
+                        .HasForeignKey("MediaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_screenshot_candidates_media_id");
+
+                    b.HasOne("Chronicleaf.Core.Milestone", null)
+                        .WithMany()
+                        .HasForeignKey("MilestoneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_screenshot_candidates_milestone_id");
                 });
 
             modelBuilder.Entity("Chronicleaf.Core.SyncSource", b =>

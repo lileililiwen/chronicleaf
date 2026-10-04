@@ -1,10 +1,10 @@
-current_spec: github-evidence
+current_spec: screenshot-capture
 
 # Chronicleaf handoff
 
-## Current state — 2026-10-03
+## Current state — 2026-10-04
 
-Eleven changes implemented, verified and archived, each with exactly two commits (implementation/
+Twelve changes implemented, verified and archived, each with exactly two commits (implementation/
 tests/archive, then this HANDOFF-only pointer):
 
 | # | Change | Implementation commit | Canonical spec |
@@ -20,6 +20,7 @@ tests/archive, then this HANDOFF-only pointer):
 | 9 | `credential-vault` | `9d1e3c8` | `openspec/specs/credential-vault/spec.md` |
 | 10 | `voice-profiles` | `fd4a6bd` | `openspec/specs/voice-profiles/spec.md` |
 | 11 | `llm-provider-contract` | `f226b42` | `openspec/specs/llm-provider-contract/spec.md` |
+| 12 | `github-evidence` | `429f2b2` | `openspec/specs/github-evidence/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -118,19 +119,64 @@ also implemented the real `IMediaReferenceChecker` that `local-media-storage` de
 seam, so `media_in_use` now actually holds for referenced media.
 
 Evidence, all re-run by the parent session rather than taken on report: `CHRONICLEAF_E2E=1 bash
-scripts/verify.sh` exit 0 with the platform-feed stage, 15/15 shell, 24/24 persistence, 23/23 access,
-19/19 project and milestone, 12/12 jobs, 9/9 media, 14/14 evidence, 32/32 credential vault, 22/22
-voice profiles, 26/26 LLM provider contract, `npm ci`, `tsc` + `vite build` and 38/38 Playwright
-across five database-isolated browser suites against the published app with a real PostgreSQL;
-`scripts/e2e.sh` green on seven runs, five of them on the exact
+scripts/verify.sh` exit 0 with the platform-feed stage, eleven filtered stages each asserted to select
+at least one test, 15/15 shell, 24/24 persistence, 23/23 access, 19/19 project and milestone, 12/12
+jobs, 9/9 media, 14/14 evidence, 32/32 credential vault, 22/22 voice profiles, 26/26 LLM provider
+contract, 27/27 GitHub evidence — 223 in total — then `npm ci`, `tsc` + `vite build` and 41/41
+Playwright across six database-isolated browser suites against the published app with a real
+PostgreSQL; `scripts/e2e.sh` green on seven runs, five of them on the exact
 final code of the last package, whose first run exposed three real UI bugs; `scripts/e2e.sh` 4/4 clean here after 5/5 by the implementer -
 nine consecutive green runs of a suite that had been failing about half the time; `BackgroundJobsTests` 12/12 on three
 consecutive runs before and after the platform swap (41s, 41s, 41s) to show the lease and two-worker
 scenarios are not flaky; the feed check exits 0 and exits 1 with the feed removed; the isolated
 no-sibling build proven in both directions; container smokes for media and jobs; name preflight exit
 0; `openspec validate --all --strict --no-interactive` 53/53, then 54/54 after
-`platform-jobs-adoption` was authored, then 55/55 after `llm-provider-contract` was archived, before
-and after every archive.
+`platform-jobs-adoption` was authored, then 55/55 after `llm-provider-contract` was archived, then
+54/54 with `github-evidence` moved from an active change into a canonical spec, before and after every
+archive.
+
+**Repository evidence records a revision, not a name.** A project connects a repository by owner and
+name and never by a URL; `src/Chronicleaf.GitHub` is a BCL-only leaf project, like `Chronicleaf.AI`,
+so the transport is swappable without reaching the product. Every selected ref is resolved to an
+immutable SHA *before* any fact is read, and the collected commits, diffs, releases, issues and pull
+requests are appended through the evidence contract that already owns append-only storage — so the
+four database check constraints that refuse a fabricated fact apply to GitHub output too. Collection
+is a durable job on the delivered queue: an idempotent key returns the same operationId, submission is
+202 with the operation the owner watches, a 429 waits for its own reset time through
+`IOperationRetryScheduler`, and a bundle that moved during the import is superseded rather than
+overwritten. Nothing is written to GitHub — the transport exposes no verb that could — the API host is
+a constant with redirects refused, and a credential stays a vault reference that never reaches a row,
+a log or a second host.
+
+**A background write now refreshes the panel it wrote to.** The evidence panel already re-read on the
+owner's own append; what it lacked was any way to learn that *something else* had appended. Until
+`github-evidence` that was unreachable, because only the owner could write a bundle. It is now driven
+event-driven rather than by another poll: the sync panel reports the transition into a terminal
+operation status once, and `MilestoneRow` passes a token into an optional `reloadKey` on the evidence
+panel. The evidence panel imports nothing from the GitHub package, and the fixture that proves it was
+confirmed by temporarily neutralising the signal and watching the assertion fail on exactly that
+revision.
+
+**Defects caught by independent verification, and one environment flake recorded rather than hidden.**
+`LeaseHeartbeat` disposed both of its cancellation sources when `StartAsync` returned, throwing
+`ObjectDisposedException` on every worker exit path and leaving a transient failure stuck in `running`
+(8 of 12 job tests); the platform-jobs swap let the adapter create its own PostgreSQL storage, leaking
+an undisposable pool and breaking 19 unrelated tests with `53300 sorry, too many clients already`; the
+`llm-provider-contract` canonicaliser behind the SHA-256 consent binding did not recurse into arrays,
+so the digest drifted whenever the evidence array reordered; its web panel read evidence once on mount;
+`github-evidence`'s inherited migration-readiness widening updated the expected missing-id list but not
+the applied set it filters from, leaving that assertion unsatisfiable; and its sync panel read the
+connection once on mount. None was worked around by editing a test. Separately, one full gate run
+failed the access stage on a Testcontainers class-cleanup `TaskCanceledException` with all 23 tests
+passed. It did not reproduce in three isolated runs (23/23, 9s each, no cleanup failure), the stage is
+untouched by `github-evidence`, that package registers no hosted service that could hold a connection
+open, and the failure occurred with 18 containers live while the stage took 1m6s against 9s in
+isolation. It is recorded as an environment teardown flake, not silently re-run until green.
+
+**A measurement error of the parent's, recorded because it nearly hid a failure.** The first full-gate
+run of `github-evidence` was piped to `tail`, which masked the real exit code and reported the task
+green while `scripts/verify.sh` had in fact exited 1. Every later gate run uses `set -o pipefail` and
+prints `GATE_EXIT` explicitly.
 
 **The generation contract is provider-neutral and consented.** A new leaf assembly `Chronicleaf.AI` holds
 the `ILLMProvider` contract and zero `ProjectReference`/`PackageReference`, so the five future adapter
@@ -147,31 +193,42 @@ registered only in test DI, and `Production_registration_contains_no_adapter_and
 proves the production composition root cannot reach it. `scripts/verify.sh` has the new
 `llm provider contract tests` stage and the new browser suite is the fifth database-isolated run.
 
-Two real defects were caught by that independent verification and fixed before their commits:
-`LeaseHeartbeat` disposed both of its cancellation sources when `StartAsync` returned, which threw
-`ObjectDisposedException` on every worker exit path and left a transient failure stuck in `running`
-forever (8 of 12 job tests failing); and the platform-jobs swap initially let the adapter create its
-own PostgreSQL storage, which leaked an undisposable pool and broke 19 unrelated project/milestone
-tests with `53300 sorry, too many clients already`. Neither was worked around by editing a test.
-
 Remaining verification gaps, stated rather than implied: mobile-viewport capture, TLS
 termination, a second process against the same Community database, destructive `Down` migrations,
 Kestrel request-body limits, concurrency beyond two writers, the lost-lease cooperative cancel (no
 test waits long enough for a 15s beat to fire), no upload UI for media, no scheduler for the media
-orphan reconciler, and `media-smoke.sh` not exercised in CI. Deployment stays `deployable: false`;
+orphan reconciler, and `media-smoke.sh` not exercised in CI. For `github-evidence` specifically, the
+opt-in real-token run needs outbound network and a real token and was **not** performed, so no claim is
+made about authenticated or private-repository behaviour, real large-compare truncation, or real
+`Retry-After` handling; its browser collection scenario does reach the real public `api.github.com`
+and really did append a bundle revision, and on a host without that route out it fails loudly rather
+than being stubbed. One `llm-provider-contract.spec.ts` case failed in a single run out of three
+(fast, at 1.1s against ~5s when it passes) and passed in the other two; the surface it covers is
+untouched by this package and the cause was not established. Deployment stays `deployable: false`;
 there is no remote, no push and no publication.
 
-Next: implement `github-evidence` only. All three of its dependencies — `milestone-evidence`,
-`credential-vault` and `background-jobs` — are archived, so it is the next ready package in the chain
-and the keystone that turns local milestones into evidence that names a real upstream repository. With
-it and `screenshot-capture` (deps: `milestone-evidence`, `local-media-storage`, `background-jobs`,
-all archived) both unblocked, the order is `github-evidence` → `screenshot-capture` and then the AI
-publishing chain `llm-provider-contract` → `llm-openai-adapter` → `grounded-markdown-drafts` →
-`screenshot-curation` → `markdown-review-export` → `community-compose-release`, which is the first
-complete workflow. `llm-provider-contract` being archived also means `grounded-markdown-drafts` is
-now only waiting on `llm-openai-adapter` (the first real BYOK transport). Read only that package,
-keep one `current_spec`, implement, verify locally, strictly validate, archive without `--skip-specs`,
-then make the implementation commit and the HANDOFF-only pointer commit, and stop. Do not push.
+Next: implement `screenshot-capture` only. All three of its dependencies — `milestone-evidence`,
+`local-media-storage` and `background-jobs` — are archived, so it is the only remaining unblocked
+package outside the AI publishing chain. It is the second half of the evidence story that
+`github-evidence` started: a milestone can now cite a real upstream revision, and capture is what
+turns that into the images a published story needs. After it, the chain is
+`llm-openai-adapter` (the first real BYOK transport, and the only thing still blocking
+`grounded-markdown-drafts`) → `grounded-markdown-drafts` → `screenshot-curation` →
+`markdown-review-export` → `community-compose-release`, which is the first complete workflow.
+
+Two working notes for whoever picks this up. First, `github-evidence` was delivered across two
+worker passes because the first was **cancelled mid-flight rather than failed**, and it left a
+substantial uncommitted implementation behind; the backend was verified as inherited (build 0
+warnings, 27/27) and completed rather than restarted. Audit `git status` before assuming a clean tree
+whenever a worker does not return `succeeded`, because the expensive mistake here would have been
+discarding that work. Second, the two packages before this one both shipped a real browser-only UI bug
+that no .NET test could see — a panel that read its data once on mount, and a canonicaliser that did
+not recurse into arrays. Run `scripts/e2e.sh` as soon as the UI builds, and diff the whole change
+surface, not only the files you wrote.
+
+Read only that package, keep one `current_spec`, implement, verify locally, strictly validate, archive
+without `--skip-specs`, then make the implementation commit and the HANDOFF-only pointer commit, and
+stop. Do not push.
 
 # Bootstrap handoff
 

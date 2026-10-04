@@ -5,7 +5,7 @@ using Chronicleaf.Core;
 namespace Chronicleaf.Api.Capture;
 
 /// <summary>
-/// The wire shape of one capture candidate (SCREENSHOT-CAPTURE-001).
+/// The wire shape of one capture candidate (SCREENSHOT-CAPTURE-001, SCREENSHOT-CURATION-001/002).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -21,11 +21,11 @@ namespace Chronicleaf.Api.Capture;
 /// that could disagree with the first.
 /// </para>
 /// <para>
-/// <b>The curation fields are published as the constants they are.</b> <c>status</c>,
-/// <c>isPrimary</c> and <c>caption</c> are here so a client can render the difference between "offered"
-/// and "chosen" the moment screenshot-curation starts choosing, without a contract change. Today they
-/// always say candidate, false and the empty string, and a client that showed anything else would be
-/// reading a field this package cannot set.
+/// <b>The curation fields are published as the values they hold.</b> <c>status</c>,
+/// <c>isPrimary</c>, <c>caption</c> and <c>displayOrder</c> are moved by screenshot-curation and
+/// read here, so a client can render the difference between "offered" and "chosen" without a second
+/// route. A row no capture has curated still reads candidate, false, the empty string and zero -
+/// which is what capture inserts, and what this shape published before curation existed.
 /// </para>
 /// </remarks>
 public sealed record ScreenshotCandidateResponse(
@@ -41,6 +41,7 @@ public sealed record ScreenshotCandidateResponse(
     [property: JsonPropertyName("status")] string Status,
     [property: JsonPropertyName("caption")] string Caption,
     [property: JsonPropertyName("isPrimary")] bool IsPrimary,
+    [property: JsonPropertyName("displayOrder")] int DisplayOrder,
     [property: JsonPropertyName("revision")] long Revision)
 {
     public static ScreenshotCandidateResponse From(ScreenshotCandidate candidate)
@@ -60,7 +61,34 @@ public sealed record ScreenshotCandidateResponse(
             candidate.Status,
             candidate.Caption,
             candidate.IsPrimary,
+            candidate.DisplayOrder,
             candidate.Revision);
+    }
+
+    /// <summary>
+    /// The same shape from the curation read, which is what the list route serves now that
+    /// curation moves these columns. One collection and one route: a second read of the same rows
+    /// would be a second copy of state that could disagree with the first.
+    /// </summary>
+    public static ScreenshotCandidateResponse From(Core.CuratedScreenshot curated)
+    {
+        ArgumentNullException.ThrowIfNull(curated);
+
+        return new ScreenshotCandidateResponse(
+            curated.Id.ToString("D"),
+            curated.MediaId.ToString("D"),
+            curated.ProjectId.ToString("D"),
+            curated.SourceUrl,
+            curated.FinalUrl,
+            curated.Viewport.Name,
+            curated.Viewport.Width,
+            curated.Viewport.Height,
+            Stamp(curated.CapturedAt),
+            curated.Status,
+            curated.Caption,
+            curated.IsPrimary,
+            curated.DisplayOrder,
+            curated.Revision);
     }
 
     internal static string Stamp(DateTimeOffset value) =>

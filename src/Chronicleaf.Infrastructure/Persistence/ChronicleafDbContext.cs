@@ -1057,6 +1057,10 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .HasColumnName("is_primary")
                 .HasDefaultValue(false)
                 .IsRequired();
+            entity.Property(candidate => candidate.DisplayOrder)
+                .HasColumnName("display_order")
+                .HasDefaultValue(0)
+                .IsRequired();
             entity.Property(candidate => candidate.Revision)
                 .HasColumnName("revision")
                 .HasDefaultValue(1L)
@@ -1079,6 +1083,21 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
             // the time the row was inserted.
             entity.HasIndex(candidate => new { candidate.ScopeId, candidate.MilestoneId, candidate.CreatedAt })
                 .HasDatabaseName("ix_screenshot_candidates_scope_id_milestone_id_created_at");
+
+            // One primary picture per milestone, as a database constraint rather than a convention:
+            // the partial index holds only the rows that claim to be primary, so clearing the old
+            // primary and setting the new one in one transaction can never leave two behind, and a
+            // writer that somehow did is refused rather than read back as two first pictures.
+            entity.HasIndex(candidate => candidate.MilestoneId)
+                .IsUnique()
+                .HasFilter("is_primary")
+                .HasDatabaseName("ux_screenshot_candidates_milestone_primary");
+
+            // The curation vocabulary, as a database constraint rather than a convention: a status
+            // no reader recognises would otherwise read as whatever the panel guessed it meant.
+            entity.HasCheckConstraint(
+                "ck_screenshot_candidates_status",
+                "status IN ('candidate', 'selected', 'rejected')");
 
             entity.HasOne<Milestone>()
                 .WithMany()
@@ -1321,8 +1340,8 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
     /// <summary>At most 32 characters for a candidate status.</summary>
     private const int CaptureStatusMaxLength = 32;
 
-    /// <summary>At most 500 characters for a caption. This package writes an empty one.</summary>
-    private const int CaptureCaptionMaxLength = 500;
+    /// <summary>At most 1000 characters for a caption, matching the Core record's own bound.</summary>
+    private const int CaptureCaptionMaxLength = ScreenshotCurationLimits.CaptionMaxLength;
 
     /// <summary>At most 39 characters; the longest owner segment GitHub accepts.</summary>
     private const int GitHubOwnerMaxLength = 39;

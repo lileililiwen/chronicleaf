@@ -106,6 +106,18 @@ public static class ChronicleafSchema
     /// </summary>
     public const string GroundedMarkdownDraftsMigrationId = "20261005081500_AddGroundedMarkdownDrafts";
 
+    /// <summary>
+    /// The forward migration that curates the <c>screenshot_candidates</c> table
+    /// (SCREENSHOT-CURATION-001/002): a wider caption for the owner's words, the explicit display
+    /// order of the selected pictures, the one-primary-per-milestone index and the status
+    /// vocabulary. It also drops the milestone-only index the capture migration created but the
+    /// model never described, so the database and the model agree again. A database that has never
+    /// applied it has nowhere to record what an owner chose, so its curation routes would fail
+    /// against missing columns; readiness says so by name rather than answering 200 and failing on
+    /// the first selection.
+    /// </summary>
+    public const string ScreenshotCurationMigrationId = "20261006090000_AddScreenshotCuration";
+
     /// <summary>Every migration a database must carry before this build calls itself ready.</summary>
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
@@ -121,6 +133,7 @@ public static class ChronicleafSchema
         GitHubEvidenceMigrationId,
         ScreenshotCaptureMigrationId,
         GroundedMarkdownDraftsMigrationId,
+        ScreenshotCurationMigrationId,
     ];
 
     /// <summary>
@@ -128,7 +141,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = GroundedMarkdownDraftsMigrationId;
+    public const string ExpectedMigrationId = ScreenshotCurationMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

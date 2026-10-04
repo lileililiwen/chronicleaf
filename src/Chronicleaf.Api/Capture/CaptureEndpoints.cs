@@ -3,6 +3,7 @@ using Chronicleaf.Api.Access;
 using Chronicleaf.Application.Access;
 using Chronicleaf.Application.Capture;
 using Chronicleaf.Application.Common;
+using Chronicleaf.Application.Curation;
 using Chronicleaf.Application.Milestones;
 using Chronicleaf.Application.Operations;
 using Chronicleaf.Core;
@@ -106,14 +107,19 @@ public static class CaptureEndpoints
     private static async Task<IResult> ListScreenshotsAsync(
         Guid milestoneId,
         HttpContext context,
-        IScreenshotCaptureService capture,
+        IScreenshotCurationService curation,
         IOwnerAccessService access,
         CancellationToken cancellationToken)
     {
         var owner = await OwnerScopeAsync(context, access, cancellationToken).ConfigureAwait(false);
 
-        var candidates = await capture
-            .ListCandidatesAsync(owner, milestoneId, cancellationToken)
+        // The curation read, not the capture one. One collection and one route: the columns this
+        // route publishes are moved by screenshot-curation now, so reading them through the
+        // capture service's constants would report candidate/false/empty for a picture its owner
+        // has already selected. Capture still owns the rows; curation owns what this route says
+        // about the choice.
+        var candidates = await curation
+            .ListAsync(owner, milestoneId, cancellationToken)
             .ConfigureAwait(false);
 
         // No ETag. The collection is append-only and this route changes nothing, so there is no

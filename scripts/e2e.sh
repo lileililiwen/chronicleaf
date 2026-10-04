@@ -14,7 +14,7 @@
 # The plaintext token is written to a file inside the publish directory, is never echoed, and is
 # handed to the fixtures through the environment.
 #
-# Seven fixtures groups run, each against its own published instance and its own disposable database,
+# Nine fixture groups run, each against its own published instance and its own disposable database,
 # because one of them asserts something another one changes. tests/projects-and-milestones.spec.ts
 # states that its installation starts with an empty project list - that is the claim it is making
 # about a new installation - and a project cannot be removed once it exists, because archiving is
@@ -37,7 +37,7 @@
 # false on the next run, because a credential cannot be un-stored through the UI either. It is also
 # the only suite that creates a milestone with recorded evidence, and an evidence bundle is append-only,
 # so sharing a database with any other suite would put a second bundle where one suite expects one.
-# Five databases is the smallest way to keep each claim honest, and it means no group is run against
+# Nine databases is the smallest way to keep each claim honest, and it means no group is run against
 # state another one left behind.
 # A sixth is what the GitHub fixture needs, for the same reason again: it asserts that a project starts
 # with no repository connected, and a connection cannot be removed through the UI - there is no delete
@@ -53,7 +53,10 @@
 # An eighth is what the grounded-draft fixture needs, and for the same reason again: a stored draft
 # cannot be removed through the UI, a project cannot be removed, and the suite needs one milestone WITH a
 # draft and one without, which is the pair the empty state and the stored state are each proved against.
-#
+# A ninth is what the curation fixture needs, for the same reason again: a selection cannot be unmade
+# through the UI - there is no undo for publishing a picture into evidence, because the bundle it
+# entered is append-only - and the suite selects, rejects and reorders one milestone's
+# pictures, which would leave a different choice behind for any suite that shared its database.
 # The credential vault reads a real operator key from a real file, generated for this run only, in a
 # temporary directory that is removed when the run ends. The key is never written into the repository,
 # into the published output or into a container image, is never echoed, and is passed to the
@@ -70,6 +73,7 @@ generation_base_url="${CHRONICLEAF_GENERATION_BASE_URL:-http://127.0.0.1:5085}"
 github_base_url="${CHRONICLEAF_GITHUB_BASE_URL:-http://127.0.0.1:5086}"
 capture_base_url="${CHRONICLEAF_CAPTURE_BASE_URL:-http://127.0.0.1:5087}"
 drafts_base_url="${CHRONICLEAF_DRAFTS_BASE_URL:-http://127.0.0.1:5088}"
+curation_base_url="${CHRONICLEAF_CURATION_BASE_URL:-http://127.0.0.1:5089}"
 log_file="$repo_root/$publish_dir/server.log"
 evidence_log_file="$repo_root/$publish_dir/server-evidence.log"
 credentials_log_file="$repo_root/$publish_dir/server-credentials.log"
@@ -78,6 +82,7 @@ generation_log_file="$repo_root/$publish_dir/server-generation.log"
 github_log_file="$repo_root/$publish_dir/server-github.log"
 capture_log_file="$repo_root/$publish_dir/server-capture.log"
 drafts_log_file="$repo_root/$publish_dir/server-drafts.log"
+curation_log_file="$repo_root/$publish_dir/server-curation.log"
 key_file=""
 
 # The operator key for this run: 32 random bytes in a temporary file outside the repository and
@@ -108,7 +113,8 @@ cleanup() {
   rm -f "$repo_root/$publish_dir/access-token" "$repo_root/$publish_dir/access-token-evidence" \
     "$repo_root/$publish_dir/access-token-credentials" "$repo_root/$publish_dir/access-token-voice" \
     "$repo_root/$publish_dir/access-token-generation" "$repo_root/$publish_dir/access-token-github" \
-    "$repo_root/$publish_dir/access-token-capture" "$repo_root/$publish_dir/access-token-drafts"
+    "$repo_root/$publish_dir/access-token-capture" "$repo_root/$publish_dir/access-token-drafts" \
+    "$repo_root/$publish_dir/access-token-curation"
   # So is the encryption key: it is removed whether the run passed or failed.
   remove_key_file
   exit "$exit_status"
@@ -499,6 +505,180 @@ SQL
 }
 
 # ---------------------------------------------------------------------------------------------
+# The curation fixture: one real project, one real milestone, one real evidence bundle, real media
+# bytes and three offered candidates pointing at them.
+#
+# Everything above the candidate rows is made through the running server's own routes with the real
+# access token and a real antiforgery value, so the project, the milestone, its evidence, its
+# media and the two capture operations are records the product itself created. The two capture jobs
+# will fail with capture_sandbox_unavailable on this host - no browser can be confined here - and
+# they write no candidates, which is exactly why the three rows are inserted directly: the
+# operation ids they carry are real jobs this installation asked for, not invented provenance.
+#
+# What the inserted rows are careful about:
+#   - the bytes are a real 1x1 PNG uploaded through the real media route, decoded and verified by
+#     the delivered store. A file the store refused would fail loudly at upload rather than quietly
+#     seed an image that cannot be served.
+#   - the viewport column is the codec's own shape - {"name","width","height"} in camel case - so a
+#     row the product cannot read back as a viewport it offers is never written.
+#   - status, caption, primary flag, display order and revision are the constants a capture inserts,
+#     because curation owns every move away from them and the seed makes no choice on its behalf.
+#   - the rows are read back and the seed refuses to continue unless all three are stored: psql
+#     exiting zero is not evidence that a statement ran.
+# ---------------------------------------------------------------------------------------------
+seed_curation() {
+  local origin="$1"
+  local token="$2"
+  local cookie_jar
+  cookie_jar="$(mktemp -d)/cookies.txt"
+
+  local antiforgery
+  antiforgery="$(curl --silent --show-error --cookie-jar "$cookie_jar" --cookie "$cookie_jar" \
+    --data "{\"accessToken\":\"${token}\"}" \
+    -H 'Content-Type: application/json' \
+    "${origin}/api/session" >/dev/null && \
+    curl --silent --show-error --cookie-jar "$cookie_jar" --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/session/antiforgery" | jq -r '.token')"
+
+  if [ -z "$antiforgery" ] || [ "$antiforgery" = "null" ]; then
+    echo "the curation seed could not read an antiforgery value from ${origin}" >&2
+    return 1
+  fi
+
+  local project_id milestone_id
+  project_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"name":"Storefront","description":"The marketing site."}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/projects" | jq -r '.id')"
+
+  milestone_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"title":"Pricing page refresh","version":"0.2.0","occurredAt":"2026-10-04T09:30:00Z","type":"feature","notes":"Both viewports agree on price.","knownLimitations":[],"nextSteps":[]}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/projects/${project_id}/milestones" | jq -r '.id')"
+
+  if [ -z "$project_id" ] || [ "$project_id" = "null" ] || [ -z "$milestone_id" ] || [ "$milestone_id" = "null" ]; then
+    echo "the curation seed could not create its project and milestone" >&2
+    return 1
+  fi
+
+  # One hand-written evidence item, so every choice below is conditional on a bundle that has
+  # something in it rather than on an empty revision that proves nothing.
+  curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"notes":"The pricing page was refreshed.","expectedRevision":0}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 0' \
+    "${origin}/api/milestones/${milestone_id}/evidence/manual" >/dev/null
+
+  # Two real capture requests, so the candidate rows below name jobs this installation asked for.
+  # Both jobs will refuse with capture_sandbox_unavailable on a host that cannot confine a
+  # browser, and neither writes a candidate - which the seed asserts no part of: the candidates
+  # are the three rows below, and the jobs are their provenance.
+  local operation_pricing operation_changelog
+  operation_pricing="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"url":"https://example.com/pricing","viewports":["desktop","mobile"],"expectedBundleRevision":1,"idempotencyKey":"e2e-curation-pricing"}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 1' \
+    "${origin}/api/milestones/${milestone_id}/captures" | jq -r '.operationId')"
+  operation_changelog="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"url":"https://example.com/changelog","viewports":["desktop"],"expectedBundleRevision":1,"idempotencyKey":"e2e-curation-changelog"}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 1' \
+    "${origin}/api/milestones/${milestone_id}/captures" | jq -r '.operationId')"
+
+  if [ -z "$operation_pricing" ] || [ "$operation_pricing" = "null" ] || [ -z "$operation_changelog" ] || [ "$operation_changelog" = "null" ]; then
+    echo "the curation seed could not request its capture jobs" >&2
+    return 1
+  fi
+
+  # One real PNG through the real media route. It is a 1x1 fixture, decoded and verified by the
+  # delivered store - and what the browser suite draws from it is the served bytes, never a claim
+  # that a page was photographed.
+  local png_file
+  png_file="$(mktemp -d)/pixel.png"
+  printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' \
+    | base64 --decode >"$png_file"
+
+  local media_id
+  media_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data-binary "@${png_file}" \
+    -H 'Content-Type: image/png' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/media?projectId=${project_id}" | jq -r '.id')"
+  rm -f "$png_file"
+
+  if [ -z "$media_id" ] || [ "$media_id" = "null" ]; then
+    echo "the curation seed could not upload its fixture image" >&2
+    return 1
+  fi
+
+  seed_curation_rows "$postgres_container" "chronicleaf_e2e_curation" \
+    "$project_id" "$milestone_id" "$media_id" "$operation_pricing" "$operation_changelog"
+
+  CHRONICLEAF_E2E_CURATION_PROJECT="$project_id"
+  export CHRONICLEAF_E2E_CURATION_PROJECT
+  CHRONICLEAF_E2E_CURATION_MILESTONE="$milestone_id"
+  export CHRONICLEAF_E2E_CURATION_MILESTONE
+}
+
+# The three offered candidates, inserted into the disposable database the curation suite is using.
+seed_curation_rows() {
+  local container="$1"
+  local database_name="$2"
+  local project_id="$3"
+  local milestone_id="$4"
+  local media_id="$5"
+  local operation_pricing="$6"
+  local operation_changelog="$7"
+
+  local now candidate_a candidate_b candidate_c scope_id
+  now="$(date -u +%Y-%m-%dT%H:%M:%S.000000Z)"
+  candidate_a="$(cat /proc/sys/kernel/random/uuid)"
+  candidate_b="$(cat /proc/sys/kernel/random/uuid)"
+  candidate_c="$(cat /proc/sys/kernel/random/uuid)"
+  scope_id="$(docker exec "$container" psql --username=chronicleaf --dbname="$database_name" --quiet --tuples-only --no-align \
+    --command 'SELECT id FROM installation LIMIT 1')"
+
+  # One statement, so a failure leaves nothing half-written. The unique tuple is
+  # (operation, source url, viewport): the two pricing rows share a job and differ by viewport,
+  # and the changelog row is its own job.
+  #
+  # `-i` is load-bearing for the same reason the grounded-draft seed states: without it the
+  # heredoc never reaches psql, psql exits 0 having inserted nothing, and the suite would run
+  # against an empty choice it mistakes for an offered one. The rows are read back below.
+  docker exec -i "$container" psql --username=chronicleaf --dbname="$database_name" --quiet \
+    --set=ON_ERROR_STOP=1 \
+    <<SQL >/dev/null
+INSERT INTO screenshot_candidates
+  (id, scope_id, project_id, milestone_id, media_id, operation_id, source_url, final_url,
+   viewport, captured_at, status, caption, is_primary, display_order, revision, created_at)
+VALUES
+  ('${candidate_a}', '${scope_id}', '${project_id}', '${milestone_id}', '${media_id}', '${operation_pricing}',
+   'https://example.com/pricing', 'https://example.com/pricing',
+   '{"name":"desktop","width":1440,"height":900}', '${now}', 'candidate', '', false, 0, 1, '${now}'),
+  ('${candidate_b}', '${scope_id}', '${project_id}', '${milestone_id}', '${media_id}', '${operation_pricing}',
+   'https://example.com/pricing', 'https://example.com/pricing',
+   '{"name":"mobile","width":390,"height":844}', '${now}', 'candidate', '', false, 0, 1, '${now}'),
+  ('${candidate_c}', '${scope_id}', '${project_id}', '${milestone_id}', '${media_id}', '${operation_changelog}',
+   'https://example.com/changelog', 'https://example.com/changelog',
+   '{"name":"desktop","width":1440,"height":900}', '${now}', 'candidate', '', false, 0, 1, '${now}');
+SQL
+
+  # Read back what the database actually holds. A count that is not three, or a row whose
+  # viewport the product cannot read back as a viewport it offers, refuses the suite: the panel
+  # under test renders viewports, and a row with an unreadable one would prove nothing.
+  local stored
+  stored="$(docker exec "$container" psql --username=chronicleaf --dbname="$database_name" \
+    --quiet --tuples-only --no-align \
+    --command "SELECT count(*) FROM screenshot_candidates WHERE milestone_id = '${milestone_id}' AND status = 'candidate'")"
+
+  if [ "$stored" != "3" ]; then
+    echo "the curation seed stored '${stored}' candidates, which is not the three offered rows" >&2
+    return 1
+  fi
+}
+# ---------------------------------------------------------------------------------------------
 # Suite 1: the shell, the access boundary, the projects and milestones lifecycle, and the
 # background operations panel. Its project list must be empty when it starts, which is why this
 # suite has a database to itself.
@@ -654,4 +834,32 @@ seed_grounded_draft "$drafts_base_url" "$(cat "$repo_root/$publish_dir/access-to
 echo "==> npm run test:e2e (real browser against $drafts_base_url)"
 run_suite "$drafts_base_url" "$drafts_log_file" "$repo_root/$publish_dir/access-token-drafts" \
   tests/grounded-markdown-drafts.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 9: the screenshot picker. It needs a milestone the browser can choose from, and it needs
+# offered candidates with real bytes behind them, so it has its own installation and its own
+# published instance for the same reason suites 1 to 8 each have one.
+#
+# What this suite claims, and what it does not. The project, the milestone, its evidence, its
+# media and its capture jobs are created by the running server's own routes through the real
+# access boundary. The three candidate rows are inserted the way the grounded-draft suite inserts
+# its rows - directly, with the rows read back and refused when they are not there - because a
+# candidate is produced by a browser and this host cannot confine one. The bytes behind all three
+# are one real 1x1 PNG uploaded through the real media route and verified by the delivered store:
+# a fixture, never presented as something a browser photographed. So a pass is evidence that the
+# picker records a human choice faithfully and publishes it into evidence - select with a caption,
+# reject, primary, caption edit, reorder and the 409 for a stale change - and is NOT evidence that
+# a screenshot was captured on this host. The .NET suite is where candidates are produced by real
+# capture jobs behind the delivered provider seam.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a ninth disposable PostgreSQL and published application at $curation_base_url"
+start_suite curation "$curation_base_url" "$curation_log_file" "$repo_root/$publish_dir/access-token-curation"
+
+echo "==> recording the project, evidence, media and offered candidates the picker reads"
+seed_curation "$curation_base_url" "$(cat "$repo_root/$publish_dir/access-token-curation")"
+
+echo "==> npm run test:e2e (real browser against $curation_base_url)"
+run_suite "$curation_base_url" "$curation_log_file" "$repo_root/$publish_dir/access-token-curation" \
+  tests/screenshot-curation.spec.ts
 stop_suite

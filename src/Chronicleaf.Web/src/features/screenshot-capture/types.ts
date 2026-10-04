@@ -7,10 +7,10 @@
  * picture. The panel is written so that the distance between those two things is the panel's whole
  * subject: a capture is work somebody has to wait for, and until it has run there is no candidate.
  *
- * `status`, `caption` and `isPrimary` are carried even though this package always writes
- * `candidate`, the empty string and `false`. Screenshot-curation is the next feature to read these
- * rows, and a client that could not tell "offered" from "chosen" would have to change to show that
- * difference later. They are here so the difference can be rendered from the moment it exists.
+ * `status`, `caption`, `isPrimary` and `displayOrder` are moved by screenshot-curation and read here,
+ * so this list can render the difference between "offered" and "chosen" without a second route. A row
+ * no curation has touched still reads `candidate`, the empty string, `false` and zero - which is what
+ * capture inserts, and what this shape published before curation existed.
  */
 import type { ApiFailure, Operation } from '../background-jobs/types';
 
@@ -27,12 +27,20 @@ export interface ScreenshotCandidate {
   readonly width: number;
   readonly height: number;
   readonly capturedAt: string;
-  /** Always `candidate` today. */
+  /** `candidate`, `selected` or `rejected` - the choice screenshot-curation records. */
   readonly status: string;
-  /** Always the empty string today; captioning belongs to curation. */
+  /** The owner's plain-text caption, or empty when none was written. */
   readonly caption: string;
-  /** Always false today; one primary is curation's constraint to hold. */
+  /** True for the milestone's single primary picture, if one is chosen. */
   readonly isPrimary: boolean;
+  /**
+   * The owner's explicit sequence among the selected pictures, written only by curation.
+   *
+   * Zero for every row no order has sequenced. The picker sorts the selected pictures by this
+   * and breaks ties by capture time; the order of unselected pictures is the capture order this
+   * list already publishes.
+   */
+  readonly displayOrder: number;
   readonly revision: number;
 }
 

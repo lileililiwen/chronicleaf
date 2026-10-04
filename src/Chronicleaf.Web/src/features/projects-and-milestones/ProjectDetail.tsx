@@ -14,6 +14,7 @@ import { GroundedMarkdownDraftPanel } from '../grounded-markdown-drafts/Grounded
 import { MilestoneEvidencePanel } from '../milestone-evidence/MilestoneEvidencePanel';
 import { LlmProviderArea } from '../llm-provider-contract/LlmProviderArea';
 import { ScreenshotCapturePanel } from '../screenshot-capture/ScreenshotCapturePanel';
+import { ScreenshotPicker } from '../screenshot-curation/ScreenshotPicker';
 import { VoiceArea } from '../voice-profiles/VoiceArea';
 import { milestoneTypeLabel, type Milestone, type MilestoneStatus, type Project } from './types';
 import { useMilestones, useProject } from './useRecords';
@@ -397,13 +398,26 @@ function MilestoneRow({
           else. The panel asks for a job rather than producing a picture, and says so while it waits:
           a capture is browser work in the delivered queue, so the owner is told the work was accepted
           and nothing more. It offers no way to select a candidate or attach one to evidence, because
-          screenshot-curation owns that and consumes these rows. On a host that cannot confine a
+          screenshot-curation owns that and reads these rows below. On a host that cannot confine a
           browser the job answers capture_sandbox_unavailable before any browser starts, and the panel
           reports that refusal as an answer rather than as a spinner that stopped. */}
       <ScreenshotCapturePanel
         milestoneId={milestone.id}
         milestoneTitle={milestone.title}
         archived={archived}
+      />
+
+      {/* SCREENSHOT-CURATION-001/002. What the owner chose about those pictures: which are selected
+          evidence, which are rejected, which one is primary, in what sequence, and with what words.
+          Selecting publishes the picture into the evidence panel above in the same server
+          transaction, so a change that advances the bundle tells that panel to read again on its own
+          terms - the same token the sync panel already uses, because neither feature has to know the
+          other exists. */}
+      <ScreenshotPicker
+        milestoneId={milestone.id}
+        milestoneTitle={milestone.title}
+        archived={archived}
+        onEvidenceChanged={() => setSettledCollections((value) => value + 1)}
       />
 
       {archived ? null : (

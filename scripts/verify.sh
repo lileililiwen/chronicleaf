@@ -3,7 +3,7 @@
 # PROJECTS-AND-MILESTONES-001/002, BACKGROUND-JOBS-001/002, LOCAL-MEDIA-STORAGE-001/002,
 # MILESTONE-EVIDENCE-001/002, CREDENTIAL-VAULT-001/002, VOICE-PROFILES-001/002,
 # LLM-PROVIDER-CONTRACT-001/002, GITHUB-EVIDENCE-001/002, LLM-OPENAI-ADAPTER-001/002,
-# GROUNDED-MARKDOWN-DRAFTS-001/002).
+# SCREENSHOT-CAPTURE-001/002, SCREENSHOT-CURATION-001/002, GROUNDED-MARKDOWN-DRAFTS-001/002).
 #
 # Required chain, in order:
 #   1. platform feed           - the committed packages/platform-feed is what the build resolves, from
@@ -243,6 +243,24 @@ else
   # sandbox probe reports a real answer - it is the enforcement underneath it that this host cannot
   # exercise.
   step "screenshot capture tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~ScreenshotCaptureTests"
+  # SCREENSHOT-CURATION-001/002. That selecting a screenshot with a caption appends an evidence
+  # revision referencing that media and caption, and that a caption edit appends a correcting
+  # revision naming what it corrects; that a candidate never selected stays outside selected
+  # evidence, that a rejected or unknown picture cannot be made primary, and that validation names
+  # its field while writing nothing; that deselecting appends a revision without the picture while
+  # earlier bundles keep their rows, and that a repeated unchanged selection is a no-op rather than
+  # a revision; that a capture re-run offers new candidates and never moves a human selection, and
+  # that changing the primary clears the old one in the same transaction with exactly one primary
+  # left; that an order must name exactly the selected pictures once each and is stored and served
+  # in that sequence without moving the bundle; and that two curations on one revision produce one
+  # winner and one 409 - all proven against the same real disposable PostgreSQL, the real API host,
+  # the real operation queue and the real media and evidence stores, with candidates produced by
+  # real capture jobs behind the delivered provider seam.
+  #
+  # The same honesty bounds as the capture stage apply: no browser is launched and no page is
+  # visited by these scenarios, so nothing here shows that a real page can be photographed, and
+  # the PNG bytes behind the selections are the same labelled synthesised fixture.
+  step "screenshot curation tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~ScreenshotCurationTests"
   # GROUNDED-MARKDOWN-DRAFTS-001/002. That a valid summary is checked against the frozen evidence
   # snapshot before any Markdown exists; that a claim naming an id outside the snapshot, or a figure
   # appearing in no evidence item, fails grounding and writes nothing; that a summary broken twice -
@@ -274,8 +292,10 @@ if [ "${CHRONICLEAF_E2E:-0}" = "1" ]; then
   # Publishes the real application, starts a disposable PostgreSQL per suite, applies the committed
   # migrations, and drives the shell, access, projects-and-milestones, background-jobs,
   # milestone-evidence, credential-vault, voice-profiles, llm-provider-contract, github-evidence,
-  # screenshot-capture and grounded-markdown-drafts fixtures in a real browser. The last eight
-  # are included by playwright.config.ts, which already matches tests/**/*.spec.ts; this stage
+  # screenshot-capture, grounded-markdown-drafts and screenshot-curation fixtures in a real browser.
+  # The suites after the shell are included by scripts/e2e.sh, which names each fixture file, so a
+  # file that stops being matched shows up as a Playwright "no tests found" failure rather than as
+  # a suite quietly passing with nothing in it; this stage
   # therefore fails if the browser cannot record a project, confirm a candidate, refuse a stale edit,
   # read a milestone's evidence and be told the truth by a 409 against a real database, turn emoji
   # off over a preset that asked for it and see the effective value change, be shown every provider

@@ -1109,8 +1109,8 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.Property<string>("Caption")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
                         .HasDefaultValue("")
                         .HasColumnName("caption");
 
@@ -1121,6 +1121,12 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<int>("DisplayOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("display_order");
 
                     b.Property<string>("FinalUrl")
                         .IsRequired()
@@ -1183,7 +1189,10 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("MediaId");
 
-                    b.HasIndex("MilestoneId");
+                    b.HasIndex("MilestoneId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_screenshot_candidates_milestone_primary")
+                        .HasFilter("is_primary");
 
                     b.HasIndex("OperationId", "SourceUrl", "Viewport")
                         .IsUnique()
@@ -1192,7 +1201,10 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.HasIndex("ScopeId", "MilestoneId", "CreatedAt")
                         .HasDatabaseName("ix_screenshot_candidates_scope_id_milestone_id_created_at");
 
-                    b.ToTable("screenshot_candidates", (string)null);
+                    b.ToTable("screenshot_candidates", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_screenshot_candidates_status", "status IN ('candidate', 'selected', 'rejected')");
+                        });
                 });
 
             modelBuilder.Entity("Chronicleaf.Core.SyncSource", b =>

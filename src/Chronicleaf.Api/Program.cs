@@ -11,6 +11,7 @@ using Chronicleaf.Api.AI;
 using Chronicleaf.Api.Capture;
 using Chronicleaf.Api.Common;
 using Chronicleaf.Api.Content;
+using Chronicleaf.Api.Curation;
 using Chronicleaf.Api.Evidence;
 using Chronicleaf.Api.GitHub;
 using Chronicleaf.Api.Media;
@@ -23,6 +24,7 @@ using Chronicleaf.Infrastructure.Access;
 using Chronicleaf.Infrastructure.AI;
 using Chronicleaf.Infrastructure.Capture;
 using Chronicleaf.Infrastructure.Content;
+using Chronicleaf.Infrastructure.Curation;
 using Chronicleaf.Infrastructure.Evidence;
 using Chronicleaf.Infrastructure.GitHub;
 using Chronicleaf.Infrastructure.Media;
@@ -134,6 +136,12 @@ builder.Services.AddGitHubEvidence();
 // migration reports schema_mismatch at /api/ready.
 builder.Services.AddScreenshotCapture(builder.Configuration);
 
+// SCREENSHOT-CURATION-001/002. The store and service that move the candidate table's curation
+// columns and publish a selection into the milestone's evidence. The table stays capture's and
+// the bundle stays evidence's: this registration owns the choice between them. A database without
+// the screenshot-curation migration reports schema_mismatch at /api/ready.
+builder.Services.AddScreenshotCuration();
+
 // GROUNDED-MARKDOWN-DRAFTS-001/002. The two stores, the service and the one job handler that turns a
 // consented, evidence-grounded call into a Markdown draft for a human to review. It registers no
 // provider, no key and no setting: the adapter packages own reaching a provider, through the same
@@ -236,6 +244,12 @@ app.MapGitHubEvidenceEndpoints();
 // than this boundary that makes it safe: a forbidden destination is refused with 403 before a browser
 // is started, and the read route publishes candidate provenance without any storage key.
 app.MapCaptureEndpoints();
+
+// SCREENSHOT-CURATION-001/002: the private curation routes. Neither is marked public, so the access
+// package's default-deny boundary already covers both. No route here captures anything and none
+// approves anything: a selection is evidence a human may act on, and approval is the review
+// package's.
+app.MapCurationEndpoints();
 
 // GROUNDED-MARKDOWN-DRAFTS-001/002: the private draft request and read routes. None of them is marked
 // public, so the access package's default-deny boundary already covers every one of them. There is no

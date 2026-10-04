@@ -173,12 +173,23 @@ public sealed class ScreenshotCandidate
     /// <summary>Always false. Promotion belongs to screenshot-curation.</summary>
     public bool IsPrimary => _isPrimary;
 
+    /// <summary>
+    /// The owner's explicit sequence among the selected pictures, moved only by screenshot-curation.
+    /// </summary>
+    /// <remarks>
+    /// Always zero for a row this package inserts. The capture job has no opinion about which
+    /// selected picture comes first, and a capture-time value here would be a selection this
+    /// package promised never to make.
+    /// </remarks>
+    public int DisplayOrder => _displayOrder;
+
     /// <summary>Always one. A candidate is immutable, so there is no second version of it to hold.</summary>
     public long Revision => _revision;
 
     private readonly string _status = ScreenshotCandidateStatus.Candidate;
     private readonly string _caption = string.Empty;
     private readonly bool _isPrimary = false;
+    private readonly int _displayOrder;
     private readonly long _revision = 1;
 }
 

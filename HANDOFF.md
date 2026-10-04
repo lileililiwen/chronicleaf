@@ -1,10 +1,10 @@
-current_spec: screenshot-capture
+current_spec: llm-openai-adapter
 
 # Chronicleaf handoff
 
 ## Current state — 2026-10-04
 
-Twelve changes implemented, verified and archived, each with exactly two commits (implementation/
+Thirteen changes implemented, verified and archived, each with exactly two commits (implementation/
 tests/archive, then this HANDOFF-only pointer):
 
 | # | Change | Implementation commit | Canonical spec |
@@ -21,6 +21,7 @@ tests/archive, then this HANDOFF-only pointer):
 | 10 | `voice-profiles` | `fd4a6bd` | `openspec/specs/voice-profiles/spec.md` |
 | 11 | `llm-provider-contract` | `f226b42` | `openspec/specs/llm-provider-contract/spec.md` |
 | 12 | `github-evidence` | `429f2b2` | `openspec/specs/github-evidence/spec.md` |
+| 13 | `screenshot-capture` | `e890e11` | `openspec/specs/screenshot-capture/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -64,7 +65,7 @@ commit: the operation id arrives as a `string`, not a `JsonElement`, and `AddPla
 **does** support Chronicleaf's PostgreSQL schema.
 
 Known artifacts to expect, not chase: `git diff --check` reports a trailing blank line for
-OpenSpec-generated canonical specs — all seven of `openspec/specs/*/spec.md` end that way, so it is
+OpenSpec-generated canonical specs — all thirteen of `openspec/specs/*/spec.md` end that way, so it is
 the tool's archive output, not a hand-editing defect. `dotnet ef database update` cannot run in this
 environment (its design-time graph wants an uncached `Dapper.AOT` 1.0.48), so container smokes
 migrate through the application's own `ChronicleafDbContext` in a `/tmp` project.
@@ -119,21 +120,27 @@ also implemented the real `IMediaReferenceChecker` that `local-media-storage` de
 seam, so `media_in_use` now actually holds for referenced media.
 
 Evidence, all re-run by the parent session rather than taken on report: `CHRONICLEAF_E2E=1 bash
-scripts/verify.sh` exit 0 with the platform-feed stage, eleven filtered stages each asserted to select
+scripts/verify.sh` exit 0 with the platform-feed stage, twelve filtered stages each asserted to select
 at least one test, 15/15 shell, 24/24 persistence, 23/23 access, 19/19 project and milestone, 12/12
 jobs, 9/9 media, 14/14 evidence, 32/32 credential vault, 22/22 voice profiles, 26/26 LLM provider
-contract, 27/27 GitHub evidence — 223 in total — then `npm ci`, `tsc` + `vite build` and 41/41
-Playwright across six database-isolated browser suites against the published app with a real
-PostgreSQL; `scripts/e2e.sh` green on seven runs, five of them on the exact
+contract, 27/27 GitHub evidence, 52/52 screenshot capture — 275 in total — then `npm ci`, `tsc` +
+`vite build` and 41/41 Playwright across six database-isolated browser suites against the published
+app with a real PostgreSQL; `scripts/e2e.sh` green on seven runs, five of them on the exact
 final code of the last package, whose first run exposed three real UI bugs; `scripts/e2e.sh` 4/4 clean here after 5/5 by the implementer -
-nine consecutive green runs of a suite that had been failing about half the time; `BackgroundJobsTests` 12/12 on three
+nine consecutive green runs of a suite that had been failing about half the time; the seventh
+database-isolated Playwright suite for screenshot capture is configured (its own disposable
+PostgreSQL, its own published application, the panel-side assertion of `capture_sandbox_unavailable`
+and the request-time refusal of a private destination) but was not exercised in this session, because
+this host has neither Docker nor the Playwright browsers and the suite's deliverable is the visible
+refusal rather than a real capture, so a green run there is a `scripts/e2e.sh` invocation away rather
+than an evidence line above; `BackgroundJobsTests` 12/12 on three
 consecutive runs before and after the platform swap (41s, 41s, 41s) to show the lease and two-worker
 scenarios are not flaky; the feed check exits 0 and exits 1 with the feed removed; the isolated
 no-sibling build proven in both directions; container smokes for media and jobs; name preflight exit
 0; `openspec validate --all --strict --no-interactive` 53/53, then 54/54 after
 `platform-jobs-adoption` was authored, then 55/55 after `llm-provider-contract` was archived, then
-54/54 with `github-evidence` moved from an active change into a canonical spec, before and after every
-archive.
+54/54 with `github-evidence` moved from an active change into a canonical spec, and 54/54 again with
+`screenshot-capture` moved the same way, before and after every archive.
 
 **Repository evidence records a revision, not a name.** A project connects a repository by owner and
 name and never by a URL; `src/Chronicleaf.GitHub` is a BCL-only leaf project, like `Chronicleaf.AI`,
@@ -202,29 +209,55 @@ opt-in real-token run needs outbound network and a real token and was **not** pe
 made about authenticated or private-repository behaviour, real large-compare truncation, or real
 `Retry-After` handling; its browser collection scenario does reach the real public `api.github.com`
 and really did append a bundle revision, and on a host without that route out it fails loudly rather
-than being stubbed. One `llm-provider-contract.spec.ts` case failed in a single run out of three
+than being stubbed. For `screenshot-capture` specifically, the request-time half is asserted by the
+new `screenshot capture tests` stage against the same real disposable PostgreSQL, the real
+temporary media root and the real API host that the other stages use: a private, loopback,
+link-local, multicast, reserved or cloud-metadata destination is refused by the URL policy before
+a job exists, the policy is consulted again to the address the name resolves to immediately before
+every connection - including when the same address is written in IPv6 spelling as an IPv4-mapped
+literal such as `::ffff:10.0.0.5`, which the IPv6 rules would otherwise judge a public page - so a
+refused destination is refused before bytes are exchanged; the candidate row is written only after
+the bytes are verified and registered by the delivered media store, the unique tuple
+`(operation_id, source_url, viewport)` is enforced by the database so a retried or resumed job
+cannot write a second copy of the same picture, a duplicate retires the second run's media through
+the delivered status transition rather than leaving an orphan, and a media-write failure fails the
+candidate before any row is published; and the candidates are written as candidates and never
+selected, made primary, captioned or appended to evidence by this package, because curation owns
+that. The kernel half - that the browser is reached only through an egress proxy whose connection
+refusal is enforced by the kernel - is **not** proven on this host, which has no `CAP_NET_ADMIN`, no
+user namespaces, no iptables and no nft: the `IScreenshotProvider` substituted into the
+integration tests is a legitimate DI seam (the same shape `IGitEvidenceSource` already uses), so no
+browser is launched by the new stage and no page is visited, the PNG bytes that exercise media
+storage, the candidate row, the PNG dimension check and the digest are a labelled synthesised
+fixture rather than a captured page, and the production provider answers
+`capture_sandbox_unavailable` before any browser process is started - the panel names the code in
+words, draws no candidate and offers nothing that looks like a retry. The browser fixture is
+configured as the seventh database-isolated Playwright suite, but `scripts/e2e.sh` was not run for
+it in this session: a host with Docker and the Playwright browsers is one green run away, and the
+suite asserts the panel-side refusal only - no claim is made that a real page was captured, and a
+candidate image is only asserted when the server actually published one. One
+`llm-provider-contract.spec.ts` case failed in a single run out of three
 (fast, at 1.1s against ~5s when it passes) and passed in the other two; the surface it covers is
 untouched by this package and the cause was not established. Deployment stays `deployable: false`;
 there is no remote, no push and no publication.
 
-Next: implement `screenshot-capture` only. All three of its dependencies — `milestone-evidence`,
-`local-media-storage` and `background-jobs` — are archived, so it is the only remaining unblocked
-package outside the AI publishing chain. It is the second half of the evidence story that
-`github-evidence` started: a milestone can now cite a real upstream revision, and capture is what
-turns that into the images a published story needs. After it, the chain is
-`llm-openai-adapter` (the first real BYOK transport, and the only thing still blocking
-`grounded-markdown-drafts`) → `grounded-markdown-drafts` → `screenshot-curation` →
-`markdown-review-export` → `community-compose-release`, which is the first complete workflow.
+Next: implement `llm-openai-adapter` only. It is the first real BYOK transport, the leaf
+`Chronicleaf.AI` already owns the `ILLMProvider` contract it will sit behind, and the only thing
+still blocking `grounded-markdown-drafts`. After it, the chain is `grounded-markdown-drafts` →
+`screenshot-curation` → `markdown-review-export` → `community-compose-release`, which is the first
+complete workflow.
 
 Two working notes for whoever picks this up. First, `github-evidence` was delivered across two
 worker passes because the first was **cancelled mid-flight rather than failed**, and it left a
 substantial uncommitted implementation behind; the backend was verified as inherited (build 0
 warnings, 27/27) and completed rather than restarted. Audit `git status` before assuming a clean tree
 whenever a worker does not return `succeeded`, because the expensive mistake here would have been
-discarding that work. Second, the two packages before this one both shipped a real browser-only UI bug
-that no .NET test could see — a panel that read its data once on mount, and a canonicaliser that did
-not recurse into arrays. Run `scripts/e2e.sh` as soon as the UI builds, and diff the whole change
-surface, not only the files you wrote.
+discarding that work. Second, every package that touched the web UI in this batch shipped a real
+browser-only defect that no .NET test could see — a panel that read its data once on mount, a
+canonicaliser that did not recurse into arrays, a sync panel that read its connection once on
+mount, an evidence panel that missed a background write, and a migration-readiness widening that
+left an assertion unsatisfiable. Run `scripts/e2e.sh` as soon as the UI builds, and diff the whole
+change surface, not only the files you wrote.
 
 Read only that package, keep one `current_spec`, implement, verify locally, strictly validate, archive
 without `--skip-specs`, then make the implementation commit and the HANDOFF-only pointer commit, and

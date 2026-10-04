@@ -2,7 +2,8 @@
 # Chronicleaf native verification (SHELL-003, COMMUNITY-PERSISTENCE-001/002, COMMUNITY-ACCESS-001/002,
 # PROJECTS-AND-MILESTONES-001/002, BACKGROUND-JOBS-001/002, LOCAL-MEDIA-STORAGE-001/002,
 # MILESTONE-EVIDENCE-001/002, CREDENTIAL-VAULT-001/002, VOICE-PROFILES-001/002,
-# LLM-PROVIDER-CONTRACT-001/002, GITHUB-EVIDENCE-001/002, LLM-OPENAI-ADAPTER-001/002).
+# LLM-PROVIDER-CONTRACT-001/002, GITHUB-EVIDENCE-001/002, LLM-OPENAI-ADAPTER-001/002,
+# GROUNDED-MARKDOWN-DRAFTS-001/002).
 #
 # Required chain, in order:
 #   1. platform feed           - the committed packages/platform-feed is what the build resolves, from
@@ -242,6 +243,28 @@ else
   # sandbox probe reports a real answer - it is the enforcement underneath it that this host cannot
   # exercise.
   step "screenshot capture tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~ScreenshotCaptureTests"
+  # GROUNDED-MARKDOWN-DRAFTS-001/002. That a valid summary is checked against the frozen evidence
+  # snapshot before any Markdown exists; that a claim naming an id outside the snapshot, or a figure
+  # appearing in no evidence item, fails grounding and writes nothing; that a summary broken twice -
+  # including the single permitted repair - fails invalid_summary with exactly two calls; that a second
+  # generation appends a revision and leaves the first byte-identical; that evidence or voice moving
+  # before the commit supersedes the run and preserves the previous draft; that instruction-shaped
+  # imported text produces no state change and no extra provider call; and that a stored revision
+  # cannot be rewritten, cannot claim evidence revision zero and cannot carry a non-digest - all proven
+  # against the same real disposable PostgreSQL, the real operator key file, the real API host and the
+  # real operation queue, with a real sealed credential behind a real consent.
+  #
+  # A simulation is refused as evidence here, and the refusal is specific rather than general. The one
+  # ILLMProvider in this file is a test double on the `anthropic` slot, a slot no production adapter
+  # claims - the same discipline the delivered contract suite uses for the same reason, and
+  # `the_slot_this_double_owns_is_claimed_by_no_production_adapter` fails the moment a future adapter
+  # package claims it, because at that moment the double would be shadowed by the real adapter and every
+  # scenario here would silently stop testing anything. What the double does not do is reach a provider:
+  # it opens no socket and sends nothing, so no stage here may be read as evidence that any provider
+  # works, that any model exists or is available to any owner, or that a paid call is cheap. The stored
+  # draft bodies come from fixtures, and the grounding, citation, provenance and supersede claims are
+  # about this system's handling of them.
+  step "grounded markdown draft tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~GroundedMarkdownDraftsTests"
 fi
 
 step "frontend install" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm ci'
@@ -250,17 +273,18 @@ step "frontend build" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm run b
 if [ "${CHRONICLEAF_E2E:-0}" = "1" ]; then
   # Publishes the real application, starts a disposable PostgreSQL per suite, applies the committed
   # migrations, and drives the shell, access, projects-and-milestones, background-jobs,
-  # milestone-evidence, credential-vault, voice-profiles, llm-provider-contract, github-evidence and
-  # screenshot-capture fixtures in a real browser. The last seven
+  # milestone-evidence, credential-vault, voice-profiles, llm-provider-contract, github-evidence,
+  # screenshot-capture and grounded-markdown-drafts fixtures in a real browser. The last eight
   # are included by playwright.config.ts, which already matches tests/**/*.spec.ts; this stage
   # therefore fails if the browser cannot record a project, confirm a candidate, refuse a stale edit,
   # read a milestone's evidence and be told the truth by a 409 against a real database, turn emoji
   # off over a preset that asked for it and see the effective value change, be shown every provider
-  # slot on a new installation with the truth about which of them can actually be called, or see a
+  # slot on a new installation with the truth about which of them can actually be called, see a
   # project admit it has no repository connected, be told in the server's own words when one is
-  # refused, and follow a real collection job to the status the operations route reports. The last of
-  # those needs outbound network to api.github.com: nothing in the github suite is faked, so a
-  # deployment without that route out fails this stage rather than passing on a stub.
+  # refused, follow a real collection job to the status the operations route reports, or read a
+  # stored draft with its provenance, its citations and both finding lists and have that body rendered
+  # as source rather than as HTML. The github suite needs outbound network to api.github.com: nothing in
+  # it is faked, so a deployment without that route out fails this stage rather than passing on a stub.
   #
   # The capture fixture needs no outbound network, and that is deliberate rather than convenient: a
   # capture that could reach a page is a capture whose isolation this host cannot demonstrate, so the

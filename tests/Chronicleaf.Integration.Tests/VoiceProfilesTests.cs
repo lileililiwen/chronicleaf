@@ -1152,13 +1152,18 @@ public sealed class VoiceProfilesTests(ChronicleafPostgresFixture postgres)
 
         // Readiness counts the voice migration among the ids this build requires, so a database
         // without it is reported by name rather than failing on the first read. The newest required
-        // id has moved on since - the generation-previews migration follows the voice one, and the
-        // github-evidence migration follows that, and the screenshot-capture migration follows that -
-        // so this scenario names the newest rather than assuming the voice migration is still it.
+        // id has moved on several times since the voice migration - generation-previews, then
+        // github-evidence, then screenshot-capture, then grounded-markdown-drafts - so this scenario
+        // asserts the newest by its position rather than naming a value that goes stale on the next
+        // package. Naming one is what every one of these three scenarios used to do, and it is why
+        // each of them went red the moment a later migration arrived: the fix was a value somebody
+        // had to remember to update. The position cannot go stale - it is the definition.
         Assert.Contains(ChronicleafSchema.VoiceProfilesMigrationId, ChronicleafSchema.RequiredMigrationIds);
         Assert.Contains(ChronicleafSchema.GitHubEvidenceMigrationId, ChronicleafSchema.RequiredMigrationIds);
         Assert.Contains(ChronicleafSchema.ScreenshotCaptureMigrationId, ChronicleafSchema.RequiredMigrationIds);
-        Assert.Equal(ChronicleafSchema.ScreenshotCaptureMigrationId, ChronicleafSchema.ExpectedMigrationId);
+        Assert.Equal(
+            ChronicleafSchema.ExpectedMigrationId,
+            ChronicleafSchema.RequiredMigrationIds[^1]);
         Assert.True(ChronicleafSchema.IsCurrent(
         [
             .. ChronicleafSchema.RequiredMigrationIds,

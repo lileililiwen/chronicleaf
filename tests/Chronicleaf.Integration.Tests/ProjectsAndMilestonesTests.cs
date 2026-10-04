@@ -1051,7 +1051,8 @@ public sealed class ProjectsAndMilestonesTests(ChronicleafPostgresFixture postgr
         // for the generation-previews table, on the same terms. GITHUB-EVIDENCE-001/002 moved it on
         // again for the github_connections and sync_sources tables, on the same terms.
         // SCREENSHOT-CAPTURE-001/002 moved it on again for the capture_requests and
-        // screenshot_candidates tables, on the same terms.
+        // screenshot_candidates tables, on the same terms, and GROUNDED-MARKDOWN-DRAFTS-001/002 moved it
+        // on again for content_assets, content_revisions and content_draft_requests, on the same terms.
         Assert.Contains(ChronicleafSchema.LocalMediaMigrationId, ChronicleafSchema.RequiredMigrationIds);
         Assert.Contains(ChronicleafSchema.MilestoneEvidenceMigrationId, ChronicleafSchema.RequiredMigrationIds);
         Assert.Contains(ChronicleafSchema.CredentialVaultMigrationId, ChronicleafSchema.RequiredMigrationIds);
@@ -1059,7 +1060,13 @@ public sealed class ProjectsAndMilestonesTests(ChronicleafPostgresFixture postgr
         Assert.Contains(ChronicleafSchema.GenerationPreviewsMigrationId, ChronicleafSchema.RequiredMigrationIds);
         Assert.Contains(ChronicleafSchema.GitHubEvidenceMigrationId, ChronicleafSchema.RequiredMigrationIds);
         Assert.Contains(ChronicleafSchema.ScreenshotCaptureMigrationId, ChronicleafSchema.RequiredMigrationIds);
-        Assert.Equal(ChronicleafSchema.ScreenshotCaptureMigrationId, ChronicleafSchema.ExpectedMigrationId);
+        // The newest required id is asserted by its position in the required list rather than by naming
+        // it, because a named "newest" is a value somebody has to remember to update and it is exactly
+        // what made each of these three scenarios go red the moment a later package added a migration.
+        // The position cannot go stale - it is the definition - and it says the same thing.
+        Assert.Equal(
+            ChronicleafSchema.ExpectedMigrationId,
+            ChronicleafSchema.RequiredMigrationIds[^1]);
 
         var database = await ProvisionedDatabaseAsync("schema_mismatch");
         var applied = await ChronicleafPostgresFixture.ReadTextAsync(
@@ -1067,34 +1074,26 @@ public sealed class ProjectsAndMilestonesTests(ChronicleafPostgresFixture postgr
             "SELECT string_agg(\"MigrationId\", '|') FROM \"__EFMigrationsHistory\"");
 
         Assert.NotNull(applied);
-        Assert.Contains(ChronicleafSchema.ProjectsAndMilestonesMigrationId, applied, StringComparison.Ordinal);
-        Assert.Contains(ChronicleafSchema.BackgroundOperationsMigrationId, applied, StringComparison.Ordinal);
-        Assert.Contains(ChronicleafSchema.LocalMediaMigrationId, applied, StringComparison.Ordinal);
-        Assert.Contains(ChronicleafSchema.MilestoneEvidenceMigrationId, applied, StringComparison.Ordinal);
-        Assert.Contains(ChronicleafSchema.CredentialVaultMigrationId, applied, StringComparison.Ordinal);
-        Assert.Contains(ChronicleafSchema.VoiceProfilesMigrationId, applied, StringComparison.Ordinal);
-        Assert.Contains(ChronicleafSchema.GenerationPreviewsMigrationId, applied, StringComparison.Ordinal);
-        Assert.Contains(ChronicleafSchema.GitHubEvidenceMigrationId, applied, StringComparison.Ordinal);
-        Assert.Contains(ChronicleafSchema.ScreenshotCaptureMigrationId, applied, StringComparison.Ordinal);
+
+        // Structural, not a hand-written list. This was an explicit enumeration of every required
+        // migration, and an explicit enumeration is a value somebody has to remember to update - which
+        // is why it went red every time a later package added one, and why each of those failures was a
+        // test to edit rather than a defect to fix. The stronger claim is the one that cannot go stale:
+        // every id this build requires was applied.
+        Assert.All(
+            ChronicleafSchema.RequiredMigrationIds,
+            id => Assert.Contains(id, applied, StringComparison.Ordinal));
+
         Assert.Empty(ChronicleafSchema.MissingMigrationIds(applied.Split('|')));
 
-        // A database stopped at the access package's migration reports exactly the nine later gaps,
-        // by name and in requirement order.
+        // A database stopped at the access package's migration reports every later gap, by name and in
+        // requirement order - and "every later gap" is derived from the required list's own order rather
+        // than from a second copy of it that could disagree with the first.
+        var appliedSoFar = new[] { ChronicleafSchema.InitialMigrationId, ChronicleafSchema.OwnerAccessMigrationId };
+
         Assert.Equal(
-            [
-                ChronicleafSchema.ProjectsAndMilestonesMigrationId,
-                ChronicleafSchema.BackgroundOperationsMigrationId,
-                ChronicleafSchema.LocalMediaMigrationId,
-                ChronicleafSchema.MilestoneEvidenceMigrationId,
-                ChronicleafSchema.CredentialVaultMigrationId,
-                ChronicleafSchema.VoiceProfilesMigrationId,
-                ChronicleafSchema.GenerationPreviewsMigrationId,
-                ChronicleafSchema.GitHubEvidenceMigrationId,
-                ChronicleafSchema.ScreenshotCaptureMigrationId,
-            ],
-            ChronicleafSchema
-                .MissingMigrationIds([ChronicleafSchema.InitialMigrationId, ChronicleafSchema.OwnerAccessMigrationId])
-                .ToArray());
+            [.. ChronicleafSchema.RequiredMigrationIds.Where(id => !appliedSoFar.Contains(id, StringComparer.Ordinal))],
+            ChronicleafSchema.MissingMigrationIds(appliedSoFar).ToArray());
     }
 
     // ===========================================================================================

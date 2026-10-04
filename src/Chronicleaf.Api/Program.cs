@@ -10,6 +10,7 @@ using Chronicleaf.Api.Access;
 using Chronicleaf.Api.AI;
 using Chronicleaf.Api.Capture;
 using Chronicleaf.Api.Common;
+using Chronicleaf.Api.Content;
 using Chronicleaf.Api.Evidence;
 using Chronicleaf.Api.GitHub;
 using Chronicleaf.Api.Media;
@@ -21,6 +22,7 @@ using Chronicleaf.AI.OpenAI;
 using Chronicleaf.Infrastructure.Access;
 using Chronicleaf.Infrastructure.AI;
 using Chronicleaf.Infrastructure.Capture;
+using Chronicleaf.Infrastructure.Content;
 using Chronicleaf.Infrastructure.Evidence;
 using Chronicleaf.Infrastructure.GitHub;
 using Chronicleaf.Infrastructure.Media;
@@ -132,6 +134,16 @@ builder.Services.AddGitHubEvidence();
 // migration reports schema_mismatch at /api/ready.
 builder.Services.AddScreenshotCapture(builder.Configuration);
 
+// GROUNDED-MARKDOWN-DRAFTS-001/002. The two stores, the service and the one job handler that turns a
+// consented, evidence-grounded call into a Markdown draft for a human to review. It registers no
+// provider, no key and no setting: the adapter packages own reaching a provider, through the same
+// ILLMProvider seam the delivered resolver already reads, so a deployment with no adapter installed
+// lists the slots honestly and cannot reach any of them. Nothing here can approve a draft - there is no
+// approval registration to remove and no configuration that would install one, because approval is the
+// review package's table bound to a revision and a body hash. A database without the
+// grounded-markdown-drafts migration reports schema_mismatch at /api/ready.
+builder.Services.AddGroundedMarkdownDrafts();
+
 // The rotation guard is applied once at start-up, so an access token that was changed since the
 // last run revokes every existing session before this process serves anything.
 builder.Services.AddHostedService<AccessTokenRotationStartup>();
@@ -224,6 +236,12 @@ app.MapGitHubEvidenceEndpoints();
 // than this boundary that makes it safe: a forbidden destination is refused with 403 before a browser
 // is started, and the read route publishes candidate provenance without any storage key.
 app.MapCaptureEndpoints();
+
+// GROUNDED-MARKDOWN-DRAFTS-001/002: the private draft request and read routes. None of them is marked
+// public, so the access package's default-deny boundary already covers every one of them. There is no
+// approve route here and no field that could report one: a draft is text a human has not reviewed yet,
+// and the review package owns the table that will record that decision.
+app.MapContentDraftEndpoints();
 
 // SHELL-001/SHELL-002: every unmatched path is either an unknown API path, an unknown
 // static asset, or a client route. Only the last one falls back to the SPA entry point. This

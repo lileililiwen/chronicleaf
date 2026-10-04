@@ -98,6 +98,14 @@ public static class ChronicleafSchema
     /// </summary>
     public const string ScreenshotCaptureMigrationId = "20261004080450_AddScreenshotCapture";
 
+    /// <summary>
+    /// The forward migration that adds the <c>content_assets</c>, <c>content_revisions</c> and
+    /// <c>content_draft_requests</c> tables (GROUNDED-MARKDOWN-DRAFTS-001/002). A database that has never
+    /// applied it has nowhere to record a draft, so its draft routes would fail against missing tables;
+    /// readiness says so by name rather than answering 200 and failing on the first request.
+    /// </summary>
+    public const string GroundedMarkdownDraftsMigrationId = "20261005081500_AddGroundedMarkdownDrafts";
+
     /// <summary>Every migration a database must carry before this build calls itself ready.</summary>
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
@@ -112,6 +120,7 @@ public static class ChronicleafSchema
         GenerationPreviewsMigrationId,
         GitHubEvidenceMigrationId,
         ScreenshotCaptureMigrationId,
+        GroundedMarkdownDraftsMigrationId,
     ];
 
     /// <summary>
@@ -119,7 +128,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = ScreenshotCaptureMigrationId;
+    public const string ExpectedMigrationId = GroundedMarkdownDraftsMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

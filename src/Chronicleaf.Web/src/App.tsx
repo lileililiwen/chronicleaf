@@ -12,10 +12,22 @@ export const TAGLINE = 'Turn project milestones into publishable stories.';
 /**
  * The shell's own notice that the rest of the product is not here yet. The text is kept exactly as
  * the runtime shell fixed it, because the browser fixture asserts it: what it now stands for is the
- * story half of the product - evidence, drafts, export and publishing - which later changes add. The
- * project half it originally referred to is built in this change, and the panel below says so.
+ * story half of the product - drafts are written and reviewable, but export and publishing are not.
  */
 export const SETUP_PENDING = 'Project setup coming in a later change.';
+
+/**
+ * What is still not here, in the shell's own list.
+ *
+ * Kept honest rather than aspirational. Grounded drafting now exists, so "AI drafting" is no longer on
+ * this list; what remains after it is the human review and approval step and the export and publication
+ * half, and those are separate packages with their own approval rules. A list that kept naming a
+ * delivered capability would be a list nobody reads.
+ */
+const LATER_ITEMS = [
+  'Human review and approval of a draft.',
+  'Markdown export and publishing to external services.',
+];
 
 export function App() {
   // The session is read once, here. One reader means one antiforgery value is ever in flight, so a
@@ -52,8 +64,9 @@ export function App() {
         <section className="later" data-testid="later-packages">
           <h2 className="later__heading">Not in this change</h2>
           <ul className="later__list">
-            <li>Evidence bundles, capture and media.</li>
-            <li>AI drafting, export and publishing to external services.</li>
+            {LATER_ITEMS.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
           </ul>
           <p className="shell__state" data-testid="setup-pending">
             {SETUP_PENDING}

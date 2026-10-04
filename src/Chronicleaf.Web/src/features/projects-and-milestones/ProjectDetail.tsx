@@ -10,6 +10,7 @@ import {
 } from './api';
 import { GitHubConnectionPanel } from '../github-evidence/GitHubConnectionPanel';
 import { GitHubSyncPanel } from '../github-evidence/GitHubSyncPanel';
+import { GroundedMarkdownDraftPanel } from '../grounded-markdown-drafts/GroundedMarkdownDraftPanel';
 import { MilestoneEvidencePanel } from '../milestone-evidence/MilestoneEvidencePanel';
 import { LlmProviderArea } from '../llm-provider-contract/LlmProviderArea';
 import { ScreenshotCapturePanel } from '../screenshot-capture/ScreenshotCapturePanel';
@@ -372,6 +373,24 @@ function MilestoneRow({
         milestoneId={milestone.id}
         milestoneTitle={milestone.title}
         archived={archived}
+      />
+
+      {/* GROUNDED-MARKDOWN-DRAFTS-001/002. A draft written from exactly the evidence above, through a
+          provider the owner names, and shown with its citations and both lists of findings. It sits under
+          the generation panel because it consumes that panel's contract - the consent handshake - and
+          drives it itself so an owner sees one flow rather than being sent somewhere else to authorize
+          one.
+
+          The panel offers no approval and no edit. A draft is text a human has not reviewed, its body is
+          rendered as source rather than as HTML, and a job that stops says the server's own refusal in
+          words while re-reading the asset from the server rather than inferring the outcome from a
+          status. Human editing and approval are the review package's, bound to a revision and a body
+          hash. */}
+      <GroundedMarkdownDraftPanel
+        milestoneId={milestone.id}
+        milestoneTitle={milestone.title}
+        archived={archived}
+        confirmed={milestone.status === 'confirmed'}
       />
 
       {/* Bounded screenshots of one public page for that milestone, which are candidates and nothing

@@ -3,6 +3,7 @@ using Chronicleaf.Application.Access;
 using Chronicleaf.Application.AI;
 using Chronicleaf.Application.Capture;
 using Chronicleaf.Application.Common;
+using Chronicleaf.Application.Content;
 using Chronicleaf.Application.GitHub;
 using Chronicleaf.Application.Media;
 using Chronicleaf.Application.Milestones;
@@ -342,6 +343,22 @@ public sealed class ApiErrorMiddleware(
                 return (
                     Envelope.Create(CaptureError.SandboxUnavailable, sandboxUnavailable.Message, traceId),
                     LogLevel.Warning);
+
+            // GROUNDED-MARKDOWN-DRAFTS-001/002. Written here for the same reason as every other feature
+            // package's refusals: this package raises them and this middleware is still the only place an
+            // envelope is written. The messages are authored in the content package and name no claim, no
+            // evidence text, no provider and no draft prose - a grounding refusal says which rule fired
+            // and nothing about the owner's own material, and the "record a manual note" wording is the
+            // remedy rather than a report.
+            case MilestoneNotConfirmedException notConfirmed:
+                return (
+                    Envelope.Create(ContentError.MilestoneNotConfirmed, notConfirmed.Message, traceId),
+                    LogLevel.Information);
+
+            case DraftGroundingMissingException noGrounding:
+                return (
+                    Envelope.Create(ContentError.NoGrounding, noGrounding.Message, traceId),
+                    LogLevel.Information);
 
             case BadHttpRequestException badRequest when badRequest.StatusCode == StatusCodes.Status413PayloadTooLarge:
                 return (

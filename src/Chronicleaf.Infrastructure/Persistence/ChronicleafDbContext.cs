@@ -77,6 +77,12 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     public DbSet<CaptureRequestRow> CaptureRequests => Set<CaptureRequestRow>();
 
+    public DbSet<ContentAsset> ContentAssets => Set<ContentAsset>();
+
+    public DbSet<ContentRevision> ContentRevisions => Set<ContentRevision>();
+
+    public DbSet<ContentDraftRequestRow> ContentDraftRequests => Set<ContentDraftRequestRow>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Installation>(entity =>
@@ -1090,7 +1096,221 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_screenshot_candidates_media_id");
         });
+
+        // -----------------------------------------------------------------------------------------
+        // grounded-markdown-drafts. Three tables: the request a job reads its work back from, the
+        // versioned asset, and the immutable revisions under it.
+        // -----------------------------------------------------------------------------------------
+
+        modelBuilder.Entity<ContentDraftRequestRow>(entity =>
+        {
+            entity.ToTable("content_draft_requests");
+            entity.HasKey(request => request.Id);
+            entity.Property(request => request.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(request => request.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(request => request.OperationId).HasColumnName("operation_id").IsRequired();
+            entity.Property(request => request.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(request => request.MilestoneId).HasColumnName("milestone_id").IsRequired();
+            entity.Property(request => request.PreviewId).HasColumnName("preview_id").IsRequired();
+            entity.Property(request => request.ConsentHash)
+                .HasColumnName("consent_hash")
+                .HasMaxLength(ContentDraftRequestRow.ConsentHashLength)
+                .IsRequired();
+            entity.Property(request => request.EvidenceRevision)
+                .HasColumnName("evidence_revision")
+                .IsRequired();
+            entity.Property(request => request.VoiceRevision).HasColumnName("voice_revision").IsRequired();
+            entity.Property(request => request.ProviderId)
+                .HasColumnName("provider_id")
+                .HasMaxLength(ContentLabelMaxLength)
+                .IsRequired();
+            entity.Property(request => request.Model)
+                .HasColumnName("model")
+                .HasMaxLength(ContentLabelMaxLength)
+                .IsRequired();
+            entity.Property(request => request.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            // One request per job. The worker is handed an operation id and nothing else, so this index
+            // is the only way it can find what the owner authorized - and a second request row for one
+            // job would mean a re-run could draft from a consent nobody presented twice.
+            entity.HasIndex(request => new { request.ScopeId, request.OperationId })
+                .IsUnique()
+                .HasDatabaseName("ux_content_draft_requests_scope_id_operation_id");
+
+            // A milestone's draft history is read newest first, so the index leads with the milestone
+            // and the time the request was accepted.
+            entity.HasIndex(request => new { request.ScopeId, request.MilestoneId, request.CreatedAt })
+                .HasDatabaseName("ix_content_draft_requests_scope_id_milestone_id_created_at");
+
+            // The consent row this request is bound to. Restrictive, because a preview that is removed
+            // while a job naming it is still queued would leave a job that cannot be run honestly.
+            entity.HasOne<GenerationPreview>()
+                .WithMany()
+                .HasForeignKey(request => request.PreviewId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_content_draft_requests_preview_id");
+
+            entity.HasOne<Milestone>()
+                .WithMany()
+                .HasForeignKey(request => request.MilestoneId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_content_draft_requests_milestone_id");
+        });
+
+        // GROUNDED-MARKDOWN-DRAFTS-002: the stable identity of one milestone's content, and the head
+        // revision it points at. The status is stored with a default of `draft` and this package never
+        // writes anything else, because approval is the review package's table bound to a revision - not
+        // a column this one learns to move. The unique index on (scope, milestone, type) is what makes
+        // "one draft story per milestone" a database decision rather than a read-then-write.
+        modelBuilder.Entity<ContentAsset>(entity =>
+        {
+            entity.ToTable("content_assets");
+            entity.HasKey(asset => asset.Id);
+            entity.Property(asset => asset.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(asset => asset.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(asset => asset.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(asset => asset.MilestoneId).HasColumnName("milestone_id").IsRequired();
+            entity.Property(asset => asset.Type)
+                .HasColumnName("type")
+                .HasMaxLength(ContentAssetTypeMaxLength)
+                .IsRequired();
+            entity.Property(asset => asset.Status)
+                .HasColumnName("status")
+                .HasMaxLength(ContentAssetStatusMaxLength)
+                .HasDefaultValue(ContentAssetStatus.Draft)
+                .IsRequired();
+
+            // The head revision is a concurrency token for the same reason the projects, milestones,
+            // credentials and candidates revisions carry one: a stale write is a conflict, never an
+            // overwrite. In practice the store's compare-and-set decides, and this keeps an accidental
+            // SaveChanges from turning a lost race into a silently merged one.
+            entity.Property(asset => asset.CurrentRevision)
+                .HasColumnName("current_revision")
+                .IsConcurrencyToken()
+                .HasDefaultValue(0L)
+                .IsRequired();
+
+            entity.Property(asset => asset.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(asset => asset.UpdatedAt)
+                .HasColumnName("updated_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            // One asset per milestone per kind per scope. This is what turns two jobs that both decided
+            // there was no asset into one row and one conflict rather than two assets, and it is the
+            // discovery read the panel's own route uses.
+            entity.HasIndex(asset => new { asset.ScopeId, asset.MilestoneId, asset.Type })
+                .IsUnique()
+                .HasDatabaseName("ux_content_assets_scope_id_milestone_id_type");
+
+            entity.HasOne<Milestone>()
+                .WithMany()
+                .HasForeignKey(asset => asset.MilestoneId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_content_assets_milestone_id");
+        });
+
+        // GROUNDED-MARKDOWN-DRAFTS-001/002: one immutable version of one asset. No update statement
+        // exists against this table anywhere in the repository, because a provenance record that can be
+        // edited is not provenance - and the review package binds an approval to a revision and a body
+        // hash, which would be a signature over nothing if the text could then change. The composite key
+        // is (asset, revision) so the head is a version and not a surrogate nobody reads.
+        modelBuilder.Entity<ContentRevision>(entity =>
+        {
+            entity.ToTable("content_revisions");
+            entity.HasKey(revision => new { revision.AssetId, revision.Revision });
+            entity.Property(revision => revision.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(revision => revision.AssetId).HasColumnName("asset_id").IsRequired();
+            entity.Property(revision => revision.Revision).HasColumnName("revision").IsRequired();
+            entity.Property(revision => revision.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(revision => revision.EvidenceBundleId)
+                .HasColumnName("evidence_bundle_id")
+                .IsRequired();
+            entity.Property(revision => revision.EvidenceRevision)
+                .HasColumnName("evidence_revision")
+                .IsRequired();
+            entity.Property(revision => revision.VoiceRevision).HasColumnName("voice_revision").IsRequired();
+            entity.Property(revision => revision.VoiceSnapshotJson)
+                .HasColumnName("voice_snapshot")
+                .HasColumnType("jsonb")
+                .IsRequired();
+            entity.Property(revision => revision.SummaryJson)
+                .HasColumnName("summary")
+                .HasColumnType("jsonb")
+                .IsRequired();
+            entity.Property(revision => revision.BodyMarkdown)
+                .HasColumnName("body_markdown")
+                .HasColumnType("text")
+                .IsRequired();
+            entity.Property(revision => revision.BodyHash)
+                .HasColumnName("body_hash")
+                .HasMaxLength(Sha256HexMaxLength)
+                .IsRequired();
+            entity.Property(revision => revision.ProviderId)
+                .HasColumnName("provider_id")
+                .HasMaxLength(ContentLabelMaxLength)
+                .IsRequired();
+            entity.Property(revision => revision.Model)
+                .HasColumnName("model")
+                .HasMaxLength(ContentLabelMaxLength)
+                .IsRequired();
+            entity.Property(revision => revision.PromptVersion)
+                .HasColumnName("prompt_version")
+                .HasMaxLength(ContentVersionMaxLength)
+                .IsRequired();
+            entity.Property(revision => revision.SchemaVersion)
+                .HasColumnName("schema_version")
+                .HasMaxLength(ContentVersionMaxLength)
+                .IsRequired();
+            entity.Property(revision => revision.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            // The read path's own lookup: a revision by its own identity, for a panel that was handed
+            // one.
+            entity.HasIndex(revision => revision.Id)
+                .IsUnique()
+                .HasDatabaseName("ux_content_revisions_id");
+
+            // A milestone's revisions are read newest first. The index leads with the asset because a
+            // revision belongs to one, and an asset belongs to one milestone.
+            entity.HasIndex(revision => new { revision.AssetId, revision.Revision, revision.Id })
+                .HasDatabaseName("ix_content_revisions_asset_id_revision_id");
+
+            // The frozen evidence snapshot. A restrictive delete, because a revision whose bundle has
+            // been removed can no longer have its claims checked against anything.
+            entity.HasOne<EvidenceBundle>()
+                .WithMany()
+                .HasForeignKey(revision => revision.EvidenceBundleId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_content_revisions_evidence_bundle_id");
+
+            entity.HasOne<ContentAsset>()
+                .WithMany()
+                .HasForeignKey(revision => revision.AssetId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_content_revisions_asset_id");
+        });
     }
+
+    /// <summary>At most 40 characters for a content kind, matching the Core record's own bound.</summary>
+    private const int ContentAssetTypeMaxLength = ContentAssetTypes.MaxLength;
+
+    /// <summary>At most 32 characters for a content status, matching the Core record's own bound.</summary>
+    private const int ContentAssetStatusMaxLength = ContentAssetStatus.MaxLength;
+
+    /// <summary>At most 200 characters for a provider id, a model name or a stored label.</summary>
+    private const int ContentLabelMaxLength = ContentAssetLimits.LabelMaxLength;
+
+    /// <summary>At most 64 characters for a prompt or schema version label.</summary>
+    private const int ContentVersionMaxLength = 64;
 
     /// <summary>At most 512 characters for a wait selector, matching the application-side bound.</summary>
     private const int CaptureSelectorMaxLength = 512;

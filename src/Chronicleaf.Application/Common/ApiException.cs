@@ -117,6 +117,17 @@ public static class ApiErrorStatus
         Capture.CaptureError.TargetBlocked => 403,
         Capture.CaptureError.SandboxUnavailable => 503,
 
+        // The grounded-markdown-drafts package's codes. Additive in the same way, and the choices are this
+        // package's failure policy rather than defaults. 422 for a milestone that is not confirmed and for
+        // a selection in which nothing was actually collected: both are facts the owner can change today
+        // with one click, and both are refused before a redacted snapshot is on screen that looks like it
+        // is about to be sent. The 409 and the two that reuse delivered codes - ConsentStale, NotFound,
+        // ValidationFailed and TooLarge - are already mapped above. The thirteen job codes deliberately
+        // have no arm: they are written to the operation row, and no route answers a draft that already
+        // failed.
+        Content.ContentError.MilestoneNotConfirmed => 422,
+        Content.ContentError.NoGrounding => 422,
+
         _ => 500,
     };
 }

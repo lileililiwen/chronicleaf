@@ -1798,7 +1798,13 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
         Assert.Contains(ChronicleafSchema.GenerationPreviewsMigrationId, ChronicleafSchema.RequiredMigrationIds);
         Assert.Contains(ChronicleafSchema.GitHubEvidenceMigrationId, ChronicleafSchema.RequiredMigrationIds);
         Assert.Contains(ChronicleafSchema.ScreenshotCaptureMigrationId, ChronicleafSchema.RequiredMigrationIds);
-        Assert.Equal(ChronicleafSchema.ScreenshotCaptureMigrationId, ChronicleafSchema.ExpectedMigrationId);
+        // The newest required id is asserted by its position in the required list rather than by naming
+        // it, because a named "newest" is a value somebody has to remember to update and it is exactly
+        // what made each of these three scenarios go red the moment a later package added a migration.
+        // The position cannot go stale - it is the definition - and it says the same thing.
+        Assert.Equal(
+            ChronicleafSchema.ExpectedMigrationId,
+            ChronicleafSchema.RequiredMigrationIds[^1]);
         Assert.True(ChronicleafSchema.IsCurrent([.. ChronicleafSchema.RequiredMigrationIds]));
 
         // A database stopped at the voice-profiles migration is short of this one and every one after

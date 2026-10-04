@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useGeneration } from './useGeneration';
-import type { AiProviderView } from './types';
+import type { AiProviderCatalogue, AiProviderView } from './types';
 
 /**
  * The generation panel, rendered under a milestone.
@@ -63,7 +63,7 @@ export function GenerationPreviewPanel({
 
       {flow.catalogue !== null && flow.catalogue.usable.length === 0 ? (
         <p className="notice" data-testid="generation-no-adapter">
-          {noUsableProviderSentence(flow.catalogue.configured.length, slots.length)}
+          {noUsableProviderSentence(flow.catalogue)}
         </p>
       ) : null}
 
@@ -89,7 +89,10 @@ export function GenerationPreviewPanel({
 
       {selected !== null ? (
         <p className="evidence__revision" data-testid="generation-capability">
-          {capabilitySentence(selected)}
+          {capabilitySentence(
+            selected,
+            (flow.catalogue?.usable ?? []).some((slot) => slot.id === selected.id),
+          )}
         </p>
       ) : null}
 
@@ -296,24 +299,57 @@ export function GenerationPreviewPanel({
 /**
  * Why nothing can be called from this installation, in one sentence per real case.
  *
- * Written out rather than interpolated, because the two situations are genuinely different and a
- * sentence that reads "no credential is stored" when a credential is stored would be the exact kind
- * of small lie a settings page should not tell. A credential with no adapter is a build that has no
- * transport; no credential is an owner who has not stored one.
+ * <b>Every clause is counted from the catalogue the server just sent.</b> This used to state that none
+ * of the slots had an adapter, which was true when this package was written and stopped being true the
+ * moment the first adapter package landed - and a page that keeps claiming a provider has no transport
+ * after one has been installed is lying to an owner who is looking at a settings page to find out what
+ * they can call. So the sentence is assembled from three numbers the server computed: how many slots
+ * have an adapter, how many have a credential, and `usable`, which is the server's own answer to "what
+ * can I call right now".
+ *
+ * The three cases are genuinely different and get three sentences. No adapter at all is a build with no
+ * transport. An adapter and no credential is an owner who has not stored one. An adapter, a credential,
+ * and still nothing usable is a deployment whose accepted-model list is empty - a fact about
+ * configuration that the owner fixes by naming a model, and a sentence saying anything else would send
+ * them to look in the wrong place.
  */
-function noUsableProviderSentence(configuredCount: number, slotCount: number): string {
-  const noAdapters =
-    slotCount === 1
-      ? 'the one provider slot this build knows about has no adapter installed'
-      : `none of the ${slotCount} provider slots this build knows about has an adapter installed`;
+function noUsableProviderSentence(catalogue: AiProviderCatalogue): string {
+  const slotCount = catalogue.supported.length;
+  const withAdapter = catalogue.supported.filter((slot) => slot.adapterInstalled);
+  const withCredential = catalogue.configured.length;
+  const bothInstalled = withAdapter.filter((slot) => slot.configured);
 
-  if (configuredCount === 0) {
-    return `No provider can be called from this installation yet: no credential is stored, and ${noAdapters}. Nothing has been sent and nothing can be.`;
+  if (withAdapter.length === 0) {
+    const noAdapters =
+      slotCount === 1
+        ? 'the one provider slot this build knows about has no adapter installed'
+        : `none of the ${slotCount} provider slots this build knows about has an adapter installed`;
+
+    if (withCredential === 0) {
+      return `No provider can be called from this installation yet: no credential is stored, and ${noAdapters}. Nothing has been sent and nothing can be.`;
+    }
+
+    const credential = withCredential === 1 ? 'A credential is stored' : `${withCredential} credentials are stored`;
+
+    return `No provider can be called from this installation yet: ${credential.toLowerCase()}, but ${noAdapters}. Nothing has been sent and nothing can be.`;
   }
 
-  const credential = configuredCount === 1 ? 'A credential is stored' : `${configuredCount} credentials are stored`;
+  const installed =
+    withAdapter.length === 1
+      ? `an adapter is installed for ${withAdapter[0].id}`
+      : `adapters are installed for ${withAdapter.map((slot) => slot.id).join(', ')}`;
 
-  return `No provider can be called from this installation yet: ${credential.toLowerCase()}, but ${noAdapters}. Nothing has been sent and nothing can be.`;
+  if (withCredential === 0) {
+    return `No provider can be called from this installation yet: ${installed}, but no credential is stored for it. Nothing has been sent and nothing can be.`;
+  }
+
+  if (bothInstalled.length > 0) {
+    return `No provider can be called from this installation yet: ${installed} and a credential is stored, but no model has been accepted for it, so every call would be refused. Nothing has been sent and nothing can be.`;
+  }
+
+  return `No provider can be called from this installation yet: ${installed}, but the ${withCredential} credential${
+    withCredential === 1 ? ' is' : 's are'
+  } stored for other providers. Nothing has been sent and nothing can be.`;
 }
 
 function slotLabel(slot: AiProviderView): string {
@@ -333,15 +369,22 @@ function slotLabel(slot: AiProviderView): string {
  *
  * "No adapter installed" and "the provider cannot enforce the schema" are different sentences on
  * purpose. The first is a fact about this deployment and the second about a provider, and an owner
- * who cannot tell them apart will read a green tick on a provider nothing can reach.
+ * who cannot tell them apart will read a green tick on a provider nothing can reach. The third case -
+ * an adapter and a credential and still nothing usable - is the one this panel could previously not
+ * express at all, and it is the one an operator with an empty accepted-model list is actually looking
+ * at.
  */
-function capabilitySentence(slot: AiProviderView): string {
+function capabilitySentence(slot: AiProviderView, usable: boolean): string {
   if (!slot.configured) {
     return 'No credential is stored for this provider, so it cannot be called. Store one in the credential settings first.';
   }
 
   if (!slot.adapterInstalled) {
     return 'A credential is stored, but no adapter is installed for this provider, so nothing can be sent to it yet.';
+  }
+
+  if (!usable) {
+    return 'An adapter is installed and a credential is stored, but no model has been accepted for it in this deployment, so every call would be refused before a credential is read. Name a model this provider accepts and it becomes usable.';
   }
 
   return slot.capability?.nativeJsonSchema === true

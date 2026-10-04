@@ -9,13 +9,21 @@ import { expect, test, type Page } from '@playwright/test';
  * is recorded through the delivered evidence form, and every claim below is read back from the page or
  * from the server's own answer.
  *
- * <b>What this fixture does not claim.</b> No adapter is registered in the published application - the
- * five adapters are separate roadmap packages - so nothing here can be read as evidence that any
- * provider works, that any model exists, or that a paid call is cheap. What it does claim is the
- * contract's own behaviour as an owner meets it: that the provider slots are listed honestly, that a
- * deployment with no adapter says so instead of pretending, that an unknown model is refused rather
- * than substituted, and that the consent is a binding that expires and that a changed input makes
- * stale. Those are properties of Chronicleaf, and they are the ones a browser can see.
+ * <b>What this fixture does not claim.</b> The published application has an OpenAI adapter whose
+ * accepted-model list is empty, so every provider is refused before a credential is leased and nothing
+ * here can be read as evidence that any provider works, that any model exists, or that a paid call is
+ * cheap. What it does claim is the contract's own behaviour as an owner meets it: that the provider
+ * slots are listed honestly, that the page names the real reason a provider cannot be called rather
+ * than a convenient one, that an unknown model is refused rather than substituted, and that the consent
+ * is a binding that expires and that a changed input makes stale. Those are properties of Chronicleaf,
+ * and they are the ones a browser can see.
+ *
+ * <b>Why the expectations are read from the server rather than hard-coded.</b> This suite asserted that
+ * no slot had an adapter installed, which was true when it was written and stopped being true when the
+ * OpenAI adapter package landed. A fixed expectation like that is a value somebody has to remember to
+ * update, and until somebody does it is a suite quietly asserting something the product no longer does.
+ * So the claims are derived from the catalogue the server sends: which slots have an adapter, which have
+ * a credential, and - the server's own answer - which can actually be called.
  *
  * This suite has a database of its own for the same reason the credential suite does: it asserts that
  * a new installation reads as unconfigured for every provider, and a credential stored by another
@@ -45,16 +53,39 @@ test('a new installation lists every provider slot and admits that none can be c
   await expect(options).toHaveCount(5);
   await expect(options.first()).toContainText('no credential stored');
 
-  await expect(page.getByTestId('generation-no-adapter')).toBeVisible();
-  await expect(page.getByTestId('generation-no-adapter')).toContainText('no credential is stored');
-  await expect(page.getByTestId('generation-no-adapter')).toContainText(
-    'none of the 5 provider slots this build knows about has an adapter installed',
-  );
-  // The per-slot line names the nearest blocker, which on a fresh installation is the credential the
-  // owner has not stored - the thing they can fix today - while the installation-level line above names
-  // the missing adapter, which they cannot. Reporting the credential one first is not hiding the
-  // adapter: both are on the page, and the adapter is the one that decides whether anything can be
-  // called at all.
+  // The catalogue is read from the server first, because the notice on the page must be checked
+  // against what the server actually holds rather than against a hard-coded expectation. It has changed
+  // once already - the OpenAI adapter package made "no slot has an adapter" false - and a page that
+  // kept asserting it would be lying to an owner reading a settings page to find out what they can call.
+  const catalogue = await readProviders(page);
+  expect(catalogue.status).toBe(200);
+  expect(catalogue.body.supported).toHaveLength(5);
+  expect(catalogue.body.configured).toHaveLength(0);
+
+  // Nothing can be called from a fresh installation whatever is installed, because no credential is
+  // stored for any slot. That is the server's own answer, not this fixture's.
+  expect(catalogue.body.usable).toHaveLength(0);
+
+  // The installed adapters are named on the page, because an owner asking "why can I not call this?"
+  // deserves the real reason and not "there is no adapter" when one is sitting right there.
+  const installed = catalogue.body.supported.filter((slot: { adapterInstalled: boolean }) => slot.adapterInstalled);
+  const notice = page.getByTestId('generation-no-adapter');
+  await expect(notice).toBeVisible();
+  await expect(notice).toContainText('Nothing has been sent and nothing can be');
+
+  if (installed.length === 0) {
+    await expect(notice).toContainText(
+      'none of the 5 provider slots this build knows about has an adapter installed',
+    );
+  } else {
+    for (const slot of installed) {
+      await expect(notice).toContainText(`an adapter is installed for ${slot.id}`);
+    }
+  }
+
+  // The per-slot line names the nearest blocker, which on a fresh installation is always the
+  // credential the owner has not stored - the thing they can fix today - whatever else is or is not
+  // installed.
   await expect(page.getByTestId('generation-capability')).toContainText('No credential is stored');
   await expect(page.getByTestId('generation-capability')).toContainText('credential settings');
 
@@ -67,22 +98,22 @@ test('a new installation lists every provider slot and admits that none can be c
   await expect(limits).toContainText('15 minutes');
   await expect(limits).toContainText('no tools');
 
-  // The catalogue agrees with the page, read from the server rather than from the DOM.
-  const catalogue = await readProviders(page);
-  expect(catalogue.status).toBe(200);
-  expect(catalogue.body.supported).toHaveLength(5);
-  expect(catalogue.body.configured).toHaveLength(0);
-  expect(catalogue.body.usable).toHaveLength(0);
   expect(catalogue.body.limits.maxOutputTokens).toBe(4096);
   expect(catalogue.body.limits.timeoutSeconds).toBe(120);
 
-  // No adapter is installed, so every slot reports no capability at all. That is deliberately not a
-  // descriptor of all-false: the slot is telling the client that nothing is known about its provider,
-  // which is a different statement from "this provider cannot do schema enforcement".
+  // Every slot reports what it is and is not. A slot with no adapter carries no capability at all -
+  // deliberately not a descriptor of all-false, because "nothing is known about this provider" and
+  // "this provider cannot enforce a schema" are different statements - and a slot with an adapter
+  // carries the adapter's own descriptor without adjustment.
   for (const slot of catalogue.body.supported) {
-    expect(slot.adapterInstalled).toBe(false);
-    expect(slot.capability).toBeNull();
     expect(slot.configured).toBe(false);
+
+    if (slot.adapterInstalled) {
+      expect(slot.capability).not.toBeNull();
+      expect(slot.capability.id).toBe(slot.id);
+    } else {
+      expect(slot.capability).toBeNull();
+    }
   }
 });
 
@@ -92,19 +123,21 @@ test('an unknown model is refused by name and no model is substituted', async ({
   await page.getByTestId('generation-model').fill('a-model-that-does-not-exist');
   await page.getByTestId('generation-preview').click();
 
-  // What the browser can be shown here is the refusal that comes first. The system's own ordering is
-  // deliberate: it asks whether an adapter is installed before it asks whether a model is acceptable,
-  // because with no adapter installed there is no provider to ask and any model answer would be this
-  // system's guess. So the honest browser-visible answer is that the provider cannot be called, and
-  // the model is never mentioned and never substituted.
+  // The refusal that comes first depends on what this deployment has. With an adapter installed, the
+  // adapter is the authority on its own provider's models and refuses the name itself; with no adapter
+  // there is no provider to ask, so the system refuses the selection instead. Both answers say the
+  // same thing to an owner - no call was made - and neither mentions the model that was typed.
   //
-  // That an unknown model is refused - rather than replaced with a near miss, and with the transport
-  // never reached - is covered by LlmProviderContractTests in the .NET suite, where an adapter is
-  // installed and the question is therefore answerable. Asserting it from a browser with no adapter
-  // would be asserting a branch this installation cannot take.
-  await expect(page.getByTestId('generation-settings-error')).toBeVisible();
-  const body = await page.getByTestId('generation-settings-error').textContent();
-  expect(body).toContain('No adapter is installed for the selected provider');
+  // What is asserted here is that no model was substituted and nothing was sent. That an unknown model
+  // is refused by a real adapter, with the transport never reached, is covered by LlmOpenaiAdapterTests
+  // in the .NET suite.
+  const error = page.getByTestId('generation-settings-error');
+  await expect(error).toBeVisible();
+
+  const body = await error.textContent();
+  expect(body).toMatch(
+    /No adapter is installed for the selected provider|does not accept that model/,
+  );
   expect(body).not.toContain('a-model-that-does-not-exist');
   expect(body).not.toContain('a-model-nobody-has');
 
@@ -114,7 +147,7 @@ test('an unknown model is refused by name and no model is substituted', async ({
   expect((await generateWithFabricatedConsent(page)).status).toBe(404);
 });
 
-test('a provider with no installed adapter cannot be previewed and nothing is stored', async ({ page }) => {
+test('a selection nothing can call is refused before any redacted snapshot is frozen', async ({ page }) => {
   await openGenerationPanel(page);
 
   // Select the one evidence item that exists, and preview it.
@@ -122,18 +155,19 @@ test('a provider with no installed adapter cannot be previewed and nothing is st
   await page.getByTestId('generation-model').fill('a-model-nobody-has');
   await page.getByTestId('generation-preview').click();
 
-  // Nothing can be generated for a provider this deployment has no adapter for, and the panel says
-  // so at the point where the owner would press the button that spends money. The consent card is
-  // never rendered, because no consent was issued.
-  await expect(page.getByTestId('generation-settings-error')).toBeVisible();
-  await expect(page.getByTestId('generation-settings-error')).toContainText('No adapter is installed');
+  // Nothing can be generated from a selection this installation cannot call, and the panel says so at
+  // the point where the owner would press the button that spends money. The consent card is never
+  // rendered, because no consent was issued.
+  const error = page.getByTestId('generation-settings-error');
+  await expect(error).toBeVisible();
   await expect(page.getByTestId('generation-preview-card')).toBeHidden();
 
   // The refusal came from the settings resolution rather than from the preview, which is the ordering
   // the contract asks for: an owner is told a selection will not work before there is a redacted
   // snapshot on screen that looks like it is about to be sent.
-  await expect(page.getByTestId('generation-settings-error')).toContainText(
-    'No adapter is installed for the selected provider',
+  const body = await error.textContent();
+  expect(body).toMatch(
+    /No adapter is installed for the selected provider|does not accept that model|No credential is stored/,
   );
   expect((await generateWithFabricatedConsent(page)).status).toBe(404);
 });

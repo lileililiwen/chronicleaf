@@ -50,6 +50,9 @@
 # away. It needs no outbound network and no container beyond its own PostgreSQL, because a host that
 # cannot confine a browser refuses the capture before any connection is made, and that refusal is what
 # it asserts.
+# An eighth is what the grounded-draft fixture needs, and for the same reason again: a stored draft
+# cannot be removed through the UI, a project cannot be removed, and the suite needs one milestone WITH a
+# draft and one without, which is the pair the empty state and the stored state are each proved against.
 #
 # The credential vault reads a real operator key from a real file, generated for this run only, in a
 # temporary directory that is removed when the run ends. The key is never written into the repository,
@@ -66,6 +69,7 @@ voice_base_url="${CHRONICLEAF_VOICE_BASE_URL:-http://127.0.0.1:5084}"
 generation_base_url="${CHRONICLEAF_GENERATION_BASE_URL:-http://127.0.0.1:5085}"
 github_base_url="${CHRONICLEAF_GITHUB_BASE_URL:-http://127.0.0.1:5086}"
 capture_base_url="${CHRONICLEAF_CAPTURE_BASE_URL:-http://127.0.0.1:5087}"
+drafts_base_url="${CHRONICLEAF_DRAFTS_BASE_URL:-http://127.0.0.1:5088}"
 log_file="$repo_root/$publish_dir/server.log"
 evidence_log_file="$repo_root/$publish_dir/server-evidence.log"
 credentials_log_file="$repo_root/$publish_dir/server-credentials.log"
@@ -73,6 +77,7 @@ voice_log_file="$repo_root/$publish_dir/server-voice.log"
 generation_log_file="$repo_root/$publish_dir/server-generation.log"
 github_log_file="$repo_root/$publish_dir/server-github.log"
 capture_log_file="$repo_root/$publish_dir/server-capture.log"
+drafts_log_file="$repo_root/$publish_dir/server-drafts.log"
 key_file=""
 
 # The operator key for this run: 32 random bytes in a temporary file outside the repository and
@@ -103,7 +108,7 @@ cleanup() {
   rm -f "$repo_root/$publish_dir/access-token" "$repo_root/$publish_dir/access-token-evidence" \
     "$repo_root/$publish_dir/access-token-credentials" "$repo_root/$publish_dir/access-token-voice" \
     "$repo_root/$publish_dir/access-token-generation" "$repo_root/$publish_dir/access-token-github" \
-    "$repo_root/$publish_dir/access-token-capture"
+    "$repo_root/$publish_dir/access-token-capture" "$repo_root/$publish_dir/access-token-drafts"
   # So is the encryption key: it is removed whether the run passed or failed.
   remove_key_file
   exit "$exit_status"
@@ -305,6 +310,195 @@ seed_operations() {
 }
 
 # ---------------------------------------------------------------------------------------------
+# The grounded-draft fixture: one real project, one real confirmed milestone, one real evidence
+# bundle, and one stored draft whose TEXT is a fixture.
+#
+# Everything above the content tables is made through the running server's own routes with the real
+# access token and a real antiforgery value, so the project, the milestone, its confirmation and its
+# evidence are records the product itself created. Only the two content rows are inserted directly,
+# and that is the same technique seed_operations above uses and for the same reason: a draft is produced
+# by a provider call, and this installation has an adapter with an empty model allowlist, so there is
+# nothing that could produce one honestly here.
+#
+# What the inserted rows are careful about:
+#   - body_markdown is hashed with sha256sum and the digest stored, because the database's check
+#     constraint refuses a row whose hash is not a hash and the panel shows that hash as provenance. A
+#     seed that did not compute it would fail loudly rather than quietly store an unverified body.
+#   - voice_snapshot is the delivered canonical form of the DEFAULT technical-blog voice, including a
+#     fingerprint computed the way the delivered hasher computes it: SHA-256 over the values joined by
+#     U+001F. A snapshot whose fingerprint did not match would be refused by the read route, so a
+#     default that ever changes shows up as a failed suite and not as a blank page.
+#   - summary is the accepted structured summary, and every claim cites the real evidence item, so the
+#     grounding findings the panel shows are the ones the real bundle produces.
+#   - The body contains a raw HTML tag on purpose. The requirement is that a draft is previewed as
+#     source, and a fixture without one could not tell a rendering preview from a rendering that happens
+#     to have no tags in it.
+# ---------------------------------------------------------------------------------------------
+seed_grounded_draft() {
+  local origin="$1"
+  local token="$2"
+  local cookie_jar
+  cookie_jar="$(mktemp -d)/cookies.txt"
+
+  local antiforgery
+  antiforgery="$(curl --silent --show-error --cookie-jar "$cookie_jar" --cookie "$cookie_jar" \
+    --data "{\"accessToken\":\"${token}\"}" \
+    -H 'Content-Type: application/json' \
+    "${origin}/api/session" >/dev/null && \
+    curl --silent --show-error --cookie-jar "$cookie_jar" --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/session/antiforgery" | jq -r '.token')"
+
+  if [ -z "$antiforgery" ] || [ "$antiforgery" = "null" ]; then
+    echo "the grounded-draft seed could not read an antiforgery value from ${origin}" >&2
+    return 1
+  fi
+
+  # Every mutation below carries the real origin header as well as the antiforgery value, because the
+  # delivered boundary checks both and a request missing either is refused for the wrong reason.
+  local project_id milestone_id
+  project_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"name":"Ledger","description":"Double-entry accounting."}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/projects" | jq -r '.id')"
+
+  milestone_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"title":"First reproducible release","version":"0.1.0","occurredAt":"2026-10-01T09:00:00Z","type":"feature","notes":"Recorded by the e2e seed.","knownLimitations":[],"nextSteps":[]}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/projects/${project_id}/milestones" | jq -r '.id')"
+
+  if [ -z "$project_id" ] || [ "$project_id" = "null" ] || [ -z "$milestone_id" ] || [ "$milestone_id" = "null" ]; then
+    echo "the grounded-draft seed could not create its project and milestone" >&2
+    return 1
+  fi
+
+  # A manual milestone is confirmed by the act of saving it, so no confirm call is needed here - and
+  # asserting that in a browser is suite 4's job rather than this script's.
+  curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"notes":"The pipeline now reproduces from a clean checkout.","expectedRevision":0}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 0' \
+    "${origin}/api/milestones/${milestone_id}/evidence/manual" >/dev/null
+
+  local bundle_id
+  bundle_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/milestones/${milestone_id}/evidence" \
+    | jq -r '.items[0].id')"
+
+  local evidence_item_id
+  evidence_item_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/milestones/${milestone_id}/evidence" \
+    | jq -r '.items[0].items[0].id')"
+
+  if [ -z "$evidence_item_id" ] || [ "$evidence_item_id" = "null" ]; then
+    echo "the grounded-draft seed could not read the evidence bundle the product created" >&2
+    return 1
+  fi
+
+  seed_content_rows "$postgres_container" "chronicleaf_e2e_drafts" \
+    "$project_id" "$milestone_id" "$bundle_id" "$evidence_item_id"
+
+  CHRONICLEAF_E2E_DRAFT_MILESTONE="$milestone_id"
+  export CHRONICLEAF_E2E_DRAFT_MILESTONE
+}
+
+# The two content rows, inserted into the disposable database the drafts suite is using.
+seed_content_rows() {
+  local container="$1"
+  local database_name="$2"
+  local project_id="$3"
+  local milestone_id="$4"
+  local bundle_id="$5"
+  local evidence_item_id="$6"
+
+  local body summary voice_snapshot body_hash fingerprint now
+  now="$(date -u +%Y-%m-%dT%H:%M:%S.000000Z)"
+
+  # The body, with a raw tag in it so the preview claim is actually testable. Numbers are avoided so the
+  # fixture cannot trip this package's own numeral rule - which is a real rule, and a fixture that
+  # violated it would be testing the wrong thing.
+  body=$'# Reproducible release pipeline\n\nThe pipeline now reproduces from a clean checkout.[^c1]\n\n## What changed\n\n- The pipeline runs from a clean checkout.[^c1]\n- The build produces the same digest each time.[^c2]\n\n## Problems solved\n\nA release could not be rebuilt from its source.[^c3]\n\n## Known limitations\n\nOnly Linux is covered.[^c4]\n\n## Next steps\n\nCover the other platform.[^c5]\n\nThe line below is a <b>not bold</b> tag in the source, and a preview renders it as these characters.\n\n[^c1]: The pipeline runs from a clean checkout.\n[^c2]: The build produces the same digest each time.\n[^c3]: A release could not be rebuilt from its source.\n[^c4]: Only Linux is covered.\n[^c5]: Cover the other platform.\n'
+
+  body_hash="$(printf '%s' "$body" | sha256sum | cut -d' ' -f1)"
+
+  # The delivered hasher's canonical form: the resolved values joined by U+001F, in the order
+  # VoiceSnapshotHasher writes them. These are the default technical-blog values, and the read route
+  # recomputes the fingerprint rather than trusting the stored one - so a default that ever changes makes
+  # this suite fail rather than make the panel show a voice it did not check.
+  fingerprint="$(printf 'zh\037restrained\037true\03760\037high\037low\037true\037革命性\037震撼\037game-changing\037exciting news' \
+    | sha256sum | cut -d' ' -f1)"
+
+  voice_snapshot="{\"presetId\":\"technical-blog\",\"profileRevision\":0,\"capturedAt\":\"${now}\",\"language\":\"zh\",\"tone\":\"restrained\",\"emoji\":true,\"titleMaxChars\":60,\"technicalDetail\":\"high\",\"marketing\":\"low\",\"firstPerson\":true,\"forbiddenTerms\":[\"革命性\",\"震撼\",\"game-changing\",\"exciting news\"],\"fingerprint\":\"${fingerprint}\"}"
+
+  summary=$(jq -cn --arg e "$evidence_item_id" '{
+    milestoneTitle: "Reproducible release pipeline",
+    summary: "The pipeline now reproduces from a clean checkout.",
+    changes: [
+      { text: "The pipeline runs from a clean checkout.", evidenceIds: [$e] },
+      { text: "The build produces the same digest each time.", evidenceIds: [$e] }
+    ],
+    problemsSolved: [
+      { text: "A release could not be rebuilt from its source.", evidenceIds: [$e] }
+    ],
+    knownLimitations: [
+      { text: "Only Linux is covered.", evidenceIds: [$e] }
+    ],
+    nextSteps: [
+      { text: "Cover the other platform.", evidenceIds: [$e] }
+    ]
+  }')
+
+  local asset_id revision_id scope_id
+  asset_id="$(cat /proc/sys/kernel/random/uuid)"
+  revision_id="$(cat /proc/sys/kernel/random/uuid)"
+  scope_id="$(docker exec "$container" psql --username=chronicleaf --dbname="$database_name" --quiet --tuples-only --no-align \
+    --command 'SELECT id FROM installation LIMIT 1')"
+
+  # One statement, so a failure leaves nothing half-written. The trigger on this table refuses UPDATE and
+  # DELETE, which is the append-only contract, and an INSERT is what a completed generation would do.
+  #
+  # `-i` is load-bearing: `docker exec` only forwards this heredoc to psql's stdin when it is asked to,
+  # and without it psql reads an empty script and exits 0 having inserted nothing. A seed that reports
+  # success and stores no rows is worse than one that fails, so the rows are read back below and the
+  # seed refuses to continue if they are not there.
+  #
+  # The three long values travel as psql variables and are interpolated with `:'name'`, which is psql's
+  # own quoting. A body interpolated into the SQL text by the shell would have to be escaped by the
+  # shell, and the two languages disagree about what a quote is: bash's ${var@Q} writes $'...' and
+  # `'...'` for strings containing newlines, and neither is SQL.
+  docker exec -i "$container" psql --username=chronicleaf --dbname="$database_name" --quiet \
+    --set=ON_ERROR_STOP=1 --set=body="$body" --set=summary="$summary" --set=voice_snapshot="$voice_snapshot" \
+    <<SQL >/dev/null
+INSERT INTO content_assets
+  (id, scope_id, project_id, milestone_id, type, status, current_revision, created_at, updated_at)
+VALUES
+  ('${asset_id}', '${scope_id}', '${project_id}', '${milestone_id}', 'markdown-story', 'draft', 1, '${now}', '${now}');
+
+INSERT INTO content_revisions
+  (id, asset_id, scope_id, revision, evidence_bundle_id, evidence_revision, voice_revision,
+   voice_snapshot, summary, body_markdown, body_hash, provider_id, model, prompt_version, schema_version, created_at)
+VALUES
+  ('${revision_id}', '${asset_id}', '${scope_id}', 1, '${bundle_id}', 1, 0,
+   :'voice_snapshot'::jsonb, :'summary'::jsonb, :'body', '${body_hash}',
+   'openai', 'seeded-not-called', 'grounded-markdown/1', 'grounded-summary/1', '${now}');
+SQL
+
+  # Read back what the database actually holds, and compare the stored digest with the one computed
+  # above. psql exiting zero is not evidence that a statement ran, and a stored body whose hash is not
+  # its own would be a fixture proving nothing: the panel shows that hash as provenance.
+  local stored
+  stored="$(docker exec "$container" psql --username=chronicleaf --dbname="$database_name" \
+    --quiet --tuples-only --no-align \
+    --command "SELECT count(*) || ' ' || coalesce(max(body_hash), '') FROM content_revisions WHERE asset_id = '${asset_id}'")"
+
+  if [ "$stored" != "1 ${body_hash}" ]; then
+    echo "the grounded-draft seed stored '${stored}', which is not the one revision hashed as ${body_hash}" >&2
+    return 1
+  fi
+}
+
+# ---------------------------------------------------------------------------------------------
 # Suite 1: the shell, the access boundary, the projects and milestones lifecycle, and the
 # background operations panel. Its project list must be empty when it starts, which is why this
 # suite has a database to itself.
@@ -429,4 +623,35 @@ start_suite capture "$capture_base_url" "$capture_log_file" "$repo_root/$publish
 echo "==> npm run test:e2e (real browser against $capture_base_url)"
 run_suite "$capture_base_url" "$capture_log_file" "$repo_root/$publish_dir/access-token-capture" \
   tests/screenshot-capture.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 8: the grounded-draft surface. It needs a milestone the browser can read, and it needs one
+# with a stored draft, so it has its own installation and its own published instance for the same
+# reason suites 1 to 7 each have one.
+#
+# What this suite claims, and what it does not. The project, the milestone, its confirmation and its
+# evidence are created by the running server's own routes through the real access boundary, and the
+# stored draft is inserted as two rows a completed generation would write - with the body hash computed
+# from its own bytes and the voice snapshot in the delivered canonical form. So the panel under test is
+# production's and the state it renders is real.
+#
+# No provider was called, and none could have been: this installation has an OpenAI adapter whose model
+# allowlist is empty, so every provider is refused before a credential is leased. The fixture asserts
+# that refusal in the browser rather than hiding it, which is why the empty state and the
+# "no provider can be called" notice are scenarios here and not a gap. A pass is evidence that the panel
+# reads a stored draft faithfully - its provenance, its citations, its findings, and its refusal to
+# render the body as HTML - and is NOT evidence that a provider can be called, that a model exists, or
+# that a draft was generated on this host. The .NET suite is where a real answer flows through both
+# generation phases.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting an eighth disposable PostgreSQL and published application at $drafts_base_url"
+start_suite drafts "$drafts_base_url" "$drafts_log_file" "$repo_root/$publish_dir/access-token-drafts"
+
+echo "==> recording the project, evidence and stored draft the panel reads"
+seed_grounded_draft "$drafts_base_url" "$(cat "$repo_root/$publish_dir/access-token-drafts")"
+
+echo "==> npm run test:e2e (real browser against $drafts_base_url)"
+run_suite "$drafts_base_url" "$drafts_log_file" "$repo_root/$publish_dir/access-token-drafts" \
+  tests/grounded-markdown-drafts.spec.ts
 stop_suite

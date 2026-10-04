@@ -491,15 +491,13 @@ public sealed class GenerationPreviewService : IGenerationPreviewService
         var preview = await _previews.FindAsync(owner.ScopeId, previewId, cancellationToken).ConfigureAwait(false)
             ?? throw new ResourceNotFoundException("generation preview");
 
-        var now = _clock.GetUtcNow();
-        if (preview.IsExpiredAt(now))
+        // The three checks of a stored consent live in ConsentVerification, because every later
+        // extension that consumes a consent has to make exactly these decisions and a second copy of
+        // the recomputation is a second thing that can drift from the binding document.
+        var revoke = ConsentVerification.Revoke(preview, owner.ScopeId, consentHash, _clock.GetUtcNow());
+        if (revoke is not null)
         {
-            throw new ConsentStaleException(ConsentStaleReasons.Expired);
-        }
-
-        if (!ConsentBinding.Matches(consentHash, StoredConsentHash(preview, owner.ScopeId)))
-        {
-            throw new ConsentStaleException(ConsentStaleReasons.HashMismatch);
+            throw new ConsentStaleException(revoke);
         }
 
         // Every check from here re-derives a fact and compares it against what the owner authorized.
@@ -988,26 +986,12 @@ public sealed class GenerationPreviewService : IGenerationPreviewService
     /// Recomputes the consent binding from the stored row.
     /// </summary>
     /// <remarks>
-    /// The preview is stored without its consent hash, and the hash is recomputed from the stored
-    /// snapshot on every call rather than kept in a second column. One source of truth means a hash
-    /// cannot disagree with the bytes it covers: if the two ever differ, the recomputation is what
-    /// the generate call compares against, so an edited row is stale by construction instead of
-    /// because a second field was missed.
+    /// Delegated to <see cref="ConsentVerification.StoredHash"/>. The preview is stored without its
+    /// consent hash, and the hash is recomputed from the stored snapshot on every call rather than kept
+    /// in a second column. One source of truth means a hash cannot disagree with the bytes it covers:
+    /// if the two ever differ, the recomputation is what the generate call compares against, so an
+    /// edited row is stale by construction instead of because a second field was missed.
     /// </remarks>
-    private static string StoredConsentHash(GenerationPreview preview, Guid scopeId)
-    {
-        var snapshot = GenerationSnapshot.Deserialize(preview.SnapshotJson);
-        return ConsentBinding.Compute(
-            scopeId,
-            snapshot.Purpose,
-            snapshot.AggregateRef,
-            snapshot.ProviderId,
-            snapshot.Model,
-            snapshot.CredentialRevision,
-            snapshot.EvidenceRevision,
-            snapshot.VoiceRevision,
-            snapshot.InputEvidenceIds,
-            snapshot.NarrativeSelections,
-            preview.Sha256);
-    }
+    private static string StoredConsentHash(GenerationPreview preview, Guid scopeId) =>
+        ConsentVerification.StoredHash(preview, scopeId);
 }

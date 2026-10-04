@@ -735,6 +735,66 @@ body {
 }
 
 /*
+ * GROUNDED-MARKDOWN-DRAFTS-001/002. A draft's own surfaces: the evidence a draft may be grounded in,
+ * the body shown as source, and the two finding lists.
+ *
+ * .draft__body is a <pre> and stays one. A draft is unapproved text that can contain a link, a prompt or
+ * a tag, and the page asking an owner whether to believe it must not be the page that renders it - which
+ * is why this is a rule about the element rather than a convention a later edit could undo by switching
+ * the tag for a div.
+ */
+
+.draft__evidence {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.375rem;
+  flex: 1 1 20rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.draft__body {
+  margin: 0.75rem 0 0;
+  padding: 0.75rem;
+  max-height: 28rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--shell-muted);
+  border: 1px solid var(--shell-border);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.draft__findings {
+  margin: 0.75rem 0 0;
+}
+
+.draft__findings ul {
+  margin: 0.375rem 0 0;
+  padding-left: 1.125rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.draft__claims {
+  margin: 0.75rem 0 0;
+  font-size: 0.875rem;
+}
+
+.draft__claims summary {
+  cursor: pointer;
+  color: var(--shell-muted);
+}
+
+.draft__claims ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.125rem;
+  line-height: 1.5;
+}
+
+/*
  * VOICE-PROFILES-001/002. The three surfaces below are the ones this change adds to the vocabulary
  * above: a group of panels, the per-field resolution table that makes an override visible, and the
  * findings list. Everything else reuses the delivered .form*, .evidence* and .notice* rules rather

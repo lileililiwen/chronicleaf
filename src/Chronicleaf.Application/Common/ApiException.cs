@@ -104,6 +104,26 @@ public static class ApiErrorStatus
         GitHub.GitHubError.ConnectionMissing => 422,
         GitHub.GitHubError.Unreachable => 503,
 
+        // The local-git-evidence package's codes. Additive in the same way, and the choices here are this
+        // package's failure policy rather than defaults. 404 for an alias nobody registered, because the
+        // request names a root that does not exist here rather than a malformed body, and a 422 would send
+        // the caller to change a name that was fine. 422 for a directory that is not a Git repository and
+        // for a project with no registration: both are facts the owner or the operator can change today,
+        // and both are about a real, reachable project. 403 for a path that leaves its registered root, and
+        // for a deployment that may not read local directories: the requests are well formed and what is
+        // refused is the destination, so a 422 would invite a client to resend an identical request. 503 for
+        // a missing Git and for a read that outlived this package's own bound - operator-repairable
+        // conditions, not a broken product, and deliberately not 504s, because the bound is a constant of
+        // this package rather than somebody else's latency promise. The ten job codes deliberately have no
+        // arm: they are written to the operation row, and no route answers a collection that already failed.
+        Git.LocalGitError.RootUnknown => 404,
+        Git.LocalGitError.NotARepository => 422,
+        Git.LocalGitError.RepositoryMissing => 422,
+        Git.LocalGitError.OutsideRoot => 403,
+        Git.LocalGitError.NotAvailableInHosted => 403,
+        Git.LocalGitError.GitUnavailable => 503,
+        Git.LocalGitError.TimedOut => 503,
+
         // The screenshot-capture package's codes. Additive in the same way, and the choices are this
         // package's failure policy rather than defaults. 403 for a destination the URL policy will not
         // photograph: the milestone is real and the request is well formed, and it is the destination

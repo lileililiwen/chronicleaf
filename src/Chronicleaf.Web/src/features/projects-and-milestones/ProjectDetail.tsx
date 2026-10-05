@@ -10,6 +10,8 @@ import {
 } from './api';
 import { GitHubConnectionPanel } from '../github-evidence/GitHubConnectionPanel';
 import { GitHubSyncPanel } from '../github-evidence/GitHubSyncPanel';
+import { LocalGitSyncPanel } from '../local-git-evidence/LocalGitSyncPanel';
+import { LocalRepositoryPanel } from '../local-git-evidence/LocalRepositoryPanel';
 import { GroundedMarkdownDraftPanel } from '../grounded-markdown-drafts/GroundedMarkdownDraftPanel';
 import { MarkdownReviewPanel } from '../markdown-review-export/MarkdownReviewPanel';
 import { MilestoneEvidencePanel } from '../milestone-evidence/MilestoneEvidencePanel';
@@ -195,6 +197,16 @@ export function ProjectDetail({
             project still shows what it collected, read-only.
           */}
           <GitHubConnectionPanel projectId={record.id} archived={archived} />
+
+          {/*
+            LOCAL-GIT-EVIDENCE-001/002. Which local repository this project collects from, and the one form
+            that changes it. It is beside the GitHub panel rather than under a milestone for the same reason
+            that one is: a registration belongs to the project, and every milestone below asks the same
+            repository. The two are separate because they are separate facts - a project may collect from a
+            hosted repository, a local one, or both - and a panel that merged them would have to invent an
+            answer to "which one?" that the server does not give.
+          */}
+          <LocalRepositoryPanel projectId={record.id} archived={archived} />
         </header>
       )}
 
@@ -372,6 +384,19 @@ function MilestoneRow({
           without reloading the page, and no panel here starts polling for a change this row is
           already told about. */}
       <GitHubSyncPanel
+        projectId={milestone.projectId}
+        milestoneId={milestone.id}
+        milestoneTitle={milestone.title}
+        archived={archived}
+        onSettled={() => setSettledCollections((value) => value + 1)}
+      />
+
+      {/* LOCAL-GIT-EVIDENCE-001/002. Asking this milestone's local repository for a ref, and following the
+          job that does it. It goes directly under the evidence panel for the same reason the panel above does,
+          and it raises the same one-shot reload signal when its job reaches a status it will not leave - so a
+          background collection of a local checkout refreshes the evidence without any panel here polling for
+          a change it has already been told about. */}
+      <LocalGitSyncPanel
         projectId={milestone.projectId}
         milestoneId={milestone.id}
         milestoneTitle={milestone.title}

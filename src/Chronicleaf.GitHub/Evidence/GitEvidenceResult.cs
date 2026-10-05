@@ -63,6 +63,23 @@ public sealed class GitEvidenceResult
     /// <summary>The immutable commit the head ref resolved to, or <c>null</c> when it could not be resolved.</summary>
     public string? ResolvedHeadSha { get; init; }
 
+    /// <summary>
+    /// How many uncommitted changes the working tree held, or <c>null</c> when the transport did not ask
+    /// and therefore cannot say (LOCAL-GIT-EVIDENCE-001).
+    /// </summary>
+    /// <remarks>
+    /// A count and never a list of names, for two reasons. One of those names could be a file nobody meant
+    /// to publish. And a count is the only claim that stays true: which changes existed is a fact about an
+    /// instant, while a path is a fact about a directory that may be different by the time a reader looks.
+    /// <para>
+    /// The count is reported rather than acted on. A local collection reads committed revisions, so an
+    /// uncommitted change is not a candidate for anything - but a reader who does not know the working tree
+    /// was dirty would read the bundle as a description of the directory rather than of the commit, and that
+    /// is the misreading this column exists to prevent.
+    /// </para>
+    /// </remarks>
+    public int? UncommittedChanges { get; init; }
+
     /// <summary>At most the requested number of commits, in the order GitHub returned them.</summary>
     public IReadOnlyList<GitCommit> Commits { get; init; } = NoCommits;
 
@@ -132,6 +149,65 @@ public sealed class GitEvidenceResult
     /// <summary>GitHub refused the request itself: a malformed ref, or a repository that is not public.</summary>
     public static GitEvidenceResult Rejected(DateTimeOffset fetchedAt) =>
         new(GitEvidenceOutcome.Rejected, repository: null, fetchedAt, retryAfter: null);
+
+    /// <summary>
+    /// The named alias is not one an operator registered (LOCAL-GIT-EVIDENCE-002).
+    /// </summary>
+    /// <remarks>
+    /// No repository and no message: which aliases exist is the operator's configuration rather than this
+    /// owner's business, and a result that echoed the refused value would be no help to the caller anyway.
+    /// </remarks>
+    public static GitEvidenceResult RootUnknown(DateTimeOffset fetchedAt) =>
+        new(GitEvidenceOutcome.RootUnknown, repository: null, fetchedAt, retryAfter: null);
+
+    /// <summary>
+    /// The path leaves its registered root, by traversal or through a symbolic link (LOCAL-GIT-EVIDENCE-002).
+    /// </summary>
+    /// <remarks>
+    /// The control the local package exists for, so it is a value of its own rather than a generic refusal. A
+    /// scenario that reaches this outcome has proved the containment check held, and the only way that fact
+    /// can be read back from a log line or an operation row is by the code being its own name.
+    /// </remarks>
+    public static GitEvidenceResult OutsideRoot(DateTimeOffset fetchedAt) =>
+        new(GitEvidenceOutcome.OutsideRoot, repository: null, fetchedAt, retryAfter: null);
+
+    /// <summary>
+    /// The path is not a Git repository this transport can read (LOCAL-GIT-EVIDENCE-002).
+    /// </summary>
+    /// <remarks>
+    /// Distinct from <see cref="Rejected"/> because a request that named a bad ref and a directory that is not
+    /// a repository are different problems: the first is the caller's word and the second is the operator's
+    /// directory, and a caller told the first would go and change a path that was never wrong.
+    /// </remarks>
+    public static GitEvidenceResult NotARepository(DateTimeOffset fetchedAt) =>
+        new(GitEvidenceOutcome.NotARepository, repository: null, fetchedAt, retryAfter: null);
+
+    /// <summary>
+    /// A read outlived this transport's own bound and was stopped (LOCAL-GIT-EVIDENCE-002).
+    /// </summary>
+    public static GitEvidenceResult ReadTimedOut(DateTimeOffset fetchedAt) =>
+        new(GitEvidenceOutcome.TimedOut, repository: null, fetchedAt, retryAfter: null);
+
+    /// <summary>
+    /// The repository moved underneath the collection: the ref that was resolved at the start no longer
+    /// names the revision the rest of the run read (LOCAL-GIT-EVIDENCE-001).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A transport that can see its own repository answer this and no other. A host API resolves a
+    /// branch to a commit in one request and the commit it names is the commit it then reads, so there
+    /// is no window in which the branch and the facts could disagree; a local repository is read with
+    /// several commands over some seconds, and a commit made in the middle of that window would
+    /// otherwise produce a bundle holding facts that never coexisted at any one revision.
+    /// </para>
+    /// <para>
+    /// So the last read of a local run re-resolves the head and compares. A move is reported as this
+    /// outcome rather than as a successful collection with a mixed set, because a bundle that names
+    /// one revision and holds facts from another is a lie no later reader could detect.
+    /// </para>
+    /// </remarks>
+    public static GitEvidenceResult Superseded(DateTimeOffset fetchedAt) =>
+        new(GitEvidenceOutcome.Superseded, repository: null, fetchedAt, retryAfter: null);
 }
 
 /// <summary>The five answers a collection attempt can give, and nothing else.</summary>
@@ -154,6 +230,44 @@ public enum GitEvidenceOutcome
 
     /// <summary>GitHub could not answer right now.</summary>
     Unavailable,
+
+    /// <summary>
+    /// The ref moved while the collection was being read, so nothing coherent was gathered
+    /// (LOCAL-GIT-EVIDENCE-001). Only a transport that can re-read its own source raises this.
+    /// </summary>
+    Superseded,
+
+    /// <summary>
+    /// The named alias is not one an operator registered (LOCAL-GIT-EVIDENCE-002).
+    /// </summary>
+    /// <remarks>
+    /// A value of its own rather than a variant of <see cref="Rejected"/> because the two have nothing in
+    /// common operationally: a malformed request is the caller's to fix, while an unregistered alias is an
+    /// operator's configuration, and a caller who is told "your request was wrong" will change a path that
+    /// was never the problem.
+    /// </remarks>
+    RootUnknown,
+
+    /// <summary>
+    /// The path leaves its registered root, by traversal or through a symbolic link
+    /// (LOCAL-GIT-EVIDENCE-002).
+    /// </summary>
+    /// <remarks>
+    /// The control the local package exists for, so it is a value of its own and never folded into a
+    /// generic refusal. A scenario that reaches this outcome has proved the containment check held, and
+    /// asserting on the code is the only way that fact can be read back from a log or an operation row.
+    /// </remarks>
+    OutsideRoot,
+
+    /// <summary>
+    /// The path is not a Git repository this transport can read (LOCAL-GIT-EVIDENCE-002).
+    /// </summary>
+    NotARepository,
+
+    /// <summary>
+    /// A read outlived this transport's own bound and was stopped (LOCAL-GIT-EVIDENCE-002).
+    /// </summary>
+    TimedOut,
 }
 
 /// <summary>

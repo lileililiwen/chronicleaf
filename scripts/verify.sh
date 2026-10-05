@@ -2,7 +2,8 @@
 # Chronicleaf native verification (SHELL-003, COMMUNITY-PERSISTENCE-001/002, COMMUNITY-ACCESS-001/002,
 # PROJECTS-AND-MILESTONES-001/002, BACKGROUND-JOBS-001/002, LOCAL-MEDIA-STORAGE-001/002,
 # MILESTONE-EVIDENCE-001/002, CREDENTIAL-VAULT-001/002, VOICE-PROFILES-001/002,
-# LLM-PROVIDER-CONTRACT-001/002, GITHUB-EVIDENCE-001/002, LLM-OPENAI-ADAPTER-001/002,
+# LLM-PROVIDER-CONTRACT-001/002, GITHUB-EVIDENCE-001/002, LOCAL-GIT-EVIDENCE-001/002,
+# LLM-OPENAI-ADAPTER-001/002,
 # LLM-OLLAMA-ADAPTER-001/002,
 # SCREENSHOT-CAPTURE-001/002, SCREENSHOT-CURATION-001/002, GROUNDED-MARKDOWN-DRAFTS-001/002,
 # MILESTONE-TIMELINE-001/002, MARKDOWN-REVIEW-EXPORT-001/002,
@@ -337,6 +338,34 @@ else
   # GitHub API was called, that a real repository was resolved, or that any specific GitHub response
   # shape is supported beyond what the transport's own pinned version documents.
   step "github evidence tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~GithubEvidenceTests"
+  # LOCAL-GIT-EVIDENCE-001/002. That two selected commits are appended with their own immutable revisions and
+  # bounded tracked differences, and that every later fact is read from two resolved SHAs rather than from
+  # the directory; that an untracked file, a dirty edit and a committed secret-named file each reach no
+  # evidence item, with the exclusions and the uncommitted count recorded rather than the bytes; that a head
+  # that moves during the read ends the operation superseded with nothing appended; that a registered root is
+  # collected from and the repository is byte-identical afterwards, `.git` included; that a path which leaves
+  # its root through a symbolic link is refused before Git is started, and one that becomes a link after
+  # registration is refused when the job runs; that a Hosted deployment refuses local filesystem discovery and
+  # starts no process at all; that the runner will only run four read verbs and builds its process from an
+  # argument vector with a sanitised environment; and that the database itself refuses a relative path that
+  # leaves its root and a run row that is half-completed - are all proven against the same real disposable
+  # PostgreSQL and the real API host, over REAL TEMPORARY GIT REPOSITORIES on a real filesystem, read by a
+  # real `git` process started by the production runner.
+  #
+  # A simulation is refused as evidence here, and the refusal is specific rather than general. There is no
+  # double anywhere in this stage. The claim under test is what this server does with a directory on a disk -
+  # which paths it will read, which bytes it will not, which Git commands it may start, and what it leaves
+  # behind - and a scripted transport substituted at the process boundary would leave the containment check,
+  # the argument vector, the caps, the timeout and the read-only claim untested, which is the whole of the
+  # package. So the repository on disk was created by a real `git` in a real directory, the application reads
+  # it through its own runner, and the only seam these scenarios use is a runner that DELEGATES to the
+  # production one and can move a head between two commands - and even that is used by exactly one scenario,
+  # the race nothing outside the process could otherwise schedule.
+  #
+  # Nothing in this stage may be read as evidence that Git works, that a particular repository is well formed,
+  # or that any particular distribution's Git behaves as another's does. What is proven is Chronicleaf's own
+  # handling of what Git answers.
+  step "local git evidence tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~LocalGitEvidenceTests"
   # SCREENSHOT-CAPTURE-001/002. That a private, local, loopback or cloud-metadata destination is refused
   # by the URL policy - including when the same address is written in IPv6 spelling as an
   # IPv4-mapped literal such as ::ffff:10.0.0.5, which the IPv6 rules would otherwise judge a public

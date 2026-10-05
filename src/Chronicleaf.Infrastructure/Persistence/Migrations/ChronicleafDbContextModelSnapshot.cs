@@ -820,6 +820,185 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.ToTable("installation", (string)null);
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.LocalRepository", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DefaultBranch")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("default_branch");
+
+                    b.Property<string>("HeadSha")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("head_sha");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("RelativePath")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("relative_path");
+
+                    b.Property<string>("RootAlias")
+                        .IsRequired()
+                        .HasMaxLength(39)
+                        .HasColumnType("character varying(39)")
+                        .HasColumnName("root_alias");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("ScopeId", "ProjectId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_local_repositories_scope_id_project_id");
+
+                    b.ToTable("local_repositories", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_local_repositories_relative_path_relative", "relative_path NOT LIKE '/%' AND relative_path NOT LIKE '%/../%' AND relative_path NOT LIKE '%/./%' AND relative_path NOT LIKE '../%' AND relative_path NOT LIKE './%' AND relative_path <> '..' AND relative_path NOT LIKE '%\\\\%' AND relative_path <> ''");
+
+                            t.HasCheckConstraint("ck_local_repositories_root_alias_relative", "root_alias <> '' AND root_alias NOT LIKE '/%' AND root_alias NOT LIKE '%/%'");
+                        });
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.LocalSyncSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BaseRef")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("base_ref");
+
+                    b.Property<string>("BaseSha")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("base_sha");
+
+                    b.Property<int>("ChangedFileCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("changed_file_count");
+
+                    b.Property<string>("CommandLog")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("command_log");
+
+                    b.Property<int>("CommitCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("commit_count");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("ExcludedFileCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("excluded_file_count");
+
+                    b.Property<long>("ExpectedBundleRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expected_bundle_revision");
+
+                    b.Property<DateTimeOffset?>("FetchedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fetched_at");
+
+                    b.Property<string>("HeadRef")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("head_ref");
+
+                    b.Property<string>("HeadSha")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("head_sha");
+
+                    b.Property<Guid>("MilestoneId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("milestone_id");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<string>("RelativePath")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("relative_path");
+
+                    b.Property<string>("RootAlias")
+                        .IsRequired()
+                        .HasMaxLength(39)
+                        .HasColumnType("character varying(39)")
+                        .HasColumnName("root_alias");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<bool>("Truncated")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("truncated");
+
+                    b.Property<int>("UncommittedCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("uncommitted_count");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MilestoneId");
+
+                    b.HasIndex("ScopeId", "OperationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_local_sync_sources_scope_id_operation_id");
+
+                    b.HasIndex("ScopeId", "MilestoneId", "CreatedAt")
+                        .HasDatabaseName("ix_local_sync_sources_scope_id_milestone_id_created_at");
+
+                    b.ToTable("local_sync_sources", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_local_sync_sources_completion", "(completed_at IS NULL AND head_sha IS NULL AND base_sha IS NULL AND command_log IS NULL) OR (completed_at IS NOT NULL AND head_sha IS NOT NULL AND command_log IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.Media", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1636,6 +1815,26 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_github_connections_project_id");
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.LocalRepository", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_local_repositories_project_id");
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.LocalSyncSource", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Milestone", null)
+                        .WithMany()
+                        .HasForeignKey("MilestoneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_local_sync_sources_milestone_id");
                 });
 
             modelBuilder.Entity("Chronicleaf.Core.Media", b =>

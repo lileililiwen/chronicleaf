@@ -4,6 +4,7 @@ using Chronicleaf.Application.AI;
 using Chronicleaf.Application.Capture;
 using Chronicleaf.Application.Common;
 using Chronicleaf.Application.Content;
+using Chronicleaf.Application.Git;
 using Chronicleaf.Application.GitHub;
 using Chronicleaf.Application.Media;
 using Chronicleaf.Application.Milestones;
@@ -325,6 +326,49 @@ public sealed class ApiErrorMiddleware(
             case GitHubUnavailableException githubUnavailable:
                 return (
                     Envelope.Create(GitHubError.Unreachable, githubUnavailable.Message, traceId),
+                    LogLevel.Warning);
+
+            // LOCAL-GIT-EVIDENCE-001/002. Written here for the same reason as the refusals above: this
+            // feature package raises them, and this middleware is still the only place an envelope is
+            // written. The messages are authored in the local-git package and name no alias, no relative
+            // path, no registered directory and no command output - a refusal here is about a directory on
+            // a machine, and a message that quoted the directory would hand a caller the layout of a
+            // filesystem it was not entitled to. The two refusals a caller can act on alone are logged at
+            // information; the three an operator has to fix are warnings, and none of them is an error of
+            // this server.
+            case LocalGitRootUnknownException rootUnknown:
+                return (
+                    Envelope.Create(LocalGitError.RootUnknown, rootUnknown.Message, traceId),
+                    LogLevel.Information);
+
+            case LocalGitOutsideRootException outsideRoot:
+                return (
+                    Envelope.Create(LocalGitError.OutsideRoot, outsideRoot.Message, traceId),
+                    LogLevel.Information);
+
+            case LocalGitNotARepositoryException notARepository:
+                return (
+                    Envelope.Create(LocalGitError.NotARepository, notARepository.Message, traceId),
+                    LogLevel.Information);
+
+            case LocalGitRepositoryMissingException repositoryMissing:
+                return (
+                    Envelope.Create(LocalGitError.RepositoryMissing, repositoryMissing.Message, traceId),
+                    LogLevel.Information);
+
+            case LocalGitNotAvailableInHostedException notInHosted:
+                return (
+                    Envelope.Create(LocalGitError.NotAvailableInHosted, notInHosted.Message, traceId),
+                    LogLevel.Warning);
+
+            case LocalGitUnavailableException gitUnavailable:
+                return (
+                    Envelope.Create(LocalGitError.GitUnavailable, gitUnavailable.Message, traceId),
+                    LogLevel.Warning);
+
+            case LocalGitTimeoutException gitTimedOut:
+                return (
+                    Envelope.Create(LocalGitError.TimedOut, gitTimedOut.Message, traceId),
                     LogLevel.Warning);
 
             // SCREENSHOT-CAPTURE-001/002. Written here for the same reason as the refusals above: this

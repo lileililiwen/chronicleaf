@@ -73,6 +73,10 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     public DbSet<SyncSource> SyncSources => Set<SyncSource>();
 
+    public DbSet<LocalRepository> LocalRepositories => Set<LocalRepository>();
+
+    public DbSet<LocalSyncSource> LocalSyncSources => Set<LocalSyncSource>();
+
     public DbSet<ScreenshotCandidate> ScreenshotCandidates => Set<ScreenshotCandidate>();
 
     public DbSet<CaptureRequestRow> CaptureRequests => Set<CaptureRequestRow>();
@@ -937,6 +941,181 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
         });
 
         // -----------------------------------------------------------------------------------------
+        // local-git-evidence. The same two shapes as the GitHub tables above, and the two deliberate
+        // differences are the point of this package.
+        //
+        // `root_alias` and `relative_path` are the only address columns, and there is no third. The
+        // registered directory lives in the operator's configuration and is never written here, so this
+        // table cannot become a map of a filesystem and a response built from it cannot publish a path.
+        // There is also no credential column: a local repository is read off the operator's own disk with
+        // the operator's own Git, and there is no remote for a token to authenticate to.
+        // -----------------------------------------------------------------------------------------
+
+        // LOCAL-GIT-EVIDENCE-002: the local repository a project collects from. One registration per
+        // project: the unique index is what makes a second POST for the same project replace the first
+        // instead of accumulating directories.
+        modelBuilder.Entity<LocalRepository>(entity =>
+        {
+            entity.ToTable("local_repositories");
+            entity.HasKey(repository => repository.Id);
+            entity.Property(repository => repository.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(repository => repository.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(repository => repository.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(repository => repository.RootAlias)
+                .HasColumnName("root_alias")
+                .HasMaxLength(LocalRootAliasMaxLength)
+                .IsRequired();
+            entity.Property(repository => repository.RelativePath)
+                .HasColumnName("relative_path")
+                .HasMaxLength(LocalRelativePathMaxLength)
+                .IsRequired();
+            entity.Property(repository => repository.DefaultBranch)
+                .HasColumnName("default_branch")
+                .HasMaxLength(LocalRefMaxLength);
+            entity.Property(repository => repository.HeadSha)
+                .HasColumnName("head_sha")
+                .HasMaxLength(LocalShaMaxLength);
+            entity.Property(repository => repository.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(repository => repository.UpdatedAt)
+                .HasColumnName("updated_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            entity.HasIndex(repository => new { repository.ScopeId, repository.ProjectId })
+                .IsUnique()
+                .HasDatabaseName("ux_local_repositories_scope_id_project_id");
+
+            // A relative path that begins a segment with a slash, or names a dot segment, is a path that
+            // could resolve outside its root. The application policy refuses both before a row exists; this
+            // constraint is what makes the refusal a property of the table rather than of one writer.
+            entity.ToTable(
+                table =>
+                {
+                    table.HasCheckConstraint(
+                        "ck_local_repositories_relative_path_relative",
+                        "relative_path NOT LIKE '/%' AND relative_path NOT LIKE '%/../%' "
+                        + "AND relative_path NOT LIKE '%/./%' AND relative_path NOT LIKE '../%' "
+                        + "AND relative_path NOT LIKE './%' AND relative_path <> '..' "
+                        + "AND relative_path NOT LIKE '%\\\\%' AND relative_path <> ''");
+                    table.HasCheckConstraint(
+                        "ck_local_repositories_root_alias_relative",
+                        "root_alias <> '' AND root_alias NOT LIKE '/%' AND root_alias NOT LIKE '%/%'");
+                });
+
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(repository => repository.ProjectId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_local_repositories_project_id");
+        });
+
+        // LOCAL-GIT-EVIDENCE-001/002: one row per local collection run, written when the owner asks and
+        // completed by the job. `command_log` holds the Git verbs that ran and never their operands, so a
+        // reader can see what kind of reads happened without this table being able to name a path.
+        modelBuilder.Entity<LocalSyncSource>(entity =>
+        {
+            entity.ToTable("local_sync_sources");
+            entity.HasKey(source => source.Id);
+            entity.Property(source => source.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(source => source.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(source => source.OperationId).HasColumnName("operation_id").IsRequired();
+            entity.Property(source => source.MilestoneId).HasColumnName("milestone_id").IsRequired();
+            entity.Property(source => source.ExpectedBundleRevision)
+                .HasColumnName("expected_bundle_revision")
+                .IsRequired();
+            entity.Property(source => source.RootAlias)
+                .HasColumnName("root_alias")
+                .HasMaxLength(LocalRootAliasMaxLength)
+                .IsRequired();
+            entity.Property(source => source.RelativePath)
+                .HasColumnName("relative_path")
+                .HasMaxLength(LocalRelativePathMaxLength)
+                .IsRequired();
+            entity.Property(source => source.HeadRef)
+                .HasColumnName("head_ref")
+                .HasMaxLength(LocalRefMaxLength)
+                .IsRequired();
+            entity.Property(source => source.BaseRef)
+                .HasColumnName("base_ref")
+                .HasMaxLength(LocalRefMaxLength);
+            entity.Property(source => source.BaseSha)
+                .HasColumnName("base_sha")
+                .HasMaxLength(LocalShaMaxLength);
+            entity.Property(source => source.HeadSha)
+                .HasColumnName("head_sha")
+                .HasMaxLength(LocalShaMaxLength);
+            entity.Property(source => source.CommandLog)
+                .HasColumnName("command_log")
+                .HasMaxLength(LocalCommandLogMaxLength);
+            entity.Property(source => source.FetchedAt)
+                .HasColumnName("fetched_at")
+                .HasColumnType("timestamp with time zone");
+            // The five count columns default to zero in the database, not only in the domain record, for the
+            // delivered reason: a run is inserted the moment an owner asks for it, so the defaults are what
+            // make "asked for, not yet collected" a state the database can hold without this store inventing
+            // numbers it has not read.
+            entity.Property(source => source.CommitCount)
+                .HasColumnName("commit_count")
+                .HasDefaultValue(0)
+                .IsRequired();
+            entity.Property(source => source.ChangedFileCount)
+                .HasColumnName("changed_file_count")
+                .HasDefaultValue(0)
+                .IsRequired();
+            entity.Property(source => source.Truncated)
+                .HasColumnName("truncated")
+                .HasDefaultValue(false)
+                .IsRequired();
+            entity.Property(source => source.ExcludedFileCount)
+                .HasColumnName("excluded_file_count")
+                .HasDefaultValue(0)
+                .IsRequired();
+            entity.Property(source => source.UncommittedCount)
+                .HasColumnName("uncommitted_count")
+                .HasDefaultValue(0)
+                .IsRequired();
+            entity.Property(source => source.CompletedAt)
+                .HasColumnName("completed_at")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(source => source.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            // One run per operation, and the worker's lookup: it is handed an operation id and nothing else,
+            // so this index is the only way it can find the request it is collecting.
+            entity.HasIndex(source => new { source.ScopeId, source.OperationId })
+                .IsUnique()
+                .HasDatabaseName("ux_local_sync_sources_scope_id_operation_id");
+
+            // A milestone's runs are read newest first, so the index leads with the milestone and the time the
+            // run was asked for.
+            entity.HasIndex(source => new { source.ScopeId, source.MilestoneId, source.CreatedAt })
+                .HasDatabaseName("ix_local_sync_sources_scope_id_milestone_id_created_at");
+
+            // A run that has completed has a head revision, and a run that has not has none. The check is on
+            // the pair rather than on either column alone so "collected" and "did not finish" cannot both be
+            // true of one row, which is the state the delivered GitHub run log would also refuse.
+            entity.ToTable(
+                table =>
+                {
+                    table.HasCheckConstraint(
+                        "ck_local_sync_sources_completion",
+                        "(completed_at IS NULL AND head_sha IS NULL AND base_sha IS NULL AND command_log IS NULL) "
+                        + "OR (completed_at IS NOT NULL AND head_sha IS NOT NULL AND command_log IS NOT NULL)");
+                });
+
+            entity.HasOne<Milestone>()
+                .WithMany()
+                .HasForeignKey(source => source.MilestoneId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_local_sync_sources_milestone_id");
+        });
+
+        // -----------------------------------------------------------------------------------------
         // screenshot-capture. Two tables and one uniqueness tuple between them: the request a job reads
         // its work back from, and the candidates that job produces.
         // -----------------------------------------------------------------------------------------
@@ -1440,6 +1619,30 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
     /// column instead of being silently shortened.
     /// </summary>
     private const int GitHubEndpointsMaxLength = 2000;
+
+    /// <summary>
+    /// At most 39 characters; the longest operator-chosen root alias, and the same bound the repository
+    /// reference uses for an owner.
+    /// </summary>
+    private const int LocalRootAliasMaxLength = 39;
+
+    /// <summary>
+    /// At most 255 characters; the longest relative path inside a registered root, and the same bound the
+    /// reference contract enforces before a row exists.
+    /// </summary>
+    private const int LocalRelativePathMaxLength = 255;
+
+    /// <summary>At most 255 characters; a local ref is a branch, tag or revision like any other.</summary>
+    private const int LocalRefMaxLength = 255;
+
+    /// <summary>At most 64 characters; a SHA-1 or SHA-256 revision is hex.</summary>
+    private const int LocalShaMaxLength = 64;
+
+    /// <summary>
+    /// At most 500 characters for the consulted subcommand list. A local run issues a bounded number of
+    /// commands and this column holds only their verbs, so the bound is generous rather than tight.
+    /// </summary>
+    private const int LocalCommandLogMaxLength = 500;
 
     /// <summary>At most 12 characters; the longest draft status is <c>approved</c>.</summary>
     private const int VoiceDraftStatusMaxLength = 12;

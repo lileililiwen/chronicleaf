@@ -13,6 +13,7 @@ using Chronicleaf.Api.Common;
 using Chronicleaf.Api.Content;
 using Chronicleaf.Api.Curation;
 using Chronicleaf.Api.Evidence;
+using Chronicleaf.Api.Git;
 using Chronicleaf.Api.GitHub;
 using Chronicleaf.Api.Media;
 using Chronicleaf.Api.Operations;
@@ -31,6 +32,7 @@ using Chronicleaf.Infrastructure.Capture;
 using Chronicleaf.Infrastructure.Content;
 using Chronicleaf.Infrastructure.Curation;
 using Chronicleaf.Infrastructure.Evidence;
+using Chronicleaf.Infrastructure.Git;
 using Chronicleaf.Infrastructure.GitHub;
 using Chronicleaf.Infrastructure.Media;
 using Chronicleaf.Infrastructure.Operations;
@@ -181,6 +183,17 @@ builder.Services.AddOllamaProvider(builder.Configuration);
 // migration reports schema_mismatch at /api/ready.
 builder.Services.AddGitHubEvidence();
 
+// LOCAL-GIT-EVIDENCE-001/002. The read-only Git transport, which runs four Git verbs and refuses every
+// other, plus the two stores, the service and the one job handler that appends collected evidence to a
+// milestone. The registered roots are the operator's own configuration (`Chronicleaf:LocalRepositoryRoots`)
+// and there is no route that adds one and no request field that could widen the set: a caller names an
+// alias and a path relative to it, and the server resolves that inside the registered directory or
+// refuses it. There is no credential here at all - a local repository is read with the operator's own Git
+// and has no remote to authenticate to - and nothing is ever written to a repository, because the runner
+// will not start a Git subcommand that changes state. A database without the local-git-evidence migration
+// reports schema_mismatch at /api/ready.
+builder.Services.AddLocalGitEvidence(builder.Configuration);
+
 // SCREENSHOT-CAPTURE-001/002. The two stores, the service, the one job handler, and the production
 // browser - the sandbox-backed Playwright provider, which is registered here and nowhere else. The
 // provider refuses on a host that cannot confine a browser rather than falling back to unrestricted
@@ -304,6 +317,12 @@ app.MapAIGenerationEndpoints();
 // here accepts or returns a URL and none returns a credential: a repository is an owner and a name,
 // and the host is a constant of the transport.
 app.MapGitHubEvidenceEndpoints();
+
+// LOCAL-GIT-EVIDENCE-001/002: the private root catalogue, registration and collection routes. None of
+// them is marked public, so the access package's default-deny boundary already covers every one of them.
+// No route here accepts an absolute path and none returns one: a registration is an operator-registered
+// alias plus a relative path, and the directory behind the alias stays in the operator's configuration.
+app.MapLocalGitEvidenceEndpoints();
 
 // SCREENSHOT-CAPTURE-001/002: the private capture and candidate routes. Neither is marked public, so
 // the access package's default-deny boundary already covers both. This is the one surface in the

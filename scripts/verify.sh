@@ -3,6 +3,7 @@
 # PROJECTS-AND-MILESTONES-001/002, BACKGROUND-JOBS-001/002, LOCAL-MEDIA-STORAGE-001/002,
 # MILESTONE-EVIDENCE-001/002, CREDENTIAL-VAULT-001/002, VOICE-PROFILES-001/002,
 # LLM-PROVIDER-CONTRACT-001/002, GITHUB-EVIDENCE-001/002, LLM-OPENAI-ADAPTER-001/002,
+# LLM-OLLAMA-ADAPTER-001/002,
 # SCREENSHOT-CAPTURE-001/002, SCREENSHOT-CURATION-001/002, GROUNDED-MARKDOWN-DRAFTS-001/002,
 # MILESTONE-TIMELINE-001/002).
 #
@@ -278,6 +279,39 @@ else
   # published reference, which is a fact about a document rather than about a service, and the
   # credential-gated live smoke the design names is NOT performed and NOT claimed.
   step "llm openrouter adapter tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~LlmOpenrouterAdapterTests"
+  # LLM-OLLAMA-ADAPTER-001/002. That a valid nonstreaming chat response maps text, finish
+  # state and whatever usage the daemon reported, with no invented request id; that a consent
+  # without a credential is a keyless call rather than a refusal; that an unfinished generation,
+  # a truncation, an empty answer, an unrecognised stop reason and three malformed bodies are
+  # each distinguishable and none of them is ever a draft; that prose refusals arrive as text
+  # the adapter cannot classify and are refused by the delivered local validator instead; that
+  # absent or nonsensical token counts are reported unknown rather than fabricated; that the
+  # outbound request is exactly the consented payload at the allowlisted origin's chat resource
+  # - model, ceiling as num_predict, stream false, system instruction carrying the schema
+  # fallback, evidence as a labelled user message - with no member asking for tools and no schema
+  # member, and no auth header unless the consent named a credential; that a 401 and a 403 are
+  # the same credential_rejected answer and neither the envelope nor the adapter's own log lines
+  # carry the key or the provider's error prose; that a 429 and a 5xx are two different codes;
+  # that a 302 is refused rather than followed; that a model or an endpoint outside the
+  # allowlists - and an empty allowlist - are both refused before a credential is leased and
+  # before a socket is opened; that a cancelled call throws and stores nothing; that a response
+  # over the 2 MiB cap is refused while its bytes are arriving; and that the adapter is
+  # registered in production and published verbatim - local endpoint, no credential required,
+  # native schema off, so the schema rides in the prompt and the text is validated locally - and
+  # is unreachable when it is not registered - all proven against the same real disposable
+  # PostgreSQL, the real operator key file and the real API host, with the real OllamaProvider
+  # over a stub at the far end of its HttpClient.
+  #
+  # One substitution, and it is the package's own declared boundary: the message handler underneath the
+  # adapter's HttpClient. Everything above the socket is production's own code, including the adapter,
+  # the endpoint allowlist, the vault lease, the optional bearer header, the status mapping and the
+  # consent handshake - so a double implementing ILLMProvider (as the contract stage needs) could not
+  # have asserted any of this. No stage here may be read as evidence that any Ollama daemon works, that
+  # a named model exists or is available to any owner, or that a call is cheap: the response bodies are
+  # transcribed from the provider's published reference, which is a fact about a document rather than
+  # about a service, and the credential-gated live smoke the design names is NOT performed and NOT
+  # claimed.
+  step "llm ollama adapter tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~LlmOllamaAdapterTests"
   # GITHUB-EVIDENCE-001/002. That a collection resolves the selected refs to immutable revisions and
   # appends bounded evidence naming each source; that a repository that is absent or not public fails
   # with repository_unavailable rather than with invented material; that a binary or excluded file is
@@ -355,10 +389,11 @@ else
   # real operation queue, with a real sealed credential behind a real consent.
   #
   # A simulation is refused as evidence here, and the refusal is specific rather than general. The one
-  # ILLMProvider in this file is a test double on the `ollama` slot, a slot no production adapter
-  # claims - the same discipline the delivered contract suite uses for the same reason, and
-  # `the_slot_this_double_owns_is_claimed_by_no_production_adapter` fails the moment a future adapter
-  # package claims it, because at that moment the double would be shadowed by the real adapter and every
+  # ILLMProvider this file's scenarios drive is a test double inserted before the production
+  # registrations, so the delivered resolver hands back the double itself for the `ollama` slot -
+  # which production also claims since llm-ollama-adapter landed, and
+  # `the_double_shadows_the_production_adapter_for_the_slot_it_owns` fails the moment that stops
+  # being true, because at that moment the double would be shadowed by the real adapter and every
   # scenario here would silently stop testing anything. What the double does not do is reach a provider:
   # it opens no socket and sends nothing, so no stage here may be read as evidence that any provider
   # works, that any model exists or is available to any owner, or that a paid call is cheap. The stored

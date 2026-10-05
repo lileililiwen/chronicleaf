@@ -16,8 +16,10 @@ import type { AiProviderCatalogue, AiProviderView } from './types';
  * - It does not present a result as approved, and it labels which of the two schema paths checked
  *   it. A local validation is a weaker guarantee than a provider's own, and a reader deserves to know
  *   which one they are looking at.
- * - It does not show provider prose, a model the system did not accept, or an endpoint. Those are
- *   the server's business, and a page is the wrong place to re-state them.
+ * - It does not show provider prose, a model the system did not accept, or an endpoint it was not
+ *   given. Those are the server's business, and a page is the wrong place to re-state them. The one
+ *   endpoint it does show is the one the owner must supply for a local-endpoint provider: without it
+ *   no call can be addressed, so the field is part of the selection, not of the result.
  */
 export function GenerationPreviewPanel({
   milestoneId,
@@ -31,10 +33,16 @@ export function GenerationPreviewPanel({
   const flow = useGeneration(milestoneId);
   const [providerId, setProviderId] = useState('');
   const [model, setModel] = useState('');
+  const [endpoint, setEndpoint] = useState('');
 
   const slots = flow.catalogue?.supported ?? [];
   const selected: AiProviderView | null =
     slots.find((slot) => slot.id === providerId) ?? null;
+
+  // Whether the selected provider runs on an endpoint the owner names rather than a published
+  // one. Only then is an endpoint field shown: for every other provider the origin is the
+  // adapter's own constant and a field would imply a choice the owner does not have.
+  const wantsEndpoint = selected?.capability?.localEndpoint === true;
 
   // The credential for the selected slot, which is what a preview binds to. Never a value: this
   // panel has no field that could hold one, and the settings surface is the only place that does.
@@ -77,6 +85,7 @@ export function GenerationPreviewPanel({
           onChange={(event) => {
             setProviderId(event.target.value);
             setModel('');
+            setEndpoint('');
           }}
         >
           {slots.map((slot) => (
@@ -111,6 +120,25 @@ export function GenerationPreviewPanel({
           name it does not accept is refused rather than replaced with a near miss.
         </p>
       </div>
+
+      {wantsEndpoint ? (
+        <div className="view">
+          <label htmlFor={`generation-endpoint-${milestoneId}`}>Endpoint</label>
+          <input
+            id={`generation-endpoint-${milestoneId}`}
+            type="text"
+            value={endpoint}
+            data-testid="generation-endpoint"
+            autoComplete="off"
+            placeholder="http://127.0.0.1:11434"
+            onChange={(event) => setEndpoint(event.target.value)}
+          />
+          <p className="evidence__item-meta">
+            The local origin this deployment may address. It must be one the operator allowlisted;
+            anything else is refused before a call is made.
+          </p>
+        </div>
+      ) : null}
 
       {flow.catalogue !== null ? (
         <p className="evidence__item-meta" data-testid="generation-limits">
@@ -176,6 +204,7 @@ export function GenerationPreviewPanel({
             flow.previewBusy ||
             flow.catalogueBusy ||
             model.trim().length === 0 ||
+            (wantsEndpoint && endpoint.trim().length === 0) ||
             selected === null ||
             flow.evidenceItems.length === 0
           }
@@ -184,6 +213,7 @@ export function GenerationPreviewPanel({
               providerId,
               model: model.trim(),
               credentialRef,
+              endpointRef: wantsEndpoint ? endpoint.trim() : null,
             })
           }
         >
@@ -376,6 +406,12 @@ function slotLabel(slot: AiProviderView): string {
  */
 function capabilitySentence(slot: AiProviderView, usable: boolean): string {
   if (!slot.configured) {
+    // A provider that needs no credential is callable without one: the sentence says so rather
+    // than sending the owner to store something the call will never read.
+    if (slot.adapterInstalled && slot.capability?.requiresCredential === false) {
+      return 'No credential is stored for this provider, and none is needed: it can be called without one. Name its endpoint below.';
+    }
+
     return 'No credential is stored for this provider, so it cannot be called. Store one in the credential settings first.';
   }
 

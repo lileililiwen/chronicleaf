@@ -31,16 +31,17 @@ namespace Chronicleaf.Integration.Tests;
 /// </para>
 /// <para>
 /// <b>The slot is <c>ollama</c>, and that choice is load-bearing and asserted.</b> The production
-/// composition root registers a real adapter for <c>openai</c>, <c>gemini</c> and <c>anthropic</c>,
-/// and the delivered resolver takes the <em>first</em> registration for a slot. A double registered
-/// for one of those would therefore be shadowed by the real adapter: every scenario in this file would
-/// receive a real provider call instead of its scripted answer, the scripted answer would never be
-/// read, and the suite would either fail loudly or - worse, in a suite that did not assert a call
-/// count - pass without having tested anything.
-/// <c>ollama</c> is a slot no production adapter claims, and
-/// <c>the_slot_this_double_owns_is_claimed_by_no_production_adapter</c> fails the moment a future
-/// adapter package takes it. That test is the guard against this exact defect returning, and it is the
-/// one assertion in this file that exists about the fixture rather than about the product.
+/// composition root registers a real adapter for every slot, including <c>ollama</c> since
+/// llm-ollama-adapter landed, and the delivered resolver takes the <em>first</em> registration
+/// for a slot. The double is therefore inserted before the production registrations: appended
+/// after them it would be shadowed by the real adapter, every scenario in this file would
+/// receive a real transport call instead of its scripted answer, the scripted answer would never
+/// be read, and the suite would either fail loudly or - worse, in a suite that did not assert a
+/// call count - pass without having tested anything.
+/// <c>the_double_shadows_the_production_adapter_for_the_slot_it_owns</c> proves the insertion
+/// holds by resolving the slot through the delivered resolver and demanding the double itself.
+/// That test is the guard against this exact defect returning, and it is the one assertion in
+/// this file that exists about the fixture rather than about the product.
 /// </para>
 /// <para>
 /// The key file is real, outside the repository, and per scenario. A draft names a stored credential by
@@ -154,11 +155,16 @@ public sealed class GroundedMarkdownDraftsApiHost : WebApplicationFactory<Progra
             if (_provider is not null)
             {
                 // The one substitution, through the same registration seam the real adapter packages
-                // will use. It is a singleton so the instance a scenario holds is the one the
-                // application resolved - and the resolver reports which adapter it actually chose, so
-                // a scenario can prove this was the one that ran rather than inferring it from an
-                // answer it happened to recognise.
-                services.AddSingleton<ILLMProvider>(_provider);
+                // use. It is inserted first rather than appended, and that ordering is load-bearing:
+                // the delivered resolver keeps the first adapter per slot, and llm-ollama-adapter
+                // registered a real adapter for this suite's slot in the production composition
+                // root. A double appended after it would be shadowed by the real transport, and
+                // every scenario here would silently stop testing anything. Inserted first, the
+                // double is the one the application resolves. It is a singleton so the instance a
+                // scenario holds is the one the application resolved - and the resolver reports
+                // which adapter it actually chose, so a scenario can prove this was the one that
+                // ran rather than inferring it from an answer it happened to recognise.
+                services.Insert(0, ServiceDescriptor.Singleton<ILLMProvider>(_provider));
             }
         });
     }
@@ -233,7 +239,8 @@ public sealed class GroundedMarkdownDraftsApiHost : WebApplicationFactory<Progra
 public sealed class ScriptedDraftProvider : ILLMProvider
 {
     /// <summary>
-    /// The slot this double serves. A slot no production adapter claims; see the host remarks.
+    /// The slot this double serves. Production claims it too since llm-ollama-adapter landed;
+    /// the double works because the host inserts it first - see the host remarks.
     /// </summary>
     public const string Slot = GenerationProviderIds.Ollama;
 

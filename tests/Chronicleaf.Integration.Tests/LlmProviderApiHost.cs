@@ -133,9 +133,16 @@ public sealed class LlmProviderApiHost : WebApplicationFactory<Program>
 
             if (_provider is not null)
             {
-                // The one substitution, through the seam the real adapter packages will use. It is
-                // a singleton so the instance a scenario holds is the one the application resolved.
-                services.AddSingleton<ILLMProvider>(_provider);
+                // The one substitution, through the seam the real adapter packages use. It is
+                // inserted first rather than appended, and that ordering is load-bearing: the
+                // delivered resolver keeps the first adapter per slot, and llm-ollama-adapter
+                // registered a real adapter for this suite's slot in the production composition
+                // root. A double appended after it would be shadowed by the real transport, and
+                // every scenario here would silently stop testing anything. Inserted first, the
+                // double is the one the application resolves - which is what makes the scenarios
+                // evidence about the contract rather than about a missing adapter. It is a
+                // singleton so the instance a scenario holds is the one the application resolved.
+                services.Insert(0, ServiceDescriptor.Singleton<ILLMProvider>(_provider));
             }
         });
     }

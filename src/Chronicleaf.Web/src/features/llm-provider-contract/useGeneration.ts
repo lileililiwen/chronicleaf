@@ -56,6 +56,7 @@ export interface GenerationFlow {
     readonly providerId: string;
     readonly model: string;
     readonly credentialRef: string | null;
+    readonly endpointRef?: string | null;
   }) => Promise<void>;
   discardPreview: () => void;
 
@@ -209,6 +210,7 @@ export function useGeneration(milestoneId: string): GenerationFlow {
       readonly providerId: string;
       readonly model: string;
       readonly credentialRef: string | null;
+      readonly endpointRef?: string | null;
     }) => {
       setPreviewBusy(true);
       setPreviewError(null);
@@ -242,6 +244,7 @@ export function useGeneration(milestoneId: string): GenerationFlow {
             providerId: input.providerId,
             model: input.model,
             credentialRef: input.credentialRef,
+            endpointRef: input.endpointRef ?? null,
             evidenceRevision,
             selectedEvidenceIds,
           }),

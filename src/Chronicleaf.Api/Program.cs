@@ -22,6 +22,7 @@ using Chronicleaf.Api.Timeline;
 using Chronicleaf.Api.Voice;
 using Chronicleaf.AI.Anthropic;
 using Chronicleaf.AI.Gemini;
+using Chronicleaf.AI.Ollama;
 using Chronicleaf.AI.OpenAI;
 using Chronicleaf.AI.OpenRouter;
 using Chronicleaf.Infrastructure.Access;
@@ -158,6 +159,19 @@ builder.Services.AddAnthropicProvider(builder.Configuration);
 // separate roadmap package and stays unclaimed.
 builder.Services.AddSingleton<IOpenRouterApiKeySource, VaultOpenRouterApiKeySource>();
 builder.Services.AddOpenRouterProvider(builder.Configuration);
+
+// LLM-OLLAMA-ADAPTER-001/002. The fifth real transport behind the generation contract: one
+// ILLMProvider for the `ollama` slot, addressing only an operator-allowlisted origin's chat
+// resource with redirects refused, and an optional leased key that is used for one bearer header
+// and returned. A local Ollama needs no key, so a consent that names no credential is a keyless
+// call rather than a refusal. The same shape as the four registrations above, and the same
+// rollback rule: removing it un-installs the transport and leaves stored previews, stored
+// credentials and stored audit rows where they are. The accepted-model and accepted-endpoint
+// allowlists are configuration and are empty unless an operator filled them in, so an untouched
+// deployment refuses every model and every endpoint before a socket is opened. All five slots are
+// now claimed.
+builder.Services.AddSingleton<IOllamaApiKeySource, VaultOllamaApiKeySource>();
+builder.Services.AddOllamaProvider(builder.Configuration);
 
 // GITHUB-EVIDENCE-001/002. The read-only GitHub transport, pinned to the API host with redirects
 // refused, plus the two stores, the service and the one job handler that appends collected evidence

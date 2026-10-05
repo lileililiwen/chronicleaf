@@ -73,16 +73,18 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
     /// The provider slot this suite's double serves.
     /// </summary>
     /// <remarks>
-    /// <b>Ollama, not openai, gemini, anthropic or openrouter.</b> llm-openai-adapter,
-    /// llm-gemini-adapter, llm-anthropic-adapter and llm-openrouter-adapter each registered a real
-    /// adapter for their slot in the production composition root, and the resolver is built from
-    /// whatever the composition root supplied. A double claiming one of those slots would therefore
-    /// be shadowed by the real adapter on any host built from production, and a scenario expecting
-    /// its scripted answer would get a real transport instead - which is a test that silently
-    /// stopped testing.
+    /// <b>Ollama, like every other slot, is claimed by a real adapter in production.</b>
+    /// llm-openai-adapter, llm-gemini-adapter, llm-anthropic-adapter, llm-openrouter-adapter and
+    /// llm-ollama-adapter each registered a real adapter for their slot in the production
+    /// composition root, and the resolver keeps the <em>first</em> registration per slot. The
+    /// double therefore works only because <see cref="LlmProviderApiHost"/> inserts it before the
+    /// production registrations: a double appended after them would be shadowed by the real
+    /// adapter on any host built from production, and a scenario expecting its scripted answer
+    /// would get a real transport instead - which is a test that silently stopped testing.
     ///
-    /// The one slot with no adapter yet is the one this suite can serve a double on, because a double
-    /// that is actually resolved is the only kind that can exercise the contract's behaviour at all.
+    /// The double stays on <c>ollama</c> because there is nowhere else for it to go: every slot
+    /// is claimed now, and the first-wins insertion is the relocation the last adapter package
+    /// had to make.
     /// </remarks>
     private const string ProviderId = GenerationProviderIds.Ollama;
 
@@ -1613,16 +1615,16 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
     }
 
     [Fact]
-    public async Task Production_registration_contains_no_adapter_for_an_unimplemented_slot_and_no_settings_value_can_reach_one()
+    public async Task Production_registration_installs_an_adapter_for_every_slot_and_an_empty_allowlist_refuses_every_model()
     {
         var database = await ProvisionedDatabaseAsync("llm_production");
         using var keyFile = OperatorKeyFile.Create();
 
-        // The production composition root: every service this package registers, plus whatever adapters
-        // later packages added. Ollama is still a separate roadmap package, so this host has none for
-        // it - and the openai, gemini, anthropic and openrouter slots are asserted below to have one
-        // each, which is what makes this a claim about one slot rather than about the registry being
-        // empty.
+        // The production composition root: every service this package registers, plus the five
+        // adapters the roadmap packages added - llm-ollama-adapter claimed the last slot, so no
+        // slot is left without one. The double this suite drives is absent here, which is what
+        // makes the refusal below a fact about the production registration rather than about a
+        // fixture.
         await using var host = LlmProviderApiHost.StartProduction(database, new FixedTimeProvider(Clock), keyFile.FilePath);
         using var owner = await OwnerClient.CreateAsync(host);
 
@@ -1630,23 +1632,25 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
         var credentialId = await SaveCredentialAsync(owner);
         var evidenceId = (await ReadEvidenceAsync(owner, milestoneId)).Items[0].Id;
 
-        // The catalogue is honest: the slots exist, a credential is configured, and the unimplemented one
-        // has no adapter.
+        // The catalogue is honest: the slots exist, a credential is configured, and every one of
+        // them has an adapter - including ollama, whose descriptor is the real adapter's own.
         using var catalogue = await ReadJsonAsync(await owner.GetAsync("/api/ai/providers"));
         var slot = catalogue.RootElement.GetProperty("supported")
             .EnumerateArray()
             .Single(entry => entry.GetProperty("id").GetString() == ProviderId);
 
         Assert.True(slot.GetProperty("configured").GetBoolean());
-        Assert.False(slot.GetProperty("adapterInstalled").GetBoolean());
-        Assert.Equal(JsonValueKind.Null, slot.GetProperty("capability").ValueKind);
-        Assert.Empty(catalogue.RootElement.GetProperty("usable").EnumerateArray());
+        Assert.True(slot.GetProperty("adapterInstalled").GetBoolean());
+        Assert.Equal(
+            ProviderId,
+            slot.GetProperty("capability").GetProperty("id").GetString());
+        Assert.True(slot.GetProperty("capability").GetProperty("localEndpoint").GetBoolean());
+        Assert.False(slot.GetProperty("capability").GetProperty("requiresCredential").GetBoolean());
 
-        // The registry is no longer empty, and this is the assertion that says so. It is stated here
-        // rather than left implicit because a future reader who finds openai, gemini, anthropic and
-        // openrouter installed must be able to tell whether that was intended: it was, by
-        // llm-openai-adapter, llm-gemini-adapter, llm-anthropic-adapter and llm-openrouter-adapter, and
-        // the one remaining slot is the one still to come.
+        // The registry is full, and this is the assertion that says so. It is stated here rather
+        // than left implicit because a future reader who finds all five slots installed must be able
+        // to tell whether that was intended: it was, one adapter package per slot, and no slot is
+        // the one still to come.
         var installed = catalogue.RootElement.GetProperty("supported")
             .EnumerateArray()
             .Where(entry => entry.GetProperty("adapterInstalled").GetBoolean())
@@ -1655,23 +1659,30 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
             .ToArray();
 
         Assert.Equal(
-            [GenerationProviderIds.Anthropic, GenerationProviderIds.Gemini, GenerationProviderIds.OpenAI, GenerationProviderIds.OpenRouter],
+            [
+                GenerationProviderIds.Anthropic,
+                GenerationProviderIds.Gemini,
+                GenerationProviderIds.Ollama,
+                GenerationProviderIds.OpenAI,
+                GenerationProviderIds.OpenRouter,
+            ],
             installed);
         Assert.Equal(
-            1,
+            0,
             catalogue.RootElement.GetProperty("supported")
                 .EnumerateArray()
                 .Count(entry => !entry.GetProperty("adapterInstalled").GetBoolean()));
 
-        // A settings value cannot reach an adapter, because there is nothing to reach. The same
-        // request that a double-serving host answers 200 for is refused here.
+        // A settings value cannot reach the double, because the double was never registered here -
+        // and it cannot reach the real adapter either, because the production allowlist is empty and
+        // refuses every model before a socket is opened.
         using (var settings = await owner.SendAsync(await owner.Post(
                    "/api/settings/ai",
                    new { providerId = ProviderId, model = KnownModel, credentialRef = credentialId })))
         {
             using var body = JsonDocument.Parse(await settings.Content.ReadAsStringAsync());
             Assert.Equal(HttpStatusCode.UnprocessableEntity, settings.StatusCode);
-            Assert.Equal("provider_not_installed", body.RootElement.GetProperty("code").GetString());
+            Assert.Equal("model_not_supported", body.RootElement.GetProperty("code").GetString());
         }
 
         // And a preview is refused the same way, before a row is written.
@@ -1688,11 +1699,11 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
         {
             using var body = JsonDocument.Parse(await preview.Content.ReadAsStringAsync());
             Assert.Equal(HttpStatusCode.UnprocessableEntity, preview.StatusCode);
-            Assert.Equal("provider_not_installed", body.RootElement.GetProperty("code").GetString());
+            Assert.Equal("model_not_supported", body.RootElement.GetProperty("code").GetString());
         }
 
-        // The credential is untouched and no preview exists. Reporting the absence costs the owner
-        // nothing and changes nothing.
+        // The credential is untouched and no preview exists. Reporting the absence of an accepted
+        // model costs the owner nothing and changes nothing.
         Assert.Equal(0, await CountRowsAsync(database, "generation_previews"));
         Assert.Equal(1, await CountRowsAsync(database, "credentials"));
         Assert.Null(host.Provider);

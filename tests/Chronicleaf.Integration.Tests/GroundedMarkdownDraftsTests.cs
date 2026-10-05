@@ -74,12 +74,13 @@ public sealed class GroundedMarkdownDraftsTests(ChronicleafPostgresFixture postg
     private const string DraftKind = "milestone.grounded-draft";
 
     // ==============================================================================================
-    // The fixture's own guard: the slot this suite's double owns must be one no production adapter
-    // claims. See the host remarks - this is the assertion that stops the suite going quietly blind.
+    // The fixture's own guard: the double this suite drives must be the adapter the application
+    // resolves for its slot. See the host remarks - this is the assertion that stops the suite
+    // going quietly blind.
     // ==============================================================================================
 
     [Fact]
-    public async Task the_slot_this_double_owns_is_claimed_by_no_production_adapter()
+    public async Task the_double_shadows_the_production_adapter_for_the_slot_it_owns()
     {
         var database = await ProvisionedDatabaseAsync("gmd_slot_ownership");
         var summary = SummaryJson(Guid.NewGuid());
@@ -92,14 +93,16 @@ public sealed class GroundedMarkdownDraftsTests(ChronicleafPostgresFixture postg
             provider);
 
         // The delivered resolver is what the service resolves through, so this is a fact about the
-        // production composition root rather than about this fixture. When the roadmap's
-        // llm-ollama-adapter package lands this list grows and this scenario fails - which is the
-        // point. At that moment a double registered for this slot would be shadowed by the real adapter
-        // and every scenario in this file would silently stop testing anything. (llm-anthropic-adapter
-        // already landed and forced the same move once: the double used to own the anthropic slot.)
+        // composition root rather than about this fixture. The roadmap's llm-ollama-adapter package
+        // claimed this slot in production, so a double appended after the production registrations
+        // would be shadowed by the real adapter and every scenario in this file would silently stop
+        // testing anything. (llm-anthropic-adapter already forced the same move once: the double
+        // used to own the anthropic slot.) The host therefore inserts the double first, and the
+        // resolver - which keeps the first adapter per slot - must hand back the double itself.
         //
-        // Read on a host with nothing registered, because the whole question is which slots production
-        // claims; asking the double-bearing host would trivially find this one and prove nothing.
+        // Read on a production host too, because the whole question is which slots production
+        // claims; asking only the double-bearing host would trivially find this one and prove
+        // nothing about the shadowing.
         await using var production = GroundedMarkdownDraftsApiHost.StartProduction(
             database,
             new FixedTimeProvider(Clock),
@@ -107,13 +110,21 @@ public sealed class GroundedMarkdownDraftsTests(ChronicleafPostgresFixture postg
 
         var installedByProduction = production.InstalledAdapters();
 
-        Assert.DoesNotContain(ScriptedDraftProvider.Slot, installedByProduction);
+        Assert.Contains(ScriptedDraftProvider.Slot, installedByProduction);
         Assert.Contains(GenerationProviderIds.OpenAI, installedByProduction);
 
-        // The double is genuinely registered on the other host, so the two statements together mean "this
-        // suite's answers are the ones a draft reaches" rather than "nothing answered at all".
+        // The double is genuinely registered on the other host, and it is the one the resolver
+        // returns for the slot - so the two statements together mean "this suite's answers are the
+        // ones a draft reaches" rather than "nothing answered at all".
         Assert.Equal(ScriptedDraftProvider.Slot, host.Provider!.ProviderId);
         Assert.Contains(ScriptedDraftProvider.Slot, host.InstalledAdapters());
+
+        using var scope = host.Services.CreateScope();
+        var resolved = scope.ServiceProvider
+            .GetRequiredService<Chronicleaf.Application.AI.ILLMProviderResolver>()
+            .Find(ScriptedDraftProvider.Slot);
+
+        Assert.Same(provider, resolved);
     }
 
     // ==============================================================================================
@@ -930,12 +941,14 @@ public sealed class GroundedMarkdownDraftsTests(ChronicleafPostgresFixture postg
         var refused = fixture.PreviewResponse;
         Assert.NotNull(refused);
 
-        // On this host nothing is registered for the slot, so the delivered contract refuses the preview
-        // - and with no preview there is no consent and therefore no draft to ask for. The refusal is the
-        // honest state of a transport nobody has pointed at anything.
+        // On this host the double was never registered, so the scripted answer is unreachable - and
+        // the production adapter that claims the slot since llm-ollama-adapter landed refuses the
+        // scripted model itself, because the production allowlist is empty. Either way there is no
+        // preview, no consent and therefore no draft to ask for, and the refusal names the model
+        // rather than substituting one.
         Assert.Equal(HttpStatusCode.UnprocessableContent, refused!.StatusCode);
         var envelope = JsonDocument.Parse(await refused.Content.ReadAsStringAsync());
-        Assert.Equal("provider_not_installed", envelope.RootElement.GetProperty("code").GetString());
+        Assert.Equal("model_not_supported", envelope.RootElement.GetProperty("code").GetString());
 
         Assert.Equal(0, await CountOperationsAsync(fixture.Database, DraftKind));
         Assert.Equal(0, await CountRowsAsync(fixture.Database, "content_draft_requests"));

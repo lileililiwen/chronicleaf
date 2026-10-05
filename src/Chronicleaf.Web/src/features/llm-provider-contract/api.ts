@@ -164,6 +164,7 @@ export async function createMilestonePreview(
     readonly providerId: string;
     readonly model: string;
     readonly credentialRef: string | null;
+    readonly endpointRef?: string | null;
     readonly evidenceRevision: number;
     readonly selectedEvidenceIds: readonly string[];
   },
@@ -177,6 +178,7 @@ export async function createMilestonePreview(
         providerId: request.providerId,
         model: request.model,
         credentialRef: request.credentialRef,
+        endpointRef: request.endpointRef ?? null,
         evidenceRevision: request.evidenceRevision,
         selectedEvidenceIds: [...request.selectedEvidenceIds],
       },

@@ -1,12 +1,12 @@
 # Chronicleaf handoff
 
-current_spec: html-content-export
+current_spec: content-asset-variants
 
 ## Current state — 2026-10-05
 
-Twenty-five changes implemented, verified and archived, each with exactly two commits (implementation/
-tests/archive, then this HANDOFF-only pointer). `current_spec` selects `html-content-export`, the
-next POST-MVP package in ROADMAP order after `narrative-memory`.
+Twenty-six changes implemented, verified and archived, each with exactly two commits (implementation/
+tests/archive, then this HANDOFF-only pointer). `current_spec` selects `content-asset-variants`, the
+next POST-MVP package in ROADMAP order after `html-content-export`.
 
 | # | Change | Implementation commit | Canonical spec |
 |---|---|---|---|
@@ -35,6 +35,7 @@ next POST-MVP package in ROADMAP order after `narrative-memory`.
 | 23 | `community-compose-release` | `5a40d46` | `openspec/specs/community-compose-release/spec.md` |
 | 24 | `local-git-evidence` | `f7e4a81` | `openspec/specs/local-git-evidence/spec.md` |
 | 25 | `narrative-memory` | `a7d12f4` | `openspec/specs/narrative-memory/spec.md` |
+| 26 | `html-content-export` | `aae5181` | `openspec/specs/html-content-export/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -389,8 +390,18 @@ owner's words; the e2e seed's candidate rows name the two real capture jobs the 
 PNG behind all three. Deployment stays `deployable: false`; there is no remote, no push and no
 publication.
 
-Next: `current_spec` is `html-content-export`, the POST-MVP package ROADMAP orders immediately
-after `narrative-memory` (sanitized portable HTML export on `markdown-review-export`). `local-git-evidence` is archived (`f7e4a81`, canonical spec
+Next: `current_spec` is `content-asset-variants`, the POST-MVP package ROADMAP orders immediately
+after `html-content-export`. `html-content-export` is archived (`aae5181`, canonical spec
+`openspec/specs/html-content-export/spec.md`): sanitized portable HTML export of the approved
+revision through the same approval bindings the Markdown export re-checks (never approved is
+`approval_required`, moved head is `approval_stale`), rendered by the pure
+`HtmlExportAdapter` (fixed allowlist template, embedded CSS, no scripts/frames/event handlers,
+unsafe-protocol links and source image runs shown as escaped characters), packed as a single
+`.html` file or a ZIP with generated `images/image-N.png` paths plus a SHA-256 manifest, with
+a missing approved picture refused as `media_unavailable` 409 rather than served picture-less.
+Read that package's own boundary before extending it, and note the one renderer defect its
+browser coverage found: a special character starting nothing (unclosed `**`) needed an explicit
+single-character advance or the inline loop would spin — the spec now carries that run. `narrative-memory` is archived (`f7e4a81`, canonical spec
 `openspec/specs/local-git-evidence/spec.md`) and its own notes are in the package section above, including
 the registration shape, the two diff numbers and the one registration name a later transport must not
 reuse. `community-compose-release` was the MVP-RELEASE gate and is
@@ -491,6 +502,46 @@ without `--skip-specs`, then make the implementation commit and the HANDOFF-only
 stop. Do not push.
 
 ## Package notes
+
+`html-content-export` is archived (`aae5181`, canonical spec
+`openspec/specs/html-content-export/spec.md`). Read that package's own boundary before extending
+it, and note what it decided that a later reader would otherwise have to rediscover.
+
+**Release evidence (`html-content-export`, commit `aae5181`, all run by the implementer rather
+than taken on report).** `CHRONICLEAF_E2E=1 bash scripts/verify.sh` exit 0 (`GATE_EXIT=0`) with
+the platform-feed stage and twenty-seven filtered stages each asserted to select at least one
+test: 15/15 shell, 24/24 persistence, 23/23 access, 19/19 projects, 12/12 jobs, 9/9 media, 14/14
+evidence, 32/32 vault, 22/22 voice, 26/26 provider contract, 23/23 OpenAI, 24/24 Gemini, 24/24
+Anthropic, 23/23 OpenRouter, 26/26 Ollama, 27/27 GitHub evidence, 18/18 GraphQL enrichment, 21/21
+local Git, 52/52 capture, 18/18 curation, 30/30 drafts, 7/7 timeline, 11/11 review-export, **10/10
+HTML export**, 7/7 narrative memory, 10/10 compose-release, 40/40 release candidates — 567 in
+total. `npm ci`, `tsc` and `vite build` all green. `bash scripts/e2e.sh` green: 65/65 Playwright
+across thirteen database-isolated browser suites (21/21 shell/access/projects/jobs, 3/3 evidence,
+6/6 vault, 4/4 voice, 4/4 providers, 3/3 GitHub, 3/3 capture, 4/4 drafts, 4/4 curation, 3/3
+timeline, 2/2 review-export **with the new sanitized-HTML download assertions**, 5/5 candidates,
+3/3 narrative). `dotnet build --nologo --no-incremental` 0 errors with the same 2 pre-existing
+warnings at HEAD. Name preflight exit 0; `openspec validate --all --strict --no-interactive`
+54/54 before and after the archive, which used no `--skip-specs`.
+
+**Inheritance note.** This package was delivered across two worker passes because the first was
+killed mid-flight and left a substantial uncommitted implementation behind (adapter, service,
+endpoint, panel, 10 backend tests). The second pass verified it as inherited
+(`dotnet build --nologo --no-incremental` 0 errors with the same 2 pre-existing warnings,
+10/10 green on first run, 11/11 on the untouched `markdown-review-export` dependency) and
+completed rather than restarted it: every ticked task was re-verified with real evidence, and
+no inherited defect was found — nothing inherited was rewritten.
+
+**The export is the same approval in a second shape, and the renderer owns nothing.**
+`GET /api/assets/{id}/export?format=html` re-checks every binding the Markdown export
+re-checks through the review package's own `ResolveApprovedAsync` — the HTML path shares it
+rather than redefining it — then reads the approval-covered pictures out of the media store
+and hands the pure `HtmlExportAdapter` a closed snapshot of bytes and pictures: no URL to
+fetch, no id to resolve, so a remote image in the source cannot become a request. Source image
+runs render as their own literal characters, links keep only `http`/`https`/relative
+destinations with `rel="noopener noreferrer"`, and every artifact path and filename is
+generated from the asset id and revision, never from owner text. The audit row names the
+revision and approval in the same vocabulary as the Markdown export, never the prose.
+Deployment stays `deployable: false`; there is no remote, no push and no publication.
 
 `narrative-memory` is archived (`a7d12f4`, canonical spec
 `openspec/specs/narrative-memory/spec.md`). Read that package's own boundary before extending it,

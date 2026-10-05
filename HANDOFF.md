@@ -1,11 +1,11 @@
-current_spec: community-compose-release
-
 # Chronicleaf handoff
 
 ## Current state — 2026-10-05
 
-Twenty-two changes implemented, verified and archived, each with exactly two commits (implementation/
-tests/archive, then this HANDOFF-only pointer):
+Twenty-three changes implemented, verified and archived, each with exactly two commits (implementation/
+tests/archive, then this HANDOFF-only pointer). No `current_spec` remains: `community-compose-release`
+was the MVP-RELEASE gate and every MVP dependency is archived; the changes still listed by
+`openspec list` are POST-MVP, CLOUD or DEMAND-GATED follow-ups with no selected next spec.
 
 | # | Change | Implementation commit | Canonical spec |
 |---|---|---|---|
@@ -31,10 +31,28 @@ tests/archive, then this HANDOFF-only pointer):
 | 20 | `llm-openrouter-adapter` | `c51dbd7` | `openspec/specs/llm-openrouter-adapter/spec.md` |
 | 21 | `llm-ollama-adapter` | `efed7af` | `openspec/specs/llm-ollama-adapter/spec.md` |
 | 22 | `markdown-review-export` | `64d6868` | `openspec/specs/markdown-review-export/spec.md` |
+| 23 | `community-compose-release` | `5a40d46` | `openspec/specs/community-compose-release/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
 after the `background-jobs` deviation below was found, and validated before implementation.
+
+**Release evidence (`community-compose-release`, commit `5a40d46`, all run by the implementer
+rather than taken on report).** `bash scripts/verify.sh` exit 0 with the platform-feed stage,
+twenty-two filtered stages each asserted to select at least one test (15/15 shell, 24/24
+persistence, 23/23 access, 19/19 projects, 12/12 jobs, 9/9 media, 14/14 evidence, 32/32 vault,
+22/22 voice, 26/26 provider contract, 23/23 OpenAI, 24/24 Gemini, 24/24 Anthropic, 23/23
+OpenRouter, 26/26 Ollama, 27/27 GitHub evidence, 52/52 capture, 18/18 curation, 30/30 drafts,
+7/7 timeline, 11/11 review-export, 10/10 compose-release), `npm ci`, `tsc` + `vite build`, all
+green. `bash scripts/verify-community.sh` exit 0 against the real image: two-service bring-up,
+operator migrate plus installation provision, readiness 200/200, fixture smoke (project →
+confirmed milestone → manual evidence → timeline, private capture refused 403 before any job),
+a public capture job failed visibly with `capture_sandbox_unavailable`, restart-identical and
+backup/restore-identical timeline and evidence heads through destroyed volumes. Name preflight
+exit 0; `openspec validate --all --strict --no-interactive` 54/54 before and after the archive,
+which used no `--skip-specs`. `deployable` stays `false`: this host cannot confine a browser
+so screenshot success is unproven here, and the credential-gated live provider smoke was not
+performed. There is no remote, no push and no publication.
 
 ## Platform packages — read this before touching any Platform.* dependency
 
@@ -368,8 +386,17 @@ owner's words; the e2e seed's candidate rows name the two real capture jobs the 
 PNG behind all three. Deployment stays `deployable: false`; there is no remote, no push and no
 publication.
 
-Next: implement `community-compose-release` only. It is the first complete workflow and
-depends on `markdown-review-export` plus all five BYOK adapters, which are all archived.
+Next: no `current_spec` remains. `community-compose-release` was the MVP-RELEASE gate and is
+archived (`5a40d46`, canonical spec `openspec/specs/community-compose-release/spec.md`):
+reproducible two-service Community packaging (application + PostgreSQL on the pinned digest,
+no Redis), operator quickstart, container entrypoint with best-effort capture firewall, and
+complete workflow evidence (GitHub → confirmed Milestone → screenshot → grounded Markdown →
+human approval → export plus Timeline). Read that package's own boundary before extending it,
+and note the two defects it exposed while proving itself: the Dockerfile's build stage had not
+been rebuilt since the leaf projects landed (container publish failed CS0246 while native
+builds stayed green — every earlier container smoke predates the drift), and the application
+port needed to become overridable because a shared daemon runs parallel verifications. The
+remaining active changes are POST-MVP, CLOUD or DEMAND-GATED follow-ups; none is selected.
 `markdown-review-export` is archived (`64d6868`, canonical spec
 `openspec/specs/markdown-review-export/spec.md`): a human edit appends a revision carrying the
 owner's words and invalidates live approvals as `content_edited`; an approval binds the head

@@ -30,13 +30,14 @@ namespace Chronicleaf.Integration.Tests;
 /// over a real key file. Only the provider's <em>answer</em> is the test's.
 /// </para>
 /// <para>
-/// <b>The slot is <c>anthropic</c>, and that choice is load-bearing and asserted.</b> The production
-/// composition root registers a real adapter for <c>openai</c>, and the delivered resolver takes the
-/// <em>first</em> registration for a slot. A double registered for <c>openai</c> would therefore be
-/// shadowed by the real adapter: every scenario in this file would receive a real provider call instead
-/// of its scripted answer, the scripted answer would never be read, and the suite would either fail
-/// loudly or - worse, in a suite that did not assert a call count - pass without having tested anything.
-/// <c>anthropic</c> is a slot no production adapter claims, and
+/// <b>The slot is <c>ollama</c>, and that choice is load-bearing and asserted.</b> The production
+/// composition root registers a real adapter for <c>openai</c>, <c>gemini</c> and <c>anthropic</c>,
+/// and the delivered resolver takes the <em>first</em> registration for a slot. A double registered
+/// for one of those would therefore be shadowed by the real adapter: every scenario in this file would
+/// receive a real provider call instead of its scripted answer, the scripted answer would never be
+/// read, and the suite would either fail loudly or - worse, in a suite that did not assert a call
+/// count - pass without having tested anything.
+/// <c>ollama</c> is a slot no production adapter claims, and
 /// <c>the_slot_this_double_owns_is_claimed_by_no_production_adapter</c> fails the moment a future
 /// adapter package takes it. That test is the guard against this exact defect returning, and it is the
 /// one assertion in this file that exists about the fixture rather than about the product.
@@ -86,7 +87,7 @@ public sealed class GroundedMarkdownDraftsApiHost : WebApplicationFactory<Progra
     /// </summary>
     public ScriptedDraftProvider? Provider => _provider;
 
-    /// <summary>Starts a host with the scripted double as the adapter for the anthropic slot.</summary>
+    /// <summary>Starts a host with the scripted double as the adapter for the ollama slot.</summary>
     public static GroundedMarkdownDraftsApiHost Start(
         string connectionString,
         TimeProvider clock,
@@ -192,7 +193,7 @@ public sealed class GroundedMarkdownDraftsApiHost : WebApplicationFactory<Progra
     /// <remarks>
     /// Read from the delivered resolver, which is the same object the service resolves through. It is
     /// what makes the slot-ownership assertion a fact about the composition root rather than a fact about
-    /// this fixture: a future adapter package that claims <c>anthropic</c> changes what this reports, and
+    /// this fixture: a future adapter package that claims <c>ollama</c> changes what this reports, and
     /// the scenario that reads it fails.
     /// </remarks>
     public IReadOnlyList<string> InstalledAdapters()
@@ -204,7 +205,7 @@ public sealed class GroundedMarkdownDraftsApiHost : WebApplicationFactory<Progra
 }
 
 /// <summary>
-/// The scripted provider the grounded-draft scenarios drive, for the <c>anthropic</c> slot
+/// The scripted provider the grounded-draft scenarios drive, for the <c>ollama</c> slot
 /// (GROUNDED-MARKDOWN-DRAFTS-001/002).
 /// </summary>
 /// <remarks>
@@ -234,7 +235,7 @@ public sealed class ScriptedDraftProvider : ILLMProvider
     /// <summary>
     /// The slot this double serves. A slot no production adapter claims; see the host remarks.
     /// </summary>
-    public const string Slot = GenerationProviderIds.Anthropic;
+    public const string Slot = GenerationProviderIds.Ollama;
 
     private PhaseAnswers _answers;
     private int _summaryCalls;

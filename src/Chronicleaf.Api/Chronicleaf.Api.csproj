@@ -11,14 +11,16 @@
   <ItemGroup>
     <ProjectReference Include="../Chronicleaf.AI/Chronicleaf.AI.csproj" />
     <!--
-      The OpenAI and Gemini transports, pointed at the contract rather than the other way round. They
-      are referenced here because this file is the composition root, and a composition root is the
-      only place allowed to know that a provider exists at all. Chronicleaf.AI.OpenAI and
-      Chronicleaf.AI.Gemini each reference the contract and nothing else in the repository, so adding
-      them here cannot give a transport reach of the vault, the evidence store or the domain records.
+      The OpenAI, Gemini and Anthropic transports, pointed at the contract rather than the other
+      way round. They are referenced here because this file is the composition root, and a
+      composition root is the only place allowed to know that a provider exists at all.
+      Chronicleaf.AI.OpenAI, Chronicleaf.AI.Gemini and Chronicleaf.AI.Anthropic each reference the
+      contract and nothing else in the repository, so adding them here cannot give a transport reach
+      of the vault, the evidence store or the domain records.
     -->
     <ProjectReference Include="../Chronicleaf.AI/Providers/OpenAI/Chronicleaf.AI.OpenAI.csproj" />
     <ProjectReference Include="../Chronicleaf.AI/Providers/Gemini/Chronicleaf.AI.Gemini.csproj" />
+    <ProjectReference Include="../Chronicleaf.AI/Providers/Anthropic/Chronicleaf.AI.Anthropic.csproj" />
     <ProjectReference Include="../Chronicleaf.Application/Chronicleaf.Application.csproj" />
     <ProjectReference Include="../Chronicleaf.Core/Chronicleaf.Core.csproj" />
     <ProjectReference Include="../Chronicleaf.Infrastructure/Chronicleaf.Infrastructure.csproj" />

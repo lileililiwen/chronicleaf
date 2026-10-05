@@ -93,9 +93,10 @@ public sealed class GroundedMarkdownDraftsTests(ChronicleafPostgresFixture postg
 
         // The delivered resolver is what the service resolves through, so this is a fact about the
         // production composition root rather than about this fixture. When the roadmap's
-        // llm-anthropic-adapter package lands this list grows and this scenario fails - which is the
+        // llm-ollama-adapter package lands this list grows and this scenario fails - which is the
         // point. At that moment a double registered for this slot would be shadowed by the real adapter
-        // and every scenario in this file would silently stop testing anything.
+        // and every scenario in this file would silently stop testing anything. (llm-anthropic-adapter
+        // already landed and forced the same move once: the double used to own the anthropic slot.)
         //
         // Read on a host with nothing registered, because the whole question is which slots production
         // claims; asking the double-bearing host would trivially find this one and prove nothing.

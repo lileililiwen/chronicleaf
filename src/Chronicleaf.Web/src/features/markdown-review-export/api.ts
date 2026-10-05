@@ -16,6 +16,9 @@ import type { ApiFailure } from '../background-jobs/types';
  * against a stale head would fork the text the approval was bound to.
  */
 
+/** The two shapes the export route serves for one approved revision. */
+export type ExportFormat = 'markdown' | 'html';
+
 /** Reads the review state of one asset. */
 export async function readReview(assetId: string, signal?: AbortSignal): Promise<ContentReview> {
   return send<ContentReview>(`/api/assets/${encodeURIComponent(assetId)}/review`, {
@@ -86,19 +89,25 @@ export async function unapproveAsset(
 }
 
 /**
- * Downloads the approved revision's exact bytes.
+ * Downloads the approved revision's exact bytes, in the chosen shape.
  *
- * The server answers with the stored bytes as a Markdown attachment, or with a 409 naming
- * `approval_required` or `approval_stale`. This client never renders the answer as a document:
- * it hands the bytes to a download, so markup in them stays inert on the way out as well.
+ * The server answers with the stored bytes as a Markdown attachment, or with the approved
+ * revision rendered through the fixed sanitizing template as an HTML file (or a ZIP holding it
+ * with the approval-covered pictures and their checksum manifest) - or with a 409 naming
+ * `approval_required`, `approval_stale` or `media_unavailable`. This client never renders the
+ * answer as a document: it hands the bytes to a download, so markup in them stays inert on the
+ * way out as well.
  */
 export async function exportAsset(
   assetId: string,
   revision: number | null,
+  format: ExportFormat = 'markdown',
   signal?: AbortSignal,
 ): Promise<{ readonly fileName: string; readonly bytes: Blob }> {
-  const query = revision === null ? 'format=markdown' : `format=markdown&revision=${revision}`;
-  const headers: Record<string, string> = { Accept: 'text/markdown' };
+  const revisionQuery = revision === null ? '' : `&revision=${revision}`;
+  const query = `format=${format}${revisionQuery}`;
+  const headers: Record<string, string> =
+    format === 'html' ? { Accept: 'text/html, application/zip' } : { Accept: 'text/markdown' };
 
   const antiforgery = await readAntiforgeryValue();
   headers[antiforgery.headerName] = antiforgery.token;
@@ -115,7 +124,7 @@ export async function exportAsset(
   }
 
   return {
-    fileName: fileNameOf(response),
+    fileName: fileNameOf(response, format),
     bytes: await response.blob(),
   };
 }
@@ -196,9 +205,9 @@ async function toFailure(response: Response): Promise<ApiFailure> {
   }
 }
 
-function fileNameOf(response: Response): string {
+function fileNameOf(response: Response, format: ExportFormat): string {
   const disposition = response.headers.get('content-disposition') ?? '';
   const match = /filename="?([^"]+)"?/.exec(disposition);
 
-  return match?.[1] ?? 'chronicleaf-export.md';
+  return match?.[1] ?? (format === 'html' ? 'chronicleaf-export.html' : 'chronicleaf-export.md');
 }

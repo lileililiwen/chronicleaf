@@ -221,4 +221,29 @@ public interface IContentReviewService
         string? format,
         long? revision,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Serves the approved revision as a sanitized portable HTML artifact, only while a live
+    /// approval authorizes it (HTML-CONTENT-EXPORT-001/002).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The authorization is the review package's own: the same live approval, the same body hash,
+    /// the same evidence head and the same media selection the Markdown export re-checks. This
+    /// method reuses that check rather than redefining it, then renders through the export
+    /// adapter. An export serves the approved revision's exact bytes in a second shape - it never
+    /// approves, never edits and never publishes.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ResourceNotFoundException">The asset is absent or in another scope (404).</exception>
+    /// <exception cref="ApprovalRequiredException">Nothing live authorizes an export (409).</exception>
+    /// <exception cref="ApprovalStaleException">The approval no longer describes the stored state (409).</exception>
+    /// <exception cref="MediaUnavailableException">An approved picture's bytes are gone (409).</exception>
+    /// <exception cref="Media.UnsupportedMediaTypeException">An approved picture is not a type
+    /// this template packs (415).</exception>
+    Task<ApprovedHtmlExport> ExportHtmlAsync(
+        OwnerScope owner,
+        Guid assetId,
+        long? revision,
+        CancellationToken cancellationToken = default);
 }

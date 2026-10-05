@@ -158,6 +158,12 @@ public static class ApiErrorStatus
         Content.ReviewError.ApprovalStale => 409,
         Content.ReviewError.ApprovalBlocked => 422,
 
+        // The html-content-export package's code. Additive in the same way: 409 for an approved
+        // picture whose bytes are gone, because nothing is wrong with the request and a 422 would
+        // invite a client to resend bytes that cannot be completed - the remedy is to reselect or
+        // re-capture the picture and approve again, never a picture-less artifact.
+        Content.HtmlExportError.MediaUnavailable => 409,
+
         // The narrative-memory package's codes. Additive in the same way. 422 for a context that
         // does not fit the byte budget without losing a pinned fact, because the remedy is to
         // narrow the cutoff or shorten entries - the same shape as every other semantic refusal

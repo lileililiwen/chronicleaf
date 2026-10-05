@@ -438,6 +438,17 @@ public sealed class ApiErrorMiddleware(
                         approvalBlocked.FieldErrors),
                     LogLevel.Information);
 
+            // HTML-CONTENT-EXPORT-001. Written here for the same reason as every other feature
+            // package's refusal: the content package raises it and this middleware is still the
+            // only place an envelope is written. The message is authored in the content package
+            // and names no prose and no media id: a picture whose bytes are gone is a conflict
+            // with the approval's own binding rather than with another writer, so the remedy is
+            // to reselect the picture and approve again rather than to retry the export.
+            case MediaUnavailableException mediaGone:
+                return (
+                    Envelope.Create(HtmlExportError.MediaUnavailable, mediaGone.Message, traceId),
+                    LogLevel.Information);
+
             // GITHUB-RELEASE-CANDIDATES-001/002. Written here for the same reason as every other feature
             // package's refusals: this package raises them and this middleware is still the only place an
             // envelope is written. The messages are authored in the candidate package and name no

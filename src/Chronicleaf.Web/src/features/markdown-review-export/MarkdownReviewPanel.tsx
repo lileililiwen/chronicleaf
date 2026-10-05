@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { readDraft, readEvidenceHead } from '../grounded-markdown-drafts/api';
 import type { ContentAsset as DraftAsset } from '../grounded-markdown-drafts/types';
 import { approveAsset, editAsset, exportAsset, readReview, unapproveAsset } from './api';
+import type { ExportFormat } from './api';
 import { renderSafeMarkdown } from './sanitize';
 import { ReviewApiError, type ContentReview } from './types';
 
@@ -25,8 +26,10 @@ import { ReviewApiError, type ContentReview } from './types';
  *   builds React text nodes and http/https anchors only. A script tag or an unsafe link in the
  *   source is visible as characters and reachable as nothing.
  * - <b>An export is a download of approved bytes, never a publication.</b> The server answers
- *   with the exact stored bytes as a Markdown attachment, or with a 409 naming what moved. This
- *   panel hands those bytes to a download and renders nothing from them.
+ *   with the exact stored bytes as a Markdown attachment, or with the same revision rendered
+ *   through the fixed sanitizing template as an HTML file - or a ZIP holding it with the
+ *   approval-covered pictures and their checksum manifest - or with a 409 naming what moved.
+ *   This panel hands those bytes to a download and renders nothing from them.
  */
 export function MarkdownReviewPanel({
   milestoneId,
@@ -162,7 +165,7 @@ export function MarkdownReviewPanel({
     }
   }, [draft, load]);
 
-  const download = useCallback(async () => {
+  const download = useCallback(async (format: ExportFormat) => {
     if (draft?.assetId == null) {
       return;
     }
@@ -171,7 +174,7 @@ export function MarkdownReviewPanel({
     setExportFailure(null);
 
     try {
-      const answer = await exportAsset(draft.assetId, null);
+      const answer = await exportAsset(draft.assetId, null, format);
       const url = URL.createObjectURL(answer.bytes);
       const anchor = document.createElement('a');
       anchor.href = url;
@@ -342,8 +345,9 @@ export function MarkdownReviewPanel({
             <h5>Preview</h5>
             <p className="view__hint" data-testid="review-preview-hint">
               Rendered from exactly the text above, with raw markup shown as characters rather
-              than run. What you see is what the next revision would carry - and what an export
-              would download byte for byte.
+              than run. What you see is what the next revision would carry - and what a Markdown
+              export would download byte for byte. An HTML export renders the same text through
+              the fixed sanitizing template instead.
             </p>
             <div className="review__preview" data-testid="review-preview-body">
               {renderSafeMarkdown(dirty ? body : (draft.bodyMarkdown ?? ''))}
@@ -393,10 +397,19 @@ export function MarkdownReviewPanel({
               type="button"
               className="action"
               disabled={exporting || !approved}
-              onClick={() => void download()}
+              onClick={() => void download('markdown')}
               data-testid="review-export"
             >
               {exporting ? 'Exporting…' : 'Export approved Markdown'}
+            </button>
+            <button
+              type="button"
+              className="action"
+              disabled={exporting || !approved}
+              onClick={() => void download('html')}
+              data-testid="review-export-html"
+            >
+              {exporting ? 'Exporting…' : 'Export approved HTML'}
             </button>
             {!approved ? (
               <span className="view__hint" data-testid="review-export-hint">
@@ -450,6 +463,10 @@ function describeFailure(failure: ReviewApiError): string {
     const detail = failure.messageFor('approval');
 
     return `This revision carries findings that must be corrected (${failure.code}).${detail === null ? '' : ` ${detail}`}`;
+  }
+
+  if (failure.isMediaUnavailable) {
+    return `An approved picture is no longer available (${failure.code}). Re-select or re-capture the picture and approve the revision again.`;
   }
 
   if (failure.isRevisionConflict) {

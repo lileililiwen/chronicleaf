@@ -215,6 +215,16 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
     }
 
     const next = nextSpecial(rest);
+
+    if (next === 0) {
+      // A special character that starts nothing - a lone `*`, an unclosed `**`, a `[` with no
+      // partner - is one literal character. Without this the loop slices zero characters and
+      // spins on the same position forever, hanging the tab on whatever the owner just typed.
+      pushText(rest.slice(0, 1));
+      rest = rest.slice(1);
+      continue;
+    }
+
     pushText(rest.slice(0, next));
     rest = rest.slice(next);
   }

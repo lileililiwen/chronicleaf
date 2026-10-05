@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using Chronicleaf.Application.Common;
 using Chronicleaf.Application.Evidence;
+using Chronicleaf.Application.Media;
 using Chronicleaf.Application.Milestones;
 using Chronicleaf.Application.Persistence;
 using Chronicleaf.Application.Voice;
@@ -43,6 +44,8 @@ public sealed class ContentReviewService(
     IContentReviewStore reviews,
     IEvidenceStore evidence,
     IVoiceProfileService voice,
+    IMediaStore media,
+    IContentExportAdapter htmlExport,
     IAuditWriter audit,
     IUnitOfWork unitOfWork,
     TimeProvider clock,
@@ -60,8 +63,11 @@ public sealed class ContentReviewService(
     /// <summary>The audit action recorded when an approved revision is exported.</summary>
     public const string ExportedAction = "content.review.exported";
 
-    /// <summary>The only export format this package serves.</summary>
+    /// <summary>The only Markdown export format this package serves.</summary>
     public const string MarkdownFormat = "markdown";
+
+    /// <summary>The sanitized HTML export format this package serves.</summary>
+    public const string HtmlFormat = "html";
 
     /// <inheritdoc />
     public async Task<EditedContentRevision> EditAsync(
@@ -490,9 +496,168 @@ public sealed class ContentReviewService(
         {
             throw new ValidationFailedException(
                 "format",
-                "This package serves Markdown. Name format=markdown.");
+                "This package serves Markdown and HTML. Name format=markdown or format=html.");
         }
 
+        var resolved = await ResolveApprovedAsync(owner, assetId, revision, cancellationToken).ConfigureAwait(false);
+        var asset = resolved.Asset;
+        var live = resolved.Approval;
+        var stored = resolved.Revision;
+
+        // The audit row names the revision and the approval, never the prose: an export is a
+        // record that bytes left the building, not a copy of them.
+        await unitOfWork.ExecuteAsync(
+            token =>
+            {
+                audit.Record(new DomainAudit(
+                    owner.ActorId,
+                    ExportedAction,
+                    asset.Id,
+                    stored.Revision,
+                    $"revision={stored.Revision.ToString(CultureInfo.InvariantCulture)};"
+                    + $"approval={live.Id:D};"));
+                return Task.FromResult(true);
+            },
+            cancellationToken).ConfigureAwait(false);
+
+        logger.LogInformation(
+            "Content asset {AssetId} revision {Revision} exported.",
+            assetId,
+            stored.Revision);
+
+        return new ApprovedContentExport(
+            $"chronicleaf-{assetId:N}-r{stored.Revision}.md",
+            stored.BodyMarkdown,
+            stored.Revision,
+            stored.BodyHash);
+    }
+
+    /// <inheritdoc />
+    public async Task<ApprovedHtmlExport> ExportHtmlAsync(
+        OwnerScope owner,
+        Guid assetId,
+        long? revision,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+
+        if (assetId == Guid.Empty)
+        {
+            throw new ValidationFailedException("assetId", "An asset id is required.");
+        }
+
+        // The authorization below is the review package's own check, shared with the Markdown
+        // export: the approved bytes, the evidence head and the selected pictures must still be
+        // exactly what the live approval describes. Only the rendering is new.
+        var resolved = await ResolveApprovedAsync(owner, assetId, revision, cancellationToken).ConfigureAwait(false);
+        var asset = resolved.Asset;
+        var live = resolved.Approval;
+        var stored = resolved.Revision;
+
+        // The pictures the approval covers, with the bytes the media store holds right now. A
+        // picture whose bytes are gone ends the export with media_unavailable: the approval bound
+        // pictures the artifact would have to carry, so serving the text without them would be a
+        // silent claim of completeness.
+        var pictures = new List<ApprovedExportPicture>();
+        foreach (var (mediaId, caption) in SelectedPictures(resolved.Head))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            MediaContent content;
+            try
+            {
+                content = await media.OpenAsync(owner, mediaId, cancellationToken).ConfigureAwait(false);
+            }
+            catch (MediaNotFoundException)
+            {
+                throw new MediaUnavailableException();
+            }
+
+            await using (content.ConfigureAwait(false))
+            {
+                if (!string.Equals(content.Ref.MediaType, MediaTypes.Png, StringComparison.Ordinal))
+                {
+                    throw new UnsupportedMediaTypeException();
+                }
+
+                var bytes = await ReadBoundedAsync(
+                    content.Content, HtmlExportAdapter.MaxArchiveBytes, cancellationToken).ConfigureAwait(false);
+
+                pictures.Add(new ApprovedExportPicture(mediaId, caption, content.Ref.MediaType, bytes));
+            }
+        }
+
+        var summary = GroundedSummary.FromCanonicalJson(stored.SummaryJson)
+            ?? throw UnreadableContentRow();
+
+        var snapshot = new ApprovedAssetSnapshot(
+            asset.Id,
+            stored.Revision,
+            summary.MilestoneTitle,
+            stored.BodyMarkdown,
+            stored.BodyHash,
+            stored.EvidenceRevision,
+            pictures.OrderBy(picture => picture.MediaId).ToList());
+
+        var artifact = await htmlExport.ExportAsync(snapshot, cancellationToken).ConfigureAwait(false);
+
+        // The same audit vocabulary as the Markdown export, with the shape named: an export is a
+        // record that bytes left the building, not a copy of them.
+        await unitOfWork.ExecuteAsync(
+            token =>
+            {
+                audit.Record(new DomainAudit(
+                    owner.ActorId,
+                    ExportedAction,
+                    asset.Id,
+                    stored.Revision,
+                    $"revision={stored.Revision.ToString(CultureInfo.InvariantCulture)};"
+                    + $"approval={live.Id:D};format=html;"));
+                return Task.FromResult(true);
+            },
+            cancellationToken).ConfigureAwait(false);
+
+        logger.LogInformation(
+            "Content asset {AssetId} revision {Revision} exported as HTML.",
+            assetId,
+            stored.Revision);
+
+        return new ApprovedHtmlExport(
+            artifact.FileName,
+            artifact.MediaType,
+            artifact.Bytes,
+            artifact.Sha256);
+    }
+
+    // ==============================================================================================
+    // Helpers.
+    // ==============================================================================================
+
+    /// <summary>
+    /// An approved export both shapes share: the asset, the live approval authorizing it, the
+    /// stored revision it names and the evidence head that revision is grounded in.
+    /// </summary>
+    private sealed record ResolvedApprovedExport(
+        ContentAsset Asset,
+        ContentApproval Approval,
+        ContentRevision Revision,
+        EvidenceBundle Head);
+
+    /// <summary>
+    /// Whether a live approval still describes the stored state, for both export shapes.
+    /// </summary>
+    /// <remarks>
+    /// This is the Markdown export's own check, moved intact: never approved is
+    /// <c>approval_required</c>, once approved but moved is <c>approval_stale</c>, and a revision
+    /// that is not the approved one exports nothing. The HTML export reuses it rather than
+    /// redefining it, so the two shapes cannot disagree about what is authorized.
+    /// </remarks>
+    private async Task<ResolvedApprovedExport> ResolveApprovedAsync(
+        OwnerScope owner,
+        Guid assetId,
+        long? revision,
+        CancellationToken cancellationToken)
+    {
         var asset = await assets.FindAsync(owner.ScopeId, assetId, cancellationToken).ConfigureAwait(false)
             ?? throw new ResourceNotFoundException("content asset");
 
@@ -553,37 +718,36 @@ public sealed class ContentReviewService(
             throw new ApprovalStaleException("media");
         }
 
-        // The audit row names the revision and the approval, never the prose: an export is a
-        // record that bytes left the building, not a copy of them.
-        await unitOfWork.ExecuteAsync(
-            token =>
-            {
-                audit.Record(new DomainAudit(
-                    owner.ActorId,
-                    ExportedAction,
-                    asset.Id,
-                    stored.Revision,
-                    $"revision={stored.Revision.ToString(CultureInfo.InvariantCulture)};"
-                    + $"approval={live.Id:D};"));
-                return Task.FromResult(true);
-            },
-            cancellationToken).ConfigureAwait(false);
-
-        logger.LogInformation(
-            "Content asset {AssetId} revision {Revision} exported.",
-            assetId,
-            stored.Revision);
-
-        return new ApprovedContentExport(
-            $"chronicleaf-{assetId:N}-r{stored.Revision}.md",
-            stored.BodyMarkdown,
-            stored.Revision,
-            stored.BodyHash);
+        return new ResolvedApprovedExport(asset, live, stored, head);
     }
 
-    // ==============================================================================================
-    // Helpers.
-    // ==============================================================================================
+    /// <summary>
+    /// Reads a media stream up to the archive bound. A picture larger than the whole archive could
+    /// ever be is refused before its bytes are all held, rather than after.
+    /// </summary>
+    private static async Task<byte[]> ReadBoundedAsync(
+        Stream content,
+        long limit,
+        CancellationToken cancellationToken)
+    {
+        using var buffered = new MemoryStream();
+        var chunk = new byte[81920];
+        long total = 0;
+        int read;
+
+        while ((read = await content.ReadAsync(chunk, cancellationToken).ConfigureAwait(false)) > 0)
+        {
+            total += read;
+            if (total > limit)
+            {
+                throw new PayloadTooLargeException(limit);
+            }
+
+            buffered.Write(chunk, 0, read);
+        }
+
+        return buffered.ToArray();
+    }
 
     /// <summary>
     /// Refuses an approval while deterministic findings remain on the stored revision.

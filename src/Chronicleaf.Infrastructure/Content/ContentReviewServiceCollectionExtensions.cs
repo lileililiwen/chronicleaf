@@ -26,6 +26,7 @@ public static class ContentReviewServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddScoped<IContentReviewStore, PostgresContentReviewStore>();
+        services.AddSingleton<IContentExportAdapter, HtmlExportAdapter>();
         services.AddScoped<IContentReviewService, ContentReviewService>();
 
         return services;

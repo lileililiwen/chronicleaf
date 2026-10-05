@@ -31,6 +31,14 @@ namespace Chronicleaf.Api.Content;
 /// naming both revisions; there is no form whose default submission could approve, and the panel
 /// renders its approve control as a button that only a press can reach.
 /// </para>
+/// <para>
+/// <b>HTML is the same approval in a second shape.</b> <c>format=html</c> on the export route
+/// re-checks every binding the Markdown export re-checks - never approved is
+/// <c>approval_required</c>, once approved but moved is <c>approval_stale</c> - and then renders
+/// the approved bytes through the fixed sanitizing template: a single HTML file, or a ZIP with
+/// the approval-covered pictures and their checksum manifest. A picture whose bytes are gone is
+/// <c>media_unavailable</c>, never a silently picture-less file.
+/// </para>
 /// </remarks>
 public static class ContentReviewEndpoints
 {
@@ -173,6 +181,15 @@ public static class ContentReviewEndpoints
         var format = context.Request.Query["format"].FirstOrDefault();
         var revisionText = context.Request.Query["revision"].FirstOrDefault();
 
+        // HTML is the same approval in a second shape, served by its own use case: the Markdown
+        // export below refuses any format but its own, so the branch happens here rather than
+        // behind a parameter neither shape owns.
+        if (string.Equals((format ?? "markdown").Trim(), "html", StringComparison.OrdinalIgnoreCase))
+        {
+            return await ExportHtmlAsync(assetId, context, reviews, access, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         long? revision = null;
         if (revisionText is not null)
         {
@@ -199,6 +216,42 @@ public static class ContentReviewEndpoints
             Encoding.UTF8.GetBytes(export.BodyMarkdown),
             "text/markdown; charset=utf-8",
             export.FileName);
+    }
+
+    private static async Task<IResult> ExportHtmlAsync(
+        Guid assetId,
+        HttpContext context,
+        IContentReviewService reviews,
+        IOwnerAccessService access,
+        CancellationToken cancellationToken)
+    {
+        var owner = await OwnerScopeAsync(context, access, cancellationToken).ConfigureAwait(false);
+
+        var revisionText = context.Request.Query["revision"].FirstOrDefault();
+
+        long? revision = null;
+        if (revisionText is not null)
+        {
+            if (!long.TryParse(revisionText, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed) ||
+                parsed < 1)
+            {
+                throw new ValidationFailedException(
+                    "revision",
+                    "A revision is a stored version number, from 1.");
+            }
+
+            revision = parsed;
+        }
+
+        var export = await reviews
+            .ExportHtmlAsync(owner, assetId, revision, cancellationToken)
+            .ConfigureAwait(false);
+
+        // The approved revision rendered through the fixed sanitizing template, as an attachment
+        // the owner chose to download: a single HTML file, or a ZIP holding the HTML, the
+        // approval-covered pictures and their checksum manifest. Never a public page and never an
+        // upstream call, under the same approval the Markdown export re-checks.
+        return Results.File(export.Bytes, export.ContentType, export.FileName);
     }
 
     /// <summary>

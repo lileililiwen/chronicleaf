@@ -464,6 +464,19 @@ else
   # real API host, with the reviewed draft produced by a real generation job behind the delivered
   # provider seam.
   step "markdown review export tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~MarkdownReviewExportTests"
+  # HTML-CONTENT-EXPORT-001/002. That an approved asset exports with its text and its
+  # allowlisted pictures as a checksummed ZIP whose manifest matches the packed bytes; that
+  # script, remote and event-handler markup produce no executable code while staying visible as
+  # characters; that a missing approved picture is a 409 media_unavailable rather than a
+  # silently picture-less file; that the single-file shape carries the body hash and template
+  # receipt; that a cancelled export returns no partial archive; that traversal text cannot
+  # reach an archive path or a filename; that never-approved is approval_required and edited is
+  # approval_stale under the same bindings the Markdown export re-checks; and that an oversized
+  # archive is refused before packing - all proven against the same real disposable PostgreSQL
+  # through the real API host, with the reviewed draft produced by a real generation job behind
+  # the delivered provider seam and the pictures by a real capture job behind the delivered
+  # browser seam.
+  step "html content export tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~HtmlContentExportTests"
   # NARRATIVE-MEMORY-001/002. That SQLite and PostgreSQL history recorded before a refresh lands
   # in the summary as attributed transition lines citing owned evidence ids without reintroducing
   # the project as new; that missing feedback reads as unknown rather than invented users; that

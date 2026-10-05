@@ -18,7 +18,8 @@ import { expect, test, type Download, type Page } from '@playwright/test';
  * revision-bound approval and its byte-exact download - and is **not** evidence that any
  * provider can be called or that a draft was generated on this host. The .NET suite is where a
  * real provider answer flows through generation into review; this one is where a person reads,
- * edits, approves and downloads the result.
+ * edits, approves and downloads the result - in both shapes the route serves, Markdown bytes
+ * and sanitized HTML.
  */
 const ACCESS_TOKEN = process.env.CHRONICLEAF_E2E_ACCESS_TOKEN;
 
@@ -76,13 +77,19 @@ test('a stored draft is reviewed, edited, approved and exported as exact bytes',
   await expect(panel.getByTestId('review-approve')).toHaveAttribute('type', 'button');
 
   // An edit appends a revision rather than rewriting one. The editor starts on the stored
-  // text, and saving stores the owner's words as revision 2.
+  // text, and saving stores the owner's words as revision 2. The unclosed bold run stays
+  // literal characters: a special character that starts nothing must never hang the preview.
   const editor = panel.getByTestId('review-body');
   await expect(editor).toHaveValue(/The pipeline now reproduces/);
-  await editor.fill(`${await editor.inputValue()}\n\nA human correction, in the owner's own words.\n`);
+  await editor.fill(
+    `${await editor.inputValue()}\n\nA human correction, in the owner's own words.\n\n**unclosed bold stays text\n`,
+  );
   await panel.getByTestId('review-save').click();
   await expect(panel.getByTestId('review-revision')).toContainText('Revision 2');
   await expect(panel.getByTestId('review-status')).toHaveText('draft');
+  await expect(panel.getByTestId('review-preview-body')).toContainText(
+    '**unclosed bold stays text',
+  );
 
   // The approval names the revision that was read. The export below downloads exactly those
   // bytes, so the text is captured here rather than trusted from the editor afterwards.
@@ -94,6 +101,21 @@ test('a stored draft is reviewed, edited, approved and exported as exact bytes',
   await panel.getByTestId('review-export').click();
   const served = await readDownload(await download);
   expect(served).toBe(approvedText);
+
+  // The same approval in the second shape: a sanitized HTML file carrying the approved text
+  // as escaped characters rather than runnable markup.
+  const htmlDownload = page.waitForEvent('download');
+  await panel.getByTestId('review-export-html').click();
+  const htmlFile = await htmlDownload;
+  expect(htmlFile.suggestedFilename()).toMatch(/\.html$/);
+  const html = await readDownload(htmlFile);
+  expect(html).toContain('<!DOCTYPE html>');
+  expect(html).toContain('chronicleaf-template-version');
+  expect(html).toContain('A human correction, in the owner&#39;s own words.');
+  expect(html).toContain('&lt;b&gt;not bold&lt;/b&gt;');
+  expect(html).toContain('**unclosed bold stays text');
+  expect(html).not.toContain('<script');
+  expect(html).not.toContain('href="javascript');
 
   // Editing after approval ends it: the status returns to invalidated, the export control
   // disables itself, and the approval cannot be re-used for the new head.

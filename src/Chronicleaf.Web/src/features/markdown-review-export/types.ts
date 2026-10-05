@@ -84,6 +84,11 @@ export class ReviewApiError extends Error {
     return this.code === 'revision_conflict';
   }
 
+  /** An approved picture's bytes are gone. Re-select or re-capture it and approve again. */
+  get isMediaUnavailable(): boolean {
+    return this.code === 'media_unavailable';
+  }
+
   /** The first message recorded for a field, for showing next to that field. */
   messageFor(field: string): string | null {
     return this.fieldErrors[field]?.[0] ?? null;

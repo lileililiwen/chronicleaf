@@ -128,6 +128,16 @@ public static class ApiErrorStatus
         Content.ContentError.MilestoneNotConfirmed => 422,
         Content.ContentError.NoGrounding => 422,
 
+        // The markdown-review-export package's codes. Additive in the same way. 409 for an export
+        // with no live approval and for an approval that no longer describes the stored revision,
+        // the evidence head or the pictures: nothing is wrong with the request, and a 422 would
+        // invite a client to resend bytes that can no longer be authorized. 422 for a revision
+        // that carries deterministic findings, because the remedy is to correct the text - the same
+        // shape as every other semantic refusal in this file.
+        Content.ReviewError.ApprovalRequired => 409,
+        Content.ReviewError.ApprovalStale => 409,
+        Content.ReviewError.ApprovalBlocked => 422,
+
         _ => 500,
     };
 }

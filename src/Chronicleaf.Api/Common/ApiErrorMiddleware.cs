@@ -360,6 +360,33 @@ public sealed class ApiErrorMiddleware(
                     Envelope.Create(ContentError.NoGrounding, noGrounding.Message, traceId),
                     LogLevel.Information);
 
+            // MARKDOWN-REVIEW-EXPORT-001/002. Written here for the same reason as every other
+            // feature package's refusals: this package raises them and this middleware is still
+            // the only place an envelope is written. The messages are authored in the content
+            // package and name no prose, no claim and no evidence text - a stale approval says
+            // which binding moved and a blocked one names the rules, and neither echoes a stored
+            // value. The 409s are conflicts with the record's own state rather than with another
+            // writer: nothing is wrong with the request, and a 422 would invite a client to
+            // resend bytes that can no longer be authorized.
+            case ApprovalRequiredException approvalRequired:
+                return (
+                    Envelope.Create(ReviewError.ApprovalRequired, approvalRequired.Message, traceId),
+                    LogLevel.Information);
+
+            case ApprovalStaleException approvalStale:
+                return (
+                    Envelope.Create(ReviewError.ApprovalStale, approvalStale.Message, traceId),
+                    LogLevel.Information);
+
+            case ApprovalBlockedException approvalBlocked:
+                return (
+                    Envelope.Create(
+                        ReviewError.ApprovalBlocked,
+                        approvalBlocked.Message,
+                        traceId,
+                        approvalBlocked.FieldErrors),
+                    LogLevel.Information);
+
             case BadHttpRequestException badRequest when badRequest.StatusCode == StatusCodes.Status413PayloadTooLarge:
                 return (
                     Envelope.Create(Envelope.PayloadTooLarge, "The request body is too large.", traceId),

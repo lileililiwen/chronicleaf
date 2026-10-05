@@ -11,6 +11,7 @@ import {
 import { GitHubConnectionPanel } from '../github-evidence/GitHubConnectionPanel';
 import { GitHubSyncPanel } from '../github-evidence/GitHubSyncPanel';
 import { GroundedMarkdownDraftPanel } from '../grounded-markdown-drafts/GroundedMarkdownDraftPanel';
+import { MarkdownReviewPanel } from '../markdown-review-export/MarkdownReviewPanel';
 import { MilestoneEvidencePanel } from '../milestone-evidence/MilestoneEvidencePanel';
 import { LlmProviderArea } from '../llm-provider-contract/LlmProviderArea';
 import { ProjectTimeline } from '../milestone-timeline/ProjectTimeline';
@@ -399,6 +400,20 @@ function MilestoneRow({
           status. Human editing and approval are the review package's, bound to a revision and a body
           hash. */}
       <GroundedMarkdownDraftPanel
+        milestoneId={milestone.id}
+        milestoneTitle={milestone.title}
+        archived={archived}
+        confirmed={milestone.status === 'confirmed'}
+      />
+
+      {/* MARKDOWN-REVIEW-EXPORT-001/002. Human editing, approval and export of exactly that
+          draft. It sits under the draft panel because it consumes that panel's read contract -
+          the stored body, its claims and both finding lists - and adds the three things the
+          draft panel deliberately has not: an editor that appends human revisions, an approval
+          bound to a revision and a body hash, and an export that downloads approved bytes as a
+          file. The preview renders the text as inert characters rather than as a document, and
+          the approve control is a button only a press can reach. */}
+      <MarkdownReviewPanel
         milestoneId={milestone.id}
         milestoneTitle={milestone.title}
         archived={archived}

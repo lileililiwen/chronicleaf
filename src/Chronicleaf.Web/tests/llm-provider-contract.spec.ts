@@ -77,9 +77,16 @@ test('a new installation lists every provider slot and admits that none can be c
     await expect(notice).toContainText(
       'none of the 5 provider slots this build knows about has an adapter installed',
     );
+  } else if (installed.length === 1) {
+    await expect(notice).toContainText(`an adapter is installed for ${installed[0].id}`);
   } else {
+    // The panel names one adapter with "an adapter is installed for" and several with the
+    // plural "adapters are installed for" followed by the list. A page that kept the singular
+    // for five adapters would read as though only one were installed, so the plural names
+    // every installed slot instead of repeating the singular per slot.
+    await expect(notice).toContainText('adapters are installed for');
     for (const slot of installed) {
-      await expect(notice).toContainText(`an adapter is installed for ${slot.id}`);
+      await expect(notice).toContainText(slot.id);
     }
   }
 

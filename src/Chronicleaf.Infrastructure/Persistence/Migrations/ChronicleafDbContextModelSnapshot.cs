@@ -224,6 +224,85 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.ToTable("capture_requests", (string)null);
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.ContentApproval", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_id");
+
+                    b.Property<DateTimeOffset>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approved_at");
+
+                    b.Property<string>("ArtifactHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("artifact_hash");
+
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("asset_id");
+
+                    b.Property<string>("BodyHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("body_hash");
+
+                    b.Property<long>("ContentRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("content_revision");
+
+                    b.Property<long>("EvidenceRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("evidence_revision");
+
+                    b.Property<DateTimeOffset?>("InvalidatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("invalidated_at");
+
+                    b.Property<string>("MediaSelectionHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("media_selection_hash");
+
+                    b.Property<string>("PayloadKind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("payload_kind");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<string>("VoiceSnapshotHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("voice_snapshot_hash");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssetId")
+                        .HasDatabaseName("IX_content_approvals_asset_id");
+
+                    b.HasIndex("ScopeId", "AssetId", "ContentRevision")
+                        .IsUnique()
+                        .HasDatabaseName("ux_content_approvals_scope_id_asset_id_revision");
+
+                    b.ToTable("content_approvals", (string)null);
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.ContentAsset", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1445,6 +1524,16 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_capture_requests_milestone_id");
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.ContentApproval", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.ContentAsset", null)
+                        .WithMany()
+                        .HasForeignKey("AssetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_content_approvals_asset_id");
                 });
 
             modelBuilder.Entity("Chronicleaf.Core.ContentAsset", b =>

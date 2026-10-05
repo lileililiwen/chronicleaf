@@ -751,12 +751,14 @@ public sealed class GroundedMarkdownDraftsTests(ChronicleafPostgresFixture postg
             fixture.Provider.Calls[1].Request.SystemInstruction,
             StringComparison.Ordinal);
 
-        // It did not become an approval. The stored status is draft, and there is nowhere in this schema
-        // for an approval to live.
+        // It did not become an approval. The stored status is draft, and the generation wrote
+        // no approval row: the approvals table below is the review package's, and a draft job
+        // has no verb that can write to it.
         var asset = await ContentRows.ReadAssetForMilestoneAsync(fixture.Database, fixture.MilestoneId);
         Assert.Equal("draft", asset!.Status);
         Assert.Equal(1, asset.CurrentRevision);
-        Assert.Equal(0, await ContentRows.CountApprovalTablesAsync(fixture.Database));
+        Assert.Equal(1, await ContentRows.CountApprovalTablesAsync(fixture.Database));
+        Assert.Equal(0, await CountRowsAsync(fixture.Database, "content_approvals"));
 
         // It did not become a publish, a second conversation, or a second credential use either: this
         // milestone has exactly one draft operation, and the vault still holds exactly the one credential
@@ -780,7 +782,7 @@ public sealed class GroundedMarkdownDraftsTests(ChronicleafPostgresFixture postg
     }
 
     [Fact]
-    public async Task Drafts_002_Boundary_an_approve_route_does_not_exist_and_no_approval_is_ever_stored()
+    public async Task Drafts_002_Boundary_no_draft_route_approves_and_no_approval_is_ever_stored()
     {
         await using var fixture = await ArrangeAsync("gmd_002_no_approval", EvidenceNote);
         var accepted = await RequestDraftAsync(fixture);
@@ -791,20 +793,22 @@ public sealed class GroundedMarkdownDraftsTests(ChronicleafPostgresFixture postg
         var asset = await ContentRows.ReadAssetForMilestoneAsync(fixture.Database, fixture.MilestoneId);
         Assert.NotNull(asset);
 
-        // Two plausible spellings of the verb a later package will add, both refused by the shell as
-        // unknown API routes. A route that does not exist cannot be called by a background job, a
-        // migration or a mistake.
-        foreach (var path in new[]
-                 {
-                     $"/api/assets/{asset!.Id:D}/approve",
-                     $"/api/assets/{asset.Id:D}/approval",
-                 })
-        {
-            using var refused = await fixture.Owner.SendAsync(await fixture.Owner.PostWithoutBody(path));
-            Assert.Equal(HttpStatusCode.NotFound, refused.StatusCode);
-        }
+        // The spelling this package never implemented is still refused by the shell as an unknown
+        // API route. The `/approve` spelling below is the review package's, and an empty POST to
+        // it is refused by name rather than honored: generation still wrote no approval row.
+        using var unknown = await fixture.Owner.SendAsync(
+            await fixture.Owner.PostWithoutBody($"/api/assets/{asset!.Id:D}/approval"));
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
 
-        Assert.Equal(0, await ContentRows.CountApprovalTablesAsync(fixture.Database));
+        using var empty = await fixture.Owner.SendAsync(
+            await fixture.Owner.PostWithoutBody($"/api/assets/{asset.Id:D}/approve"));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, empty.StatusCode);
+
+        Assert.Equal(0, await CountRowsAsync(fixture.Database, "content_approvals"));
+
+        // The stored status is draft, and the table the review package owns holds nothing for it.
+        Assert.Equal("draft", asset.Status);
+        Assert.Equal(1, await ContentRows.CountApprovalTablesAsync(fixture.Database));
 
         // And the read route publishes no field that could report an approval.
         using var read = await fixture.Owner.GetAsync($"/api/assets/{asset!.Id:D}");

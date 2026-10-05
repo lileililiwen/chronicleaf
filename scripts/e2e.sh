@@ -14,7 +14,7 @@
 # The plaintext token is written to a file inside the publish directory, is never echoed, and is
 # handed to the fixtures through the environment.
 #
-# Ten fixture groups run, each against its own published instance and its own disposable database,
+# Eleven fixture groups run, each against its own published instance and its own disposable database,
 # because one of them asserts something another one changes. tests/projects-and-milestones.spec.ts
 # states that its installation starts with an empty project list - that is the claim it is making
 # about a new installation - and a project cannot be removed once it exists, because archiving is
@@ -78,6 +78,7 @@ capture_base_url="${CHRONICLEAF_CAPTURE_BASE_URL:-http://127.0.0.1:5087}"
 drafts_base_url="${CHRONICLEAF_DRAFTS_BASE_URL:-http://127.0.0.1:5088}"
 curation_base_url="${CHRONICLEAF_CURATION_BASE_URL:-http://127.0.0.1:5089}"
 timeline_base_url="${CHRONICLEAF_TIMELINE_BASE_URL:-http://127.0.0.1:5090}"
+review_base_url="${CHRONICLEAF_REVIEW_BASE_URL:-http://127.0.0.1:5091}"
 log_file="$repo_root/$publish_dir/server.log"
 evidence_log_file="$repo_root/$publish_dir/server-evidence.log"
 credentials_log_file="$repo_root/$publish_dir/server-credentials.log"
@@ -88,6 +89,7 @@ capture_log_file="$repo_root/$publish_dir/server-capture.log"
 drafts_log_file="$repo_root/$publish_dir/server-drafts.log"
 curation_log_file="$repo_root/$publish_dir/server-curation.log"
 timeline_log_file="$repo_root/$publish_dir/server-timeline.log"
+review_log_file="$repo_root/$publish_dir/server-review.log"
 key_file=""
 
 # The operator key for this run: 32 random bytes in a temporary file outside the repository and
@@ -119,7 +121,8 @@ cleanup() {
     "$repo_root/$publish_dir/access-token-credentials" "$repo_root/$publish_dir/access-token-voice" \
     "$repo_root/$publish_dir/access-token-generation" "$repo_root/$publish_dir/access-token-github" \
     "$repo_root/$publish_dir/access-token-capture" "$repo_root/$publish_dir/access-token-drafts" \
-    "$repo_root/$publish_dir/access-token-curation" "$repo_root/$publish_dir/access-token-timeline"
+    "$repo_root/$publish_dir/access-token-curation" "$repo_root/$publish_dir/access-token-timeline" \
+    "$repo_root/$publish_dir/access-token-review"
   # So is the encryption key: it is removed whether the run passed or failed.
   remove_key_file
   exit "$exit_status"
@@ -510,6 +513,224 @@ SQL
 }
 
 # ---------------------------------------------------------------------------------------------
+# The review fixture: one real project, two real milestones, one real evidence bundle each, and
+# one stored draft each for the review panel to edit, approve and export.
+#
+# Everything above the content rows is made through the running server's own routes with the real
+# access token and a real antiforgery value, so the project, the milestones and their evidence
+# are records the product itself created. The two content rows are inserted the way the
+# grounded-draft suite inserts its rows - directly, with the rows read back and refused when they
+# are not there - because a draft is produced by a provider and this host calls none.
+#
+# What the inserted rows are careful about:
+#   - the summary cites the real evidence item the seed created, so the revision carries no
+#     grounding finding and the browser can actually approve it. A fixture with a finding in it
+#     could not tell a blocked approval from a broken one.
+#   - the voice snapshot declares English and the body is English, so the revision carries no
+#     voice finding either, for the same reason. The fingerprint is the delivered hasher's
+#     canonical form over the English values, and the read route recomputes it rather than
+#     trusting the stored one.
+#   - the body contains a raw HTML tag, an unsafe link and a safe link on purpose. The
+#     requirement is that a preview never executes markup, and a fixture without any could not
+#     tell a sanitizing renderer from one that happens to have nothing to refuse.
+#   - two milestones, because the first browser test edits, approves and re-edits its milestone
+#     and a milestone cannot be un-edited through the UI. The second test reads its own row
+#     rather than state the first test left behind.
+# ---------------------------------------------------------------------------------------------
+seed_review() {
+  local origin="$1"
+  local token="$2"
+  local cookie_jar
+  cookie_jar="$(mktemp -d)/cookies.txt"
+
+  local antiforgery
+  antiforgery="$(curl --silent --show-error --cookie-jar "$cookie_jar" --cookie "$cookie_jar" \
+    --data "{\"accessToken\":\"${token}\"}" \
+    -H 'Content-Type: application/json' \
+    "${origin}/api/session" >/dev/null && \
+    curl --silent --show-error --cookie-jar "$cookie_jar" --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/session/antiforgery" | jq -r '.token')"
+
+  if [ -z "$antiforgery" ] || [ "$antiforgery" = "null" ]; then
+    echo "the review seed could not read an antiforgery value from ${origin}" >&2
+    return 1
+  fi
+
+  local project_id
+  project_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"name":"Fieldnotes","description":"Reviewed releases."}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/projects" | jq -r '.id')"
+
+  if [ -z "$project_id" ] || [ "$project_id" = "null" ]; then
+    echo "the review seed could not create its project" >&2
+    return 1
+  fi
+
+  # The seeded bodies are English, so the voice an edit is judged under must be too: an edit
+  # re-snapshots the project's current voice, and the default profile declares Chinese, which
+  # would report language findings on every field and leave the browser with nothing it can
+  # approve. A fixture with a finding in it could not tell a blocked approval from a broken one.
+  # The stored language is read back, because a PUT that did not take would leave the same
+  # un-approvable fixture behind.
+  local voice_language
+  voice_language="$(curl --silent --show-error --request PUT --cookie "$cookie_jar" \
+    --data '{"presetId":"technical-blog","overrides":{"language":"en"}}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 0' \
+    "${origin}/api/projects/${project_id}/voice-profile" | jq -r '.effectiveValues.language')"
+
+  if [ "$voice_language" != "en" ]; then
+    echo "the review seed could not set the project's voice" >&2
+    return 1
+  fi
+
+  seed_review_milestone "$origin" "$cookie_jar" "$antiforgery" "$project_id" "Reviewed release" || return 1
+  seed_review_milestone "$origin" "$cookie_jar" "$antiforgery" "$project_id" "Second review" || return 1
+}
+
+seed_review_milestone() {
+  local origin="$1"
+  local cookie_jar="$2"
+  local antiforgery="$3"
+  local project_id="$4"
+  local title="$5"
+
+  # A manual milestone is confirmed by the act of saving it, so no confirm call is needed here.
+  local milestone_id
+  milestone_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data "{\"title\":\"${title}\",\"version\":\"0.1.0\",\"occurredAt\":\"2026-10-01T09:00:00Z\",\"type\":\"feature\",\"notes\":\"Recorded by the e2e seed.\",\"knownLimitations\":[],\"nextSteps\":[]}" \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/projects/${project_id}/milestones" | jq -r '.id')"
+
+  if [ -z "$milestone_id" ] || [ "$milestone_id" = "null" ]; then
+    echo "the review seed could not create its milestone" >&2
+    return 1
+  fi
+
+  curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"notes":"The pipeline now reproduces from a clean checkout.","expectedRevision":0}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 0' \
+    "${origin}/api/milestones/${milestone_id}/evidence/manual" >/dev/null
+
+  local bundle_id
+  bundle_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/milestones/${milestone_id}/evidence" \
+    | jq -r '.items[0].id')"
+
+  local evidence_item_id
+  evidence_item_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/milestones/${milestone_id}/evidence" \
+    | jq -r '.items[0].items[0].id')"
+
+  if [ -z "$evidence_item_id" ] || [ "$evidence_item_id" = "null" ]; then
+    echo "the review seed could not read the evidence bundle the product created" >&2
+    return 1
+  fi
+
+  seed_review_rows "$postgres_container" "chronicleaf_e2e_review" \
+    "$project_id" "$milestone_id" "$bundle_id" "$evidence_item_id"
+}
+
+# The two content rows for one review milestone, inserted into the disposable database the review
+# suite is using.
+seed_review_rows() {
+  local container="$1"
+  local database_name="$2"
+  local project_id="$3"
+  local milestone_id="$4"
+  local bundle_id="$5"
+  local evidence_item_id="$6"
+
+  local body summary voice_snapshot body_hash fingerprint now
+  now="$(date -u +%Y-%m-%dT%H:%M:%S.000000Z)"
+
+  # The body, with a raw tag and both kinds of link in it so the preview claim is actually
+  # testable. Numbers are avoided so the fixture cannot trip the numeral rule - which is a real
+  # rule, and a fixture that violated it would be testing the wrong thing.
+  body=$'# Reproducible release pipeline\n\nThe pipeline now reproduces from a clean checkout.[^c1]\n\n## What changed\n\n- The pipeline runs from a clean checkout.[^c1]\n- The build produces the same digest each time.[^c2]\n\n## Problems solved\n\nA release could not be rebuilt from its source.[^c3]\n\n## Known limitations\n\nOnly Linux is covered.[^c4]\n\n## Next steps\n\nCover the other platform.[^c5]\n\nThe line below is a <b>not bold</b> tag in the source, and a preview renders it as these characters.\n\nAn [unsafe link](javascript:alert('"'"'review'"'"')) goes nowhere, and a [safe link](https://example.invalid/notes) stays a link.\n\n[^c1]: The pipeline runs from a clean checkout.\n[^c2]: The build produces the same digest each time.\n[^c3]: A release could not be rebuilt from its source.\n[^c4]: Only Linux is covered.\n[^c5]: Cover the other platform.\n'
+
+  body_hash="$(printf '%s' "$body" | sha256sum | cut -d' ' -f1)"
+
+  # The delivered hasher's canonical form over the English values this body is judged under: the
+  # resolved values joined by U+001F, in the order VoiceSnapshotHasher writes them. The read
+  # route recomputes the fingerprint rather than trusting the stored one - so a default that ever
+  # changes makes this suite fail rather than make the panel show a voice it did not check.
+  fingerprint="$(printf 'en\037restrained\037true\03760\037high\037low\037true\037革命性\037震撼\037game-changing\037exciting news' \
+    | sha256sum | cut -d' ' -f1)"
+
+  voice_snapshot="{\"presetId\":\"technical-blog\",\"profileRevision\":0,\"capturedAt\":\"${now}\",\"language\":\"en\",\"tone\":\"restrained\",\"emoji\":true,\"titleMaxChars\":60,\"technicalDetail\":\"high\",\"marketing\":\"low\",\"firstPerson\":true,\"forbiddenTerms\":[\"革命性\",\"震撼\",\"game-changing\",\"exciting news\"],\"fingerprint\":\"${fingerprint}\"}"
+
+  summary=$(jq -cn --arg e "$evidence_item_id" '{
+    milestoneTitle: "Reproducible release pipeline",
+    summary: "The pipeline now reproduces from a clean checkout.",
+    changes: [
+      { text: "The pipeline runs from a clean checkout.", evidenceIds: [$e] },
+      { text: "The build produces the same digest each time.", evidenceIds: [$e] }
+    ],
+    problemsSolved: [
+      { text: "A release could not be rebuilt from its source.", evidenceIds: [$e] }
+    ],
+    knownLimitations: [
+      { text: "Only Linux is covered.", evidenceIds: [$e] }
+    ],
+    nextSteps: [
+      { text: "Cover the other platform.", evidenceIds: [$e] }
+    ]
+  }')
+
+  local asset_id revision_id scope_id
+  asset_id="$(cat /proc/sys/kernel/random/uuid)"
+  revision_id="$(cat /proc/sys/kernel/random/uuid)"
+  scope_id="$(docker exec "$container" psql --username=chronicleaf --dbname="$database_name" --quiet --tuples-only --no-align \
+    --command 'SELECT id FROM installation LIMIT 1')"
+
+  # One statement per table, in dependency order. The trigger on content_revisions refuses UPDATE
+  # and DELETE, which is the append-only contract, and an INSERT is what a completed generation
+  # would do.
+  #
+  # `-i` is load-bearing: `docker exec` only forwards this heredoc to psql's stdin when it is asked to,
+  # and without it psql reads an empty script and exits 0 having inserted nothing. The rows are read
+  # back below and the seed refuses to continue if they are not there.
+  #
+  # The three long values travel as psql variables and are interpolated with `:'name'`, which is psql's
+  # own quoting. A body interpolated into the SQL text by the shell would have to be escaped by the
+  # shell, and the two languages disagree about what a quote is.
+  docker exec -i "$container" psql --username=chronicleaf --dbname="$database_name" --quiet \
+    --set=ON_ERROR_STOP=1 --set=body="$body" --set=summary="$summary" --set=voice_snapshot="$voice_snapshot" \
+    <<SQL >/dev/null
+INSERT INTO content_assets
+  (id, scope_id, project_id, milestone_id, type, status, current_revision, created_at, updated_at)
+VALUES
+  ('${asset_id}', '${scope_id}', '${project_id}', '${milestone_id}', 'markdown-story', 'draft', 1, '${now}', '${now}');
+
+INSERT INTO content_revisions
+  (id, asset_id, scope_id, revision, evidence_bundle_id, evidence_revision, voice_revision,
+   voice_snapshot, summary, body_markdown, body_hash, provider_id, model, prompt_version, schema_version, created_at)
+VALUES
+  ('${revision_id}', '${asset_id}', '${scope_id}', 1, '${bundle_id}', 1, 0,
+   :'voice_snapshot'::jsonb, :'summary'::jsonb, :'body', '${body_hash}',
+   'openai', 'seeded-not-called', 'grounded-markdown/1', 'grounded-summary/1', '${now}');
+SQL
+
+  # Read back what the database actually holds, and compare the stored digest with the one computed
+  # above. psql exiting zero is not evidence that a statement ran, and a stored body whose hash is not
+  # its own would be a fixture proving nothing: the approval binds that hash.
+  local stored
+  stored="$(docker exec "$container" psql --username=chronicleaf --dbname="$database_name" \
+    --quiet --tuples-only --no-align \
+    --command "SELECT count(*) || ' ' || coalesce(max(body_hash), '') FROM content_revisions WHERE asset_id = '${asset_id}'")"
+
+  if [ "$stored" != "1 ${body_hash}" ]; then
+    echo "the review seed stored '${stored}', which is not the one revision hashed as ${body_hash}" >&2
+    return 1
+  fi
+}
+
+# ---------------------------------------------------------------------------------------------
 # The curation fixture: one real project, one real milestone, one real evidence bundle, real media
 # bytes and three offered candidates pointing at them.
 #
@@ -888,4 +1109,35 @@ start_suite timeline "$timeline_base_url" "$timeline_log_file" "$repo_root/$publ
 echo "==> npm run test:e2e (real browser against $timeline_base_url)"
 run_suite "$timeline_base_url" "$timeline_log_file" "$repo_root/$publish_dir/access-token-timeline" \
   tests/milestone-timeline.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 11: human review. It needs a milestone with a stored draft the browser can edit, approve
+# and export, and it needs that draft to carry no finding - because an approval is refused while
+# findings remain - so it has its own installation and its own published instance for the same
+# reason suites 1 to 10 each have one.
+#
+# What this suite claims, and what it does not. The project, the milestones and their evidence
+# are created by the running server's own routes through the real access boundary. The two
+# stored drafts are inserted the way the grounded-draft suite inserts its rows - directly, with
+# the rows read back and refused when they are not there - because a draft is produced by a
+# provider and this host calls none. The summary cites the real evidence item and the voice
+# snapshot declares the English the body is written in, so neither finding list has anything to
+# report and the browser can actually approve. The body carries a raw tag, an unsafe link and a
+# safe link, so a pass is evidence that the panel renders markup as characters rather than
+# running it. So a pass is evidence that the panel edits a draft into a new revision, binds an
+# approval to a revision and a body hash, serves the approved bytes as a download, ends the
+# approval on a later edit, and never approves on Enter - and is NOT evidence that a draft was
+# generated on this host. The .NET suite is where a real provider answer flows through
+# generation into review.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting an eleventh disposable PostgreSQL and published application at $review_base_url"
+start_suite review "$review_base_url" "$review_log_file" "$repo_root/$publish_dir/access-token-review"
+
+echo "==> recording the project, evidence and stored drafts the review panel reads"
+seed_review "$review_base_url" "$(cat "$repo_root/$publish_dir/access-token-review")"
+
+echo "==> npm run test:e2e (real browser against $review_base_url)"
+run_suite "$review_base_url" "$review_log_file" "$repo_root/$publish_dir/access-token-review" \
+  tests/markdown-review-export.spec.ts
 stop_suite

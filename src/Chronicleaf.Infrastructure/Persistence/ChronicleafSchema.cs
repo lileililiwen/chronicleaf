@@ -118,6 +118,17 @@ public static class ChronicleafSchema
     /// </summary>
     public const string ScreenshotCurationMigrationId = "20261006090000_AddScreenshotCuration";
 
+    /// <summary>
+    /// The forward migration that adds the <c>content_approvals</c> table
+    /// (MARKDOWN-REVIEW-EXPORT-001/002): one human decision per content revision, bound to the
+    /// revision, the body hash, the evidence revision, the voice snapshot hash and the media
+    /// selection hash, with revision and digest check constraints. A database that has never
+    /// applied it has nowhere to record an approval, so its review routes would fail against a
+    /// missing table; readiness says so by name rather than answering 200 and failing on the
+    /// first approval.
+    /// </summary>
+    public const string MarkdownReviewExportMigrationId = "20261007090000_AddMarkdownReviewExport";
+
     /// <summary>Every migration a database must carry before this build calls itself ready.</summary>
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
@@ -134,6 +145,7 @@ public static class ChronicleafSchema
         ScreenshotCaptureMigrationId,
         GroundedMarkdownDraftsMigrationId,
         ScreenshotCurationMigrationId,
+        MarkdownReviewExportMigrationId,
     ];
 
     /// <summary>
@@ -141,7 +153,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = ScreenshotCurationMigrationId;
+    public const string ExpectedMigrationId = MarkdownReviewExportMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

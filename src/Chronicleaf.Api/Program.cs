@@ -205,6 +205,14 @@ builder.Services.AddScreenshotCuration();
 // grounded-markdown-drafts migration reports schema_mismatch at /api/ready.
 builder.Services.AddGroundedMarkdownDrafts();
 
+// MARKDOWN-REVIEW-EXPORT-001/002. The approvals store and the review service: human edits that
+// append revisions, approvals bound to a revision and a body hash, and exports that serve the
+// approved bytes only while every binding still holds. It registers no provider, no publisher
+// and no setting: an export serves bytes to the owner that asked for them, and publication is a
+// later package's reviewed adapter. A database without the markdown-review-export migration
+// reports schema_mismatch at /api/ready.
+builder.Services.AddMarkdownReviewExport();
+
 // The rotation guard is applied once at start-up, so an access token that was changed since the
 // last run revokes every existing session before this process serves anything.
 builder.Services.AddHostedService<AccessTokenRotationStartup>();
@@ -315,6 +323,13 @@ app.MapCurationEndpoints();
 // approve route here and no field that could report one: a draft is text a human has not reviewed yet,
 // and the review package owns the table that will record that decision.
 app.MapContentDraftEndpoints();
+
+// MARKDOWN-REVIEW-EXPORT-001/002: the private edit, approve, unapprove, review and export
+// routes. None of them is marked public, so the access package's default-deny boundary already
+// covers every one of them. There is no generation here and no publication: an edit appends a
+// human revision, an approval binds a revision and a body hash, and an export serves approved
+// bytes as an attachment the owner chose to download.
+app.MapContentReviewEndpoints();
 
 // SHELL-001/SHELL-002: every unmatched path is either an unknown API path, an unknown
 // static asset, or a client route. Only the last one falls back to the SPA entry point. This

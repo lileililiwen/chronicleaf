@@ -83,6 +83,8 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     public DbSet<ContentDraftRequestRow> ContentDraftRequests => Set<ContentDraftRequestRow>();
 
+    public DbSet<ContentApproval> ContentApprovals => Set<ContentApproval>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Installation>(entity =>
@@ -1317,6 +1319,77 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_content_revisions_asset_id");
         });
+
+        // MARKDOWN-REVIEW-EXPORT-001/002: one human decision about one revision. The row is never
+        // deleted: withdrawing an approval marks it invalidated with a reason, so the history of
+        // what was once exportable survives. The unique index on (scope, asset, revision) is what
+        // makes two approvals of one revision a single row and a refusal rather than two
+        // decisions, and the export re-checks the body, the evidence head and the pictures rather
+        // than trusting this row - which is why no trigger here needs to refuse anything.
+        modelBuilder.Entity<ContentApproval>(entity =>
+        {
+            entity.ToTable("content_approvals");
+            entity.HasKey(approval => approval.Id);
+            entity.Property(approval => approval.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(approval => approval.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(approval => approval.AssetId).HasColumnName("asset_id").IsRequired();
+            entity.Property(approval => approval.ContentRevision)
+                .HasColumnName("content_revision")
+                .IsRequired();
+            entity.Property(approval => approval.ActorId).HasColumnName("actor_id");
+            entity.Property(approval => approval.PayloadKind)
+                .HasColumnName("payload_kind")
+                .HasMaxLength(ContentPayloadKindMaxLength)
+                .IsRequired();
+            entity.Property(approval => approval.BodyHash)
+                .HasColumnName("body_hash")
+                .HasMaxLength(Sha256HexMaxLength)
+                .IsRequired();
+            entity.Property(approval => approval.EvidenceRevision)
+                .HasColumnName("evidence_revision")
+                .IsRequired();
+            entity.Property(approval => approval.VoiceSnapshotHash)
+                .HasColumnName("voice_snapshot_hash")
+                .HasMaxLength(Sha256HexMaxLength)
+                .IsRequired();
+            entity.Property(approval => approval.MediaSelectionHash)
+                .HasColumnName("media_selection_hash")
+                .HasMaxLength(Sha256HexMaxLength)
+                .IsRequired();
+            entity.Property(approval => approval.ArtifactHash)
+                .HasColumnName("artifact_hash")
+                .HasMaxLength(Sha256HexMaxLength);
+            entity.Property(approval => approval.ApprovedAt)
+                .HasColumnName("approved_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(approval => approval.InvalidatedAt)
+                .HasColumnName("invalidated_at")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(approval => approval.Reason)
+                .HasColumnName("reason")
+                .HasColumnType("text");
+
+            // One approval per revision per scope. A second decision about the same revision is
+            // the same decision answered again, and the store's insert reports it as such.
+            entity.HasIndex(approval => new
+                {
+                    approval.ScopeId,
+                    approval.AssetId,
+                    approval.ContentRevision,
+                })
+                .IsUnique()
+                .HasDatabaseName("ux_content_approvals_scope_id_asset_id_revision");
+
+            entity.HasIndex(approval => approval.AssetId)
+                .HasDatabaseName("IX_content_approvals_asset_id");
+
+            entity.HasOne<ContentAsset>()
+                .WithMany()
+                .HasForeignKey(approval => approval.AssetId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_content_approvals_asset_id");
+        });
     }
 
     /// <summary>At most 40 characters for a content kind, matching the Core record's own bound.</summary>
@@ -1330,6 +1403,9 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     /// <summary>At most 64 characters for a prompt or schema version label.</summary>
     private const int ContentVersionMaxLength = 64;
+
+    /// <summary>At most 32 characters for an approval payload kind, matching the Core record's own bound.</summary>
+    private const int ContentPayloadKindMaxLength = ContentPayloadKinds.MaxLength;
 
     /// <summary>At most 512 characters for a wait selector, matching the application-side bound.</summary>
     private const int CaptureSelectorMaxLength = 512;

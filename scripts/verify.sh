@@ -5,7 +5,7 @@
 # LLM-PROVIDER-CONTRACT-001/002, GITHUB-EVIDENCE-001/002, LLM-OPENAI-ADAPTER-001/002,
 # LLM-OLLAMA-ADAPTER-001/002,
 # SCREENSHOT-CAPTURE-001/002, SCREENSHOT-CURATION-001/002, GROUNDED-MARKDOWN-DRAFTS-001/002,
-# MILESTONE-TIMELINE-001/002).
+# MILESTONE-TIMELINE-001/002, MARKDOWN-REVIEW-EXPORT-001/002).
 #
 # Required chain, in order:
 #   1. platform feed           - the committed packages/platform-feed is what the build resolves, from
@@ -409,6 +409,19 @@ else
   # real disposable PostgreSQL through the real API host. No new table is migrated: the timeline
   # is a projection of the milestone records the projects-and-milestones migration already holds.
   step "milestone timeline tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~MilestoneTimelineTests"
+  # MARKDOWN-REVIEW-EXPORT-001/002. That approving the current draft binds the actor, the content
+  # hash and the evidence revision; that an export without approval is a 409 approval_required and
+  # an edit or an evidence append after approval makes it a 409 approval_stale until a new
+  # approval; that a revision carrying deterministic findings cannot be approved and no
+  # acknowledgment clears that; that the export serves the exact approved bytes as a Markdown
+  # attachment with no upstream call; that unsafe markup is stored as the owner's words and
+  # served as text the browser saves rather than as a document it runs; that a late approval of
+  # a stale revision exports nothing unreviewed; that an edit without If-Match is a 428, a stale
+  # head a 409 and an empty body a 422; and that withdrawing an approval ends exports while the
+  # row stays as history - all proven against the same real disposable PostgreSQL through the
+  # real API host, with the reviewed draft produced by a real generation job behind the delivered
+  # provider seam.
+  step "markdown review export tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~MarkdownReviewExportTests"
 fi
 
 step "frontend install" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm ci'
@@ -418,7 +431,8 @@ if [ "${CHRONICLEAF_E2E:-0}" = "1" ]; then
   # Publishes the real application, starts a disposable PostgreSQL per suite, applies the committed
   # migrations, and drives the shell, access, projects-and-milestones, background-jobs,
   # milestone-evidence, credential-vault, voice-profiles, llm-provider-contract, github-evidence,
-  # screenshot-capture, grounded-markdown-drafts, screenshot-curation and milestone-timeline fixtures in a real browser.
+  # screenshot-capture, grounded-markdown-drafts, screenshot-curation, milestone-timeline and
+  # markdown-review-export fixtures in a real browser.
   # The suites after the shell are included by scripts/e2e.sh, which names each fixture file, so a
   # file that stops being matched shows up as a Playwright "no tests found" failure rather than as
   # a suite quietly passing with nothing in it; this stage
@@ -427,9 +441,10 @@ if [ "${CHRONICLEAF_E2E:-0}" = "1" ]; then
   # off over a preset that asked for it and see the effective value change, be shown every provider
   # slot on a new installation with the truth about which of them can actually be called, see a
   # project admit it has no repository connected, be told in the server's own words when one is
-  # refused, follow a real collection job to the status the operations route reports, or read a
+  # refused, follow a real collection job to the status the operations route reports, read a
   # stored draft with its provenance, its citations and both finding lists and have that body rendered
-  # as source rather than as HTML. The github suite needs outbound network to api.github.com: nothing in
+  # as source rather than as HTML, or edit a stored draft into a new revision, approve the revision it
+  # read, download the approved bytes exactly and see a later edit end the approval. The github suite needs outbound network to api.github.com: nothing in
   # it is faked, so a deployment without that route out fails this stage rather than passing on a stub.
   #
   # The capture fixture needs no outbound network, and that is deliberate rather than convenient: a

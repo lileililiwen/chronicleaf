@@ -1,6 +1,6 @@
 # Chronicleaf handoff
 
-current_spec: github-graphql-enrichment
+current_spec: narrative-memory
 
 ## Current state — 2026-10-05
 
@@ -604,11 +604,38 @@ of controls — both fixed in the spec, and the panel no longer renders both emp
 One environment flake recorded: a curation reorder poll failed once and passed on both adjacent runs
 (4/4 before, 4/4 after); untouched by this change.
 
-Next: `current_spec` advances to `github-graphql-enrichment`. `github-release-candidates` is archived
-(`08651c4`, canonical spec `openspec/specs/github-release-candidates/spec.md`): verified tag/release/
-merged-PR/closed-issue/star-threshold candidates as proposals only — no confirm verb, no evidence
-append, no publish — over HMAC-signed deliveries, bounded idempotent polls with supersede, and a
-vault-referenced webhook secret. Read that package's boundary before extending it.
+Next: `current_spec` advances to `narrative-memory` (depends only on archived
+`grounded-markdown-drafts` + `markdown-review-export`). `github-graphql-enrichment` is archived
+(`c7a97b8`, canonical spec `openspec/specs/github-graphql-enrichment/spec.md`): optional
+relationship-only enrichment of already-collected evidence through one fixed named GraphQL
+operation (`ChronicleafRelationshipEnrichment`, page literals in the query text, only owner/name/
+validated-SHA/server-cursor vary), `POST /api/milestones/{id}/github-enrichment`
+`{evidenceRevision,idempotencyKey}` → 202 `milestone.github-enrichment` job. Every SHA is
+validated 40-hex before any request; partial errors become `unavailable` items in the package's
+own reason vocabulary (never a response sentence); pagination dedups on provider node id;
+permission problems end as `github_enrichment_job_permission_denied` with nothing appended; 429
+waits the provider's reset via `OperationRateLimitedException`; a bundle that moves during the
+query or between request and run is `github_enrichment_job_superseded` (run-row revision check
+plus CAS append, milestone moves covered by the delivered input-revision check). No new
+credential scope: the vault lease is one bearer header for one read. The reader reuses the
+delivered GitHub `HttpClient` (no second client, plain `AddSingleton`, `IGitEvidenceSource`
+still `GitHubEvidenceClient`); the run row is `github_enrichment_runs` (new required migration
+`20261010090000`, schema const + `ExpectedMigrationId` advanced). Read that package's boundary
+before extending it. No Web UI was added: the appended issue/PR items render in the existing
+evidence panel, so no new Playwright suite exists and `CHRONICLEAF_E2E=1` was not run.
+
+**Release evidence (`github-graphql-enrichment`, commit `c7a97b8`, all run by the implementer
+rather than taken on report).** `dotnet build --nologo --no-incremental` 0 errors with the same
+2 pre-existing warnings at HEAD (Core `_displayOrder`, obsolete `HasCheckConstraint`). `bash
+scripts/verify.sh` exit 0 with `GATE_EXIT=0` and the new `github graphql enrichment tests` stage
+**18/18** (`GithubGraphqlEnrichmentTests`: 001 success/failure/boundary, 002
+success/failure/boundary plus stale-request supersede, 429-wait-then-retry, credential-lease,
+registration, closed-code-set, 7 SHA-validation cases) against real disposable PostgreSQL and the
+real API host with only the wire scripted; `npm ci`, `tsc` + `vite build` green. Name preflight
+exit 0; `openspec validate --all --strict --no-interactive` 54/54 before and after the archive,
+which used no `--skip-specs`. One test defect found by the run itself: a shared `JsonObject`
+across two pages threw `The node already has a parent` — the fixture now builds one node per
+page. Deployment stays `deployable: false`; there is no remote, no push and no publication.
 
 **About that 2-warning baseline, recorded because HANDOFF's own numbers were wrong.** This file has
 repeatedly claimed "0 warnings" for a build that never had them. The first full-gate run of

@@ -158,6 +158,23 @@ public static class ApiErrorStatus
         Content.ReviewError.ApprovalStale => 409,
         Content.ReviewError.ApprovalBlocked => 422,
 
+        // The github-release-candidates package's codes. Additive in the same way, and the choices are
+        // this package's failure policy rather than defaults. 401 for a delivery that did not
+        // authenticate - and deliberately the same 401 for an unknown connection id, a connection with
+        // no subscription, a missing signature and a wrong one, because a route that answered those
+        // four differently would let anybody discover which connection ids exist. It is not a 404 and
+        // not a 403 for the same reason. 422 for a delivery that authenticated but could not be read,
+        // which is a different problem only the sender can fix and must be distinguishable from a
+        // wrong signature. 422 for a project with no repository connection, which is something the
+        // owner supplies. 413 for a body over this package's own one-mebibyte ceiling, and 503 for
+        // GitHub being unreachable rather than a 500. The six job codes deliberately have no arm:
+        // they are written to the operation row, and no route answers a poll that already failed.
+        GitHubCandidates.GitHubCandidateError.SignatureInvalid => 401,
+        GitHubCandidates.GitHubCandidateError.DeliveryMalformed => 422,
+        GitHubCandidates.GitHubCandidateError.ConnectionMissing => 422,
+        GitHubCandidates.GitHubCandidateError.Unreachable => 503,
+        GitHubCandidates.GitHubCandidateError.DeliveryTooLarge => 413,
+
         _ => 500,
     };
 }

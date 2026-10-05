@@ -89,6 +89,14 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     public DbSet<ContentApproval> ContentApprovals => Set<ContentApproval>();
 
+    public DbSet<GitHubWebhookSubscription> GitHubWebhookSubscriptions => Set<GitHubWebhookSubscription>();
+
+    public DbSet<GitHubWebhookDelivery> GitHubWebhookDeliveries => Set<GitHubWebhookDelivery>();
+
+    public DbSet<GitHubCandidate> GitHubCandidates => Set<GitHubCandidate>();
+
+    public DbSet<GitHubCandidateRun> GitHubCandidateRuns => Set<GitHubCandidateRun>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Installation>(entity =>
@@ -1569,6 +1577,343 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_content_approvals_asset_id");
         });
+
+        // -----------------------------------------------------------------------------------------
+        // github-release-candidates. Four tables, and the two unique indexes are the package.
+        //
+        // A candidate is a proposal, so the table has no milestone column, no bundle column and no
+        // revision: confirming one is a human decision made elsewhere, and a row that could name a
+        // milestone would be a claim this package cannot make. `source_key` is the provider's own
+        // identity for the thing proposed, and the unique index on (scope_id, source_key) is what
+        // makes "exactly one candidate per source key" a fact about the database rather than a hope
+        // about a loop - a tag and a release naming one commit are two candidates on purpose, because
+        // their keys differ.
+        // -----------------------------------------------------------------------------------------
+
+        // GITHUB-RELEASE-CANDIDATES-001: which connection accepts a signed delivery, and where the
+        // secret that authenticates it is held. `credential_ref` is the vault's own id, so this table
+        // cannot hold a secret and a read of it learns only that one is configured. Archiving is an
+        // update rather than a delete, because the receipts already stored name this connection and
+        // are the only record that a delivery ever arrived.
+        modelBuilder.Entity<GitHubWebhookSubscription>(entity =>
+        {
+            entity.ToTable("github_webhook_subscriptions");
+            entity.HasKey(subscription => subscription.Id);
+            entity.Property(subscription => subscription.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(subscription => subscription.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(subscription => subscription.ConnectionId)
+                .HasColumnName("connection_id")
+                .IsRequired();
+            entity.Property(subscription => subscription.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(subscription => subscription.CredentialRef)
+                .HasColumnName("credential_ref")
+                .IsRequired();
+            entity.Property(subscription => subscription.ArchivedAt)
+                .HasColumnName("archived_at")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(subscription => subscription.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(subscription => subscription.UpdatedAt)
+                .HasColumnName("updated_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            // One subscription per connection, and this is the index the delivery route's only lookup
+            // uses. A connection with two rows would make "is this connection subscribed" a question
+            // with two answers.
+            entity.HasIndex(subscription => subscription.ConnectionId)
+                .IsUnique()
+                .HasDatabaseName("ux_github_webhook_subscriptions_connection_id");
+
+            // A project's own read, and the archive statement's filter.
+            entity.HasIndex(subscription => new { subscription.ScopeId, subscription.ProjectId })
+                .HasDatabaseName("ix_github_webhook_subscriptions_scope_id_project_id");
+
+            // The connection this subscription is for, and the project it belongs to. Both are
+            // restrictive: a connection that is replaced or a project that is archived stops a delivery
+            // being routed, and a subscription row that could be cascaded away would take the receipts
+            // that name it with it.
+            entity.HasOne<GitHubConnection>()
+                .WithMany()
+                .HasForeignKey(subscription => subscription.ConnectionId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_github_webhook_subscriptions_connection_id");
+
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(subscription => subscription.ProjectId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_github_webhook_subscriptions_project_id");
+        });
+
+        // GITHUB-RELEASE-CANDIDATES-001/002: one signed delivery and what became of it. There is no body
+        // column, no signature column and no secret column: a delivery's own text may name a private
+        // issue title or an author's login, and a table of receipts is a table a support export would
+        // carry. The `proposals` column is this package's own already-routed reading of the body, and it
+        // exists because the work happens after the route has answered 202.
+        modelBuilder.Entity<GitHubWebhookDelivery>(entity =>
+        {
+            entity.ToTable("github_webhook_deliveries");
+            entity.HasKey(delivery => delivery.Id);
+            entity.Property(delivery => delivery.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(delivery => delivery.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(delivery => delivery.ConnectionId)
+                .HasColumnName("connection_id")
+                .IsRequired();
+            entity.Property(delivery => delivery.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(delivery => delivery.DeliveryId)
+                .HasColumnName("delivery_id")
+                .HasMaxLength(GitHubDeliveryIdMaxLength)
+                .IsRequired();
+            entity.Property(delivery => delivery.Event)
+                .HasColumnName("event")
+                .HasMaxLength(GitHubCandidateEventNameMaxLength)
+                .IsRequired();
+            entity.Property(delivery => delivery.Action)
+                .HasColumnName("action")
+                .HasMaxLength(GitHubCandidateEventNameMaxLength);
+            entity.Property(delivery => delivery.Status)
+                .HasColumnName("status")
+                .HasMaxLength(GitHubCandidateStatusMaxLength)
+                .IsRequired();
+            entity.Property(delivery => delivery.Reason)
+                .HasColumnName("reason")
+                .HasMaxLength(GitHubCandidateReasonMaxLength);
+            entity.Property(delivery => delivery.CandidateCount)
+                .HasColumnName("candidate_count")
+                .HasDefaultValue(0)
+                .IsRequired();
+            entity.Property(delivery => delivery.ReceivedAt)
+                .HasColumnName("received_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(delivery => delivery.ProposalsJson)
+                .HasColumnName("proposals")
+                .HasColumnType("jsonb")
+                .IsRequired();
+
+            // The retry guard, decided by the database. GitHub redelivers without announcing it, and
+            // this is what makes a redelivery the same delivery rather than a second one.
+            entity.HasIndex(delivery => new { delivery.ConnectionId, delivery.DeliveryId })
+                .IsUnique()
+                .HasDatabaseName("ux_github_webhook_deliveries_connection_id_delivery_id");
+
+            // The outbox consumer's only lookup: the aggregate it carries is this row's own id, so this
+            // index is the read that turns a queued event back into the connection and delivery it
+            // names.
+            entity.HasIndex(delivery => new { delivery.ScopeId, delivery.Id })
+                .HasDatabaseName("ix_github_webhook_deliveries_scope_id_id");
+
+            // A connection's receipts are read newest first, so the index carries that order.
+            entity.HasIndex(delivery => new { delivery.ScopeId, delivery.ConnectionId, delivery.ReceivedAt })
+                .HasDatabaseName("ix_github_webhook_deliveries_scope_id_connection_received_at");
+
+            entity.ToTable(
+                table =>
+                {
+                    // The receipt and ignored-reason vocabularies as database constraints rather than
+                    // conventions. A status no reader recognises would otherwise be reported as whatever
+                    // the panel guessed it meant, and a reason a reader cannot interpret is not an
+                    // explanation.
+                    table.HasCheckConstraint(
+                        "ck_github_webhook_deliveries_status",
+                        "status IN ('pending', 'recorded', 'ignored')");
+
+                    table.HasCheckConstraint(
+                        "ck_github_webhook_deliveries_reason",
+                        "reason IS NULL OR reason IN ('unsupported-event', 'unsupported-action', "
+                        + "'below-star-threshold', 'connection-inactive', 'nothing-named')");
+
+                    // A receipt that was decided says so consistently: a counted receipt is recorded, and
+                    // a receipt with nothing counted is ignored and names why. Half of that is not a
+                    // state a reader could be told about honestly.
+                    table.HasCheckConstraint(
+                        "ck_github_webhook_deliveries_outcome",
+                        "(status = 'pending' AND candidate_count = 0) "
+                        + "OR (status = 'recorded' AND candidate_count > 0 AND reason IS NULL) "
+                        + "OR (status = 'ignored' AND candidate_count = 0 AND reason IS NOT NULL)");
+                });
+
+            entity.HasOne<GitHubConnection>()
+                .WithMany()
+                .HasForeignKey(delivery => delivery.ConnectionId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_github_webhook_deliveries_connection_id");
+        });
+
+        // GITHUB-RELEASE-CANDIDATES-001/002: one proposal for a Milestone, attributed to the thing that
+        // produced it. The kind and source vocabularies are check constraints rather than conventions,
+        // so a stored value no reader recognises cannot be published as one it does.
+        modelBuilder.Entity<GitHubCandidate>(entity =>
+        {
+            entity.ToTable("github_candidates");
+            entity.HasKey(candidate => candidate.Id);
+            entity.Property(candidate => candidate.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(candidate => candidate.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(candidate => candidate.ConnectionId)
+                .HasColumnName("connection_id")
+                .IsRequired();
+            entity.Property(candidate => candidate.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(candidate => candidate.SourceKey)
+                .HasColumnName("source_key")
+                .HasMaxLength(GitHubCandidateSourceKeyMaxLength)
+                .IsRequired();
+            entity.Property(candidate => candidate.Kind)
+                .HasColumnName("kind")
+                .HasMaxLength(GitHubCandidateKindMaxLength)
+                .IsRequired();
+            entity.Property(candidate => candidate.Title)
+                .HasColumnName("title")
+                .HasMaxLength(GitHubCandidateTitleMaxLength)
+                .IsRequired();
+            entity.Property(candidate => candidate.Revision)
+                .HasColumnName("revision")
+                .HasMaxLength(GitHubCandidateRevisionMaxLength);
+            entity.Property(candidate => candidate.Source)
+                .HasColumnName("source")
+                .HasMaxLength(GitHubCandidateSourceMaxLength)
+                .IsRequired();
+            entity.Property(candidate => candidate.DeliveryId)
+                .HasColumnName("delivery_id")
+                .HasMaxLength(GitHubDeliveryIdMaxLength);
+            entity.Property(candidate => candidate.ReceivedAt)
+                .HasColumnName("received_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            // The whole package in one index: exactly one candidate per provider source key per scope.
+            // Two deliveries of one release arriving at the same instant therefore produce one candidate
+            // and one refusal rather than two, and the caller counts the refusal as "already proposed"
+            // rather than raising.
+            entity.HasIndex(candidate => new { candidate.ScopeId, candidate.SourceKey })
+                .IsUnique()
+                .HasDatabaseName("ux_github_candidates_scope_id_source_key");
+
+            // The owner's review queue, read newest first.
+            entity.HasIndex(candidate => new { candidate.ScopeId, candidate.ProjectId, candidate.ReceivedAt })
+                .HasDatabaseName("ix_github_candidates_scope_id_project_id_received_at");
+
+            entity.ToTable(
+                table =>
+                {
+                    // The three disjoint key prefixes, as a database constraint. Without it a writer
+                    // that produced a key of its own shape would make "where did this key come from"
+                    // unanswerable.
+                    table.HasCheckConstraint(
+                        "ck_github_candidates_source_key",
+                        "source_key LIKE 'release:%' OR source_key LIKE 'tag:%' OR source_key LIKE 'event:%'");
+
+                    table.HasCheckConstraint(
+                        "ck_github_candidates_kind",
+                        "kind IN ('release', 'tag', 'pull-request', 'issue', 'star')");
+
+                    table.HasCheckConstraint(
+                        "ck_github_candidates_source",
+                        "source IN ('webhook', 'poll')");
+                });
+
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(candidate => candidate.ProjectId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_github_candidates_project_id");
+
+            entity.HasOne<GitHubConnection>()
+                .WithMany()
+                .HasForeignKey(candidate => candidate.ConnectionId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_github_candidates_connection_id");
+        });
+
+        // GITHUB-RELEASE-CANDIDATES-001: one row per poll, written when the owner asks and completed by
+        // the job. The four count columns default to zero in the database as well as in the record, so
+        // "asked for and not yet polled" is a state the table can hold without this store inventing
+        // numbers it has not read. The check constraint is on the completion pair rather than on any one
+        // column, so half a completion cannot be stored at all.
+        modelBuilder.Entity<GitHubCandidateRun>(entity =>
+        {
+            entity.ToTable("github_candidate_runs");
+            entity.HasKey(run => run.Id);
+            entity.Property(run => run.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(run => run.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(run => run.OperationId).HasColumnName("operation_id").IsRequired();
+            entity.Property(run => run.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(run => run.ExpectedProjectRevision)
+                .HasColumnName("expected_project_revision")
+                .IsRequired();
+            entity.Property(run => run.Owner)
+                .HasColumnName("owner")
+                .HasMaxLength(GitHubOwnerMaxLength)
+                .IsRequired();
+            entity.Property(run => run.Repo)
+                .HasColumnName("repo")
+                .HasMaxLength(GitHubRepoMaxLength)
+                .IsRequired();
+            entity.Property(run => run.Since)
+                .HasColumnName("since")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(run => run.HeadSha)
+                .HasColumnName("head_sha")
+                .HasMaxLength(GitHubShaMaxLength);
+            entity.Property(run => run.Endpoints)
+                .HasColumnName("endpoints")
+                .HasMaxLength(GitHubCandidateEndpointsMaxLength);
+            entity.Property(run => run.FetchedAt)
+                .HasColumnName("fetched_at")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(run => run.ReleaseCount)
+                .HasColumnName("release_count")
+                .HasDefaultValue(0)
+                .IsRequired();
+            entity.Property(run => run.TagCount)
+                .HasColumnName("tag_count")
+                .HasDefaultValue(0)
+                .IsRequired();
+            entity.Property(run => run.CandidateCount)
+                .HasColumnName("candidate_count")
+                .HasDefaultValue(0)
+                .IsRequired();
+            entity.Property(run => run.RecordedCount)
+                .HasColumnName("recorded_count")
+                .HasDefaultValue(0)
+                .IsRequired();
+            entity.Property(run => run.CompletedAt)
+                .HasColumnName("completed_at")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(run => run.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            // One run per operation, and the worker's lookup: a job is handed an operation id and
+            // nothing else, so this index is the only way it can find the window the owner typed.
+            entity.HasIndex(run => new { run.ScopeId, run.OperationId })
+                .IsUnique()
+                .HasDatabaseName("ux_github_candidate_runs_scope_id_operation_id");
+
+            // A project's polls are read newest first, so the index carries that order.
+            entity.HasIndex(run => new { run.ScopeId, run.ProjectId, run.CreatedAt })
+                .HasDatabaseName("ix_github_candidate_runs_scope_id_project_id_created_at");
+
+            // A run that has completed named the endpoints it read; one that has not has not. Checked on
+            // the pair so "polled" and "did not finish" cannot both be true of one row.
+            entity.ToTable(
+                table =>
+                {
+                    table.HasCheckConstraint(
+                        "ck_github_candidate_runs_completion",
+                        "(completed_at IS NULL AND fetched_at IS NULL AND endpoints IS NULL) "
+                        + "OR (completed_at IS NOT NULL AND fetched_at IS NOT NULL AND endpoints IS NOT NULL)");
+                });
+
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(run => run.ProjectId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_github_candidate_runs_project_id");
+        });
     }
 
     /// <summary>At most 40 characters for a content kind, matching the Core record's own bound.</summary>
@@ -1644,6 +1989,47 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
     /// </summary>
     private const int LocalCommandLogMaxLength = 500;
 
+    // ---------------------------------------------------------------------------------------------
+    // github-release-candidates. Every bound below is the application policy's own number rather than
+    // a fresh one, so the column and the rule that writes it cannot disagree: a value the policy
+    // already cut is always within the column, and a row that somehow was not is refused by the column
+    // instead of being silently shortened.
+    // ---------------------------------------------------------------------------------------------
+
+    /// <summary>At most 64 characters; GitHub's delivery ids are UUIDs and this leaves room.</summary>
+    private const int GitHubDeliveryIdMaxLength = 64;
+
+    /// <summary>At most 40 characters; the longest routed event name is <c>pull_request</c>.</summary>
+    private const int GitHubCandidateEventNameMaxLength = 40;
+
+    /// <summary>At most 12 characters; the longest receipt status is <c>recorded</c>.</summary>
+    private const int GitHubCandidateStatusMaxLength = 12;
+
+    /// <summary>At most 24 characters; the longest reason is <c>below-star-threshold</c>.</summary>
+    private const int GitHubCandidateReasonMaxLength = 24;
+
+    /// <summary>At most 16 characters; the longest kind is <c>pull-request</c>.</summary>
+    private const int GitHubCandidateKindMaxLength = 16;
+
+    /// <summary>At most 200 characters; a provider's release name, cut on the way in.</summary>
+    private const int GitHubCandidateTitleMaxLength = 200;
+
+    /// <summary>At most 320 characters; the widest source key the builder can produce.</summary>
+    private const int GitHubCandidateSourceKeyMaxLength = 320;
+
+    /// <summary>At most 64 characters; a commit sha or a stable revision, both hex or ISO 8601.</summary>
+    private const int GitHubCandidateRevisionMaxLength = 64;
+
+    /// <summary>At most 8 characters; the longest source is <c>webhook</c>.</summary>
+    private const int GitHubCandidateSourceMaxLength = 8;
+
+    /// <summary>
+    /// At most 200 characters for the consulted path list. A candidate poll consults exactly two
+    /// endpoints, so this is generous rather than tight, and a run that somehow exceeded it is refused
+    /// by the column instead of being silently shortened.
+    /// </summary>
+    private const int GitHubCandidateEndpointsMaxLength = 200;
+
     /// <summary>At most 12 characters; the longest draft status is <c>approved</c>.</summary>
     private const int VoiceDraftStatusMaxLength = 12;
 
@@ -1658,7 +2044,6 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     /// <summary>At most 16 characters; the longest evidence kind is <c>project-metadata</c>.</summary>
     private const int EvidenceKindMaxLength = 16;
-
     /// <summary>At most 12 characters; the longest availability is <c>unavailable</c>.</summary>
     private const int EvidenceAvailabilityMaxLength = 12;
 

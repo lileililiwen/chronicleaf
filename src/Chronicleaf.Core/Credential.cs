@@ -155,9 +155,19 @@ public sealed class Credential
 public static class CredentialProviders
 {
     /// <summary>The identifiers, in the order a settings surface lists them.</summary>
+    /// <remarks>
+    /// <b><c>github-webhook</c> is a second GitHub slot, and it has to be.</b> The unique index on
+    /// <c>(scope_id, provider)</c> means one installation holds one credential per provider, and the
+    /// two GitHub secrets are not interchangeable: the <c>github</c> token authenticates Chronicleaf to
+    /// GitHub when it reads a repository, and the webhook secret authenticates GitHub to Chronicleaf
+    /// when it delivers a signed event. Reusing one slot would mean saving a webhook secret overwrote
+    /// the read token (or the other way round), so the two are two names and both are refused if the
+    /// owner stores the wrong kind of value under the wrong one.
+    /// </remarks>
     public static readonly IReadOnlyList<string> All =
     [
         "github",
+        "github-webhook",
         "openai",
         "gemini",
         "anthropic",

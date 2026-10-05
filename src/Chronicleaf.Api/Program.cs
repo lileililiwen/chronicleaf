@@ -15,6 +15,7 @@ using Chronicleaf.Api.Curation;
 using Chronicleaf.Api.Evidence;
 using Chronicleaf.Api.Git;
 using Chronicleaf.Api.GitHub;
+using Chronicleaf.Api.Candidates;
 using Chronicleaf.Api.Media;
 using Chronicleaf.Api.Operations;
 using Chronicleaf.Api.Projects;
@@ -34,6 +35,7 @@ using Chronicleaf.Infrastructure.Curation;
 using Chronicleaf.Infrastructure.Evidence;
 using Chronicleaf.Infrastructure.Git;
 using Chronicleaf.Infrastructure.GitHub;
+using Chronicleaf.Infrastructure.GitHubCandidates;
 using Chronicleaf.Infrastructure.Media;
 using Chronicleaf.Infrastructure.Operations;
 using Chronicleaf.Infrastructure.Persistence;
@@ -183,6 +185,17 @@ builder.Services.AddOllamaProvider(builder.Configuration);
 // migration reports schema_mismatch at /api/ready.
 builder.Services.AddGitHubEvidence();
 
+// GITHUB-RELEASE-CANDIDATES-001/002. The read-only candidate transport - a third registration name,
+// so it shadows neither the hosted evidence transport nor the local one - plus four stores, the service,
+// the one job handler that performs a poll and the one outbox consumer that turns an accepted delivery
+// into candidates. There is no key to configure here: a webhook secret is a delivered vault credential
+// under the `github-webhook` provider, stored by the owner, and this package only ever holds a
+// reference to it and a lease for the length of one comparison. Nothing is ever written to GitHub - the
+// transport exposes no verb that could - and nothing here confirms a candidate, appends evidence or
+// publishes. A database without the github-release-candidates migration reports schema_mismatch at
+// /api/ready.
+builder.Services.AddGitHubCandidates();
+
 // LOCAL-GIT-EVIDENCE-001/002. The read-only Git transport, which runs four Git verbs and refuses every
 // other, plus the two stores, the service and the one job handler that appends collected evidence to a
 // milestone. The registered roots are the operator's own configuration (`Chronicleaf:LocalRepositoryRoots`)
@@ -317,6 +330,14 @@ app.MapAIGenerationEndpoints();
 // here accepts or returns a URL and none returns a credential: a repository is an owner and a name,
 // and the host is a constant of the transport.
 app.MapGitHubEvidenceEndpoints();
+
+// GITHUB-RELEASE-CANDIDATES-001/002: the private candidate, poll and subscription routes, plus the one
+// public delivery route. The five private ones are not marked public, so the access package's
+// default-deny boundary already covers every one of them. The delivery route is marked public
+// deliberately and is the single place in this repository that an owner session does not protect: its
+// caller is GitHub, it has no session, and the HMAC signature over its own raw bytes is what
+// authenticates it. Nothing in this file confirms a candidate, and no route here returns a secret.
+app.MapGitHubCandidateEndpoints();
 
 // LOCAL-GIT-EVIDENCE-001/002: the private root catalogue, registration and collection routes. None of
 // them is marked public, so the access package's default-deny boundary already covers every one of them.

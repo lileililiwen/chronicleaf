@@ -47,7 +47,15 @@ public interface IAuditLog
         CancellationToken cancellationToken = default);
 }
 
-/// <summary>Read side of the durable outbox.</summary>
+/// <summary>The durable outbox: one row per something that happened and still has to be acted on.</summary>
+/// <remarks>
+/// The read side and the write side are both here, and the write side is additive to the two the
+/// data-foundation package first shipped. It exists because the delivered dispatcher routes a pending
+/// row to whichever <c>IOutboxEventHandler</c> claims its kind - and without a way to write a row for a
+/// kind this repository did not itself produce, that routing could never reach a second package. The
+/// row is staged only and reaches PostgreSQL when the caller's unit of work commits, so an event can
+/// never exist without whatever it was written alongside.
+/// </remarks>
 public interface IOutboxStore
 {
     Task<IReadOnlyList<Core.OutboxEvent>> ListPendingAsync(
@@ -55,4 +63,15 @@ public interface IOutboxStore
         CancellationToken cancellationToken = default);
 
     Task<long> CountAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Stages one event of this package's own kind.
+    /// </summary>
+    /// <param name="payload">
+    /// The versioned envelope. Its kind must be one a consumer is registered for, and its aggregate id
+    /// and revision identify the thing the event is about, because the unique index on
+    /// <c>(kind, aggregate_id, revision)</c> is what makes redelivery of the same revision impossible.
+    /// </param>
+    /// <exception cref="Common.ValidationFailedException">The payload names no kind or no aggregate.</exception>
+    Task EnqueueAsync(OutboxPayload payload, CancellationToken cancellationToken = default);
 }

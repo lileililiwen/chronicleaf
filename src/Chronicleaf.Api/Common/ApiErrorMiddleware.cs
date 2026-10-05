@@ -6,6 +6,7 @@ using Chronicleaf.Application.Common;
 using Chronicleaf.Application.Content;
 using Chronicleaf.Application.Git;
 using Chronicleaf.Application.GitHub;
+using Chronicleaf.Application.GitHubCandidates;
 using Chronicleaf.Application.Media;
 using Chronicleaf.Application.Milestones;
 using Chronicleaf.Application.Operations;
@@ -14,6 +15,11 @@ using Chronicleaf.Application.Secrets;
 // namespace Chronicleaf.Api, which wins the lookup from inside this namespace. The alias keeps the
 // envelope type unambiguous: the shell record is a different, shipped contract.
 using Envelope = Chronicleaf.Application.Common.ApiError;
+
+// The candidate package's failure types are addressed through an alias because this file already
+// carries a `GitHub` prefix for the delivered evidence package, and two feature packages both
+// contributing `...Error` constants to one switch is exactly where a mistyped arm would compile.
+using CandidateError = Chronicleaf.Application.GitHubCandidates.GitHubCandidateError;
 
 namespace Chronicleaf.Api.Common;
 
@@ -429,6 +435,52 @@ public sealed class ApiErrorMiddleware(
                         approvalBlocked.Message,
                         traceId,
                         approvalBlocked.FieldErrors),
+                    LogLevel.Information);
+
+            // GITHUB-RELEASE-CANDIDATES-001/002. Written here for the same reason as every other feature
+            // package's refusals: this package raises them and this middleware is still the only place an
+            // envelope is written. The messages are authored in the candidate package and name no
+            // repository, no secret and no delivery body. The 401 is one answer for a wrong signature, a
+            // missing one, a SHA-1 one and a connection id nobody has - a route that answered those
+            // differently would let anybody enumerate an installation's repository connections. The 422
+            // is deliberately distinguishable from it: the sender proved who it was and the problem is
+            // what it sent. The 413 is this package's own one-mebibyte ceiling, and the 503 is GitHub
+            // being unreachable rather than this server being broken.
+            case GitHubCandidateSignatureInvalidException signatureInvalid:
+                return (
+                    Envelope.Create(CandidateError.SignatureInvalid, signatureInvalid.Message, traceId),
+                    LogLevel.Information);
+
+            case GitHubCandidateDeliveryMalformedException deliveryMalformed:
+                return (
+                    Envelope.Create(
+                        CandidateError.DeliveryMalformed,
+                        deliveryMalformed.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            case GitHubCandidateConnectionMissingException connectionMissing:
+                return (
+                    Envelope.Create(
+                        CandidateError.ConnectionMissing,
+                        connectionMissing.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            case GitHubCandidateUnavailableException candidateUnavailable:
+                return (
+                    Envelope.Create(
+                        CandidateError.Unreachable,
+                        candidateUnavailable.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            case GitHubCandidateDeliveryTooLargeException deliveryTooLarge:
+                return (
+                    Envelope.Create(
+                        CandidateError.DeliveryTooLarge,
+                        deliveryTooLarge.Message,
+                        traceId),
                     LogLevel.Information);
 
             case BadHttpRequestException badRequest when badRequest.StatusCode == StatusCodes.Status413PayloadTooLarge:

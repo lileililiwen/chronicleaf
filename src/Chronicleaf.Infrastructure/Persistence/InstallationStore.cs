@@ -93,9 +93,15 @@ public sealed class AuditLog(ChronicleafDbContext dbContext) : IAuditLog
     }
 }
 
-/// <summary>Read side of the durable outbox.</summary>
-public sealed class OutboxStore(ChronicleafDbContext dbContext) : IOutboxStore
+/// <summary>The durable outbox: pending reads and the one staged write a package owns its kind through.</summary>
+public sealed class OutboxStore(ChronicleafDbContext dbContext, TimeProvider? clock = null) : IOutboxStore
 {
+    // The clock is optional rather than required, and that is a deliberate shape rather than a
+    // convenience: the delivered persistence scenarios construct this store with the context alone,
+    // and a package adding a staged write must not be able to break a call site it does not own. The
+    // container always supplies one, so a staged row carries the same instant the delivered rows do.
+    private readonly TimeProvider now = clock ?? TimeProvider.System;
+
     public async Task<IReadOnlyList<OutboxEvent>> ListPendingAsync(
         int limit,
         CancellationToken cancellationToken = default)
@@ -113,4 +119,41 @@ public sealed class OutboxStore(ChronicleafDbContext dbContext) : IOutboxStore
 
     public Task<long> CountAsync(CancellationToken cancellationToken = default) =>
         dbContext.Outbox.LongCountAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public Task EnqueueAsync(OutboxPayload payload, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (string.IsNullOrWhiteSpace(payload.Kind))
+        {
+            throw new ValidationFailedException("kind", "An outbox event must name the kind it announces.");
+        }
+
+        if (payload.AggregateId == Guid.Empty)
+        {
+            throw new ValidationFailedException("aggregateId", "An outbox event must name the thing it is about.");
+        }
+
+        if (payload.Revision < 1)
+        {
+            // A revision of zero or less has no meaning against the unique (kind, aggregate, revision)
+            // index, and an event that cannot be deduplicated is an event a dispatcher may replay into
+            // the same work twice.
+            throw new ValidationFailedException("revision", "An outbox event's revision is one or greater.");
+        }
+
+        // Staged only: it reaches PostgreSQL when the caller's unit of work commits, so an event never
+        // exists without whatever it was written alongside.
+        dbContext.Outbox.Add(new OutboxEvent(
+            Guid.NewGuid(),
+            payload.Kind,
+            payload.AggregateId,
+            payload.Revision,
+            payload.ToJson(),
+            now.GetUtcNow()));
+
+        return Task.CompletedTask;
+    }
 }

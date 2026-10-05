@@ -49,7 +49,12 @@ public static class ChronicleafPersistenceServiceCollectionExtensions
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IInstallationStore, InstallationStore>();
         services.AddScoped<IAuditLog, AuditLog>();
-        services.AddScoped<IOutboxStore, OutboxStore>();
+        // The factory rather than the open generic, so a staged outbox row is stamped by the same
+        // TimeProvider the delivered rows are. The store's own parameter is optional, which is what
+        // keeps the delivered persistence scenarios' direct construction compiling unchanged.
+        services.AddScoped<IOutboxStore>(provider => new OutboxStore(
+            provider.GetRequiredService<ChronicleafDbContext>(),
+            provider.GetRequiredService<TimeProvider>()));
         services.AddScoped<IOutboxDispatcher, OutboxDispatcher>();
 
         services.AddSingleton(new ChronicleafDatabaseOptions(connectionString));

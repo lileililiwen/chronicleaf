@@ -739,6 +739,186 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.ToTable("generation_previews", (string)null);
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.GitHubCandidate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConnectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("connection_id");
+
+                    b.Property<string>("DeliveryId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("delivery_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<string>("Revision")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("SourceKey")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("source_key");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConnectionId");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("ScopeId", "SourceKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_github_candidates_scope_id_source_key");
+
+                    b.HasIndex("ScopeId", "ProjectId", "ReceivedAt")
+                        .HasDatabaseName("ix_github_candidates_scope_id_project_id_received_at");
+
+                    b.ToTable("github_candidates", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_github_candidates_kind", "kind IN ('release', 'tag', 'pull-request', 'issue', 'star')");
+
+                            t.HasCheckConstraint("ck_github_candidates_source", "source IN ('webhook', 'poll')");
+
+                            t.HasCheckConstraint("ck_github_candidates_source_key", "source_key LIKE 'release:%' OR source_key LIKE 'tag:%' OR source_key LIKE 'event:%'");
+                        });
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.GitHubCandidateRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("CandidateCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("candidate_count");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Endpoints")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("endpoints");
+
+                    b.Property<long>("ExpectedProjectRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expected_project_revision");
+
+                    b.Property<DateTimeOffset?>("FetchedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fetched_at");
+
+                    b.Property<string>("HeadSha")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("head_sha");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<string>("Owner")
+                        .IsRequired()
+                        .HasMaxLength(39)
+                        .HasColumnType("character varying(39)")
+                        .HasColumnName("owner");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<int>("RecordedCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("recorded_count");
+
+                    b.Property<int>("ReleaseCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("release_count");
+
+                    b.Property<string>("Repo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("repo");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<DateTimeOffset?>("Since")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("since");
+
+                    b.Property<int>("TagCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("tag_count");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("ScopeId", "OperationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_github_candidate_runs_scope_id_operation_id");
+
+                    b.HasIndex("ScopeId", "ProjectId", "CreatedAt")
+                        .HasDatabaseName("ix_github_candidate_runs_scope_id_project_id_created_at");
+
+                    b.ToTable("github_candidate_runs", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_github_candidate_runs_completion", "(completed_at IS NULL AND fetched_at IS NULL AND endpoints IS NULL) OR (completed_at IS NOT NULL AND fetched_at IS NOT NULL AND endpoints IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.GitHubConnection", b =>
                 {
                     b.Property<Guid>("Id")
@@ -795,6 +975,137 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ux_github_connections_scope_id_project_id");
 
                     b.ToTable("github_connections", (string)null);
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.GitHubWebhookDelivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("action");
+
+                    b.Property<int>("CandidateCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("candidate_count");
+
+                    b.Property<Guid>("ConnectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("connection_id");
+
+                    b.Property<string>("DeliveryId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("delivery_id");
+
+                    b.Property<string>("Event")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("event");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("ProposalsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("proposals");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConnectionId", "DeliveryId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_github_webhook_deliveries_connection_id_delivery_id");
+
+                    b.HasIndex("ScopeId", "Id")
+                        .HasDatabaseName("ix_github_webhook_deliveries_scope_id_id");
+
+                    b.HasIndex("ScopeId", "ConnectionId", "ReceivedAt")
+                        .HasDatabaseName("ix_github_webhook_deliveries_scope_id_connection_received_at");
+
+                    b.ToTable("github_webhook_deliveries", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_github_webhook_deliveries_outcome", "(status = 'pending' AND candidate_count = 0) OR (status = 'recorded' AND candidate_count > 0 AND reason IS NULL) OR (status = 'ignored' AND candidate_count = 0 AND reason IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_github_webhook_deliveries_reason", "reason IS NULL OR reason IN ('unsupported-event', 'unsupported-action', 'below-star-threshold', 'connection-inactive', 'nothing-named')");
+
+                            t.HasCheckConstraint("ck_github_webhook_deliveries_status", "status IN ('pending', 'recorded', 'ignored')");
+                        });
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.GitHubWebhookSubscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at");
+
+                    b.Property<Guid>("ConnectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("connection_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CredentialRef")
+                        .HasColumnType("uuid")
+                        .HasColumnName("credential_ref");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConnectionId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_github_webhook_subscriptions_connection_id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("ScopeId", "ProjectId")
+                        .HasDatabaseName("ix_github_webhook_subscriptions_scope_id_project_id");
+
+                    b.ToTable("github_webhook_subscriptions", (string)null);
                 });
 
             modelBuilder.Entity("Chronicleaf.Core.Installation", b =>
@@ -1807,6 +2118,33 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_generation_previews_milestone_id");
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.GitHubCandidate", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.GitHubConnection", null)
+                        .WithMany()
+                        .HasForeignKey("ConnectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_github_candidates_connection_id");
+
+                    b.HasOne("Chronicleaf.Core.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_github_candidates_project_id");
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.GitHubCandidateRun", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_github_candidate_runs_project_id");
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.GitHubConnection", b =>
                 {
                     b.HasOne("Chronicleaf.Core.Project", null)
@@ -1815,6 +2153,33 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_github_connections_project_id");
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.GitHubWebhookDelivery", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.GitHubConnection", null)
+                        .WithMany()
+                        .HasForeignKey("ConnectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_github_webhook_deliveries_connection_id");
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.GitHubWebhookSubscription", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.GitHubConnection", null)
+                        .WithMany()
+                        .HasForeignKey("ConnectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_github_webhook_subscriptions_connection_id");
+
+                    b.HasOne("Chronicleaf.Core.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_github_webhook_subscriptions_project_id");
                 });
 
             modelBuilder.Entity("Chronicleaf.Core.LocalRepository", b =>

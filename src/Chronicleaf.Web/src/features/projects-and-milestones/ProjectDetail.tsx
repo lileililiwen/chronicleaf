@@ -8,6 +8,7 @@ import {
   getProject,
   listMilestones,
 } from './api';
+import { GitHubCandidatePanel } from '../github-release-candidates/GitHubCandidatePanel';
 import { GitHubConnectionPanel } from '../github-evidence/GitHubConnectionPanel';
 import { GitHubSyncPanel } from '../github-evidence/GitHubSyncPanel';
 import { LocalGitSyncPanel } from '../local-git-evidence/LocalGitSyncPanel';
@@ -207,6 +208,20 @@ export function ProjectDetail({
             answer to "which one?" that the server does not give.
           */}
           <LocalRepositoryPanel projectId={record.id} archived={archived} />
+
+          {/*
+            GITHUB-RELEASE-CANDIDATES-001/002. The tag and event derived Milestone candidates this
+            project's repository has produced, and the one form that asks for another read. It sits under
+            the connection panel because a candidate is something read from the connection above: with no
+            repository connected this panel has nothing to read, and it says so rather than showing an
+            empty list that would look like a quiet repository.
+
+            It is here and not under a milestone because a candidate is a proposal about the project, not
+            about any one milestone: nothing in it can be confirmed from here, so there is no milestone to
+            scope it to. An archived project still shows what was proposed, read-only, because a
+            candidate somebody did not act on is a fact about the repository and not about the project.
+          */}
+          <GitHubCandidatePanel projectId={record.id} archived={archived} />
         </header>
       )}
 

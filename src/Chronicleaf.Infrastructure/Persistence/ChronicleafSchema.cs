@@ -139,6 +139,17 @@ public static class ChronicleafSchema
     /// </summary>
     public const string LocalGitEvidenceMigrationId = "20261008090000_AddLocalGitEvidence";
 
+    /// <summary>
+    /// The forward migration that adds the <c>github_webhook_subscriptions</c>,
+    /// <c>github_webhook_deliveries</c>, <c>github_candidates</c> and <c>github_candidate_runs</c> tables
+    /// with the unique indexes that make one candidate per provider source key and one receipt per
+    /// delivery database decisions (GITHUB-RELEASE-CANDIDATES-001/002). A database that has never
+    /// applied it has nowhere to record a delivery, a receipt or a candidate, so its candidate routes
+    /// would fail against missing tables; readiness says so by name rather than answering 200 and
+    /// failing on the first delivery.
+    /// </summary>
+    public const string GitHubReleaseCandidatesMigrationId = "20261009090000_AddGitHubReleaseCandidates";
+
     /// <summary>Every migration a database must carry before this build calls itself ready.</summary>
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
@@ -157,6 +168,7 @@ public static class ChronicleafSchema
         ScreenshotCurationMigrationId,
         MarkdownReviewExportMigrationId,
         LocalGitEvidenceMigrationId,
+        GitHubReleaseCandidatesMigrationId,
     ];
 
     /// <summary>
@@ -164,7 +176,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = LocalGitEvidenceMigrationId;
+    public const string ExpectedMigrationId = GitHubReleaseCandidatesMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

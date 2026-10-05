@@ -7,9 +7,19 @@
  * nothing for it to display by accident.
  */
 
-/** The closed vocabulary of providers a credential may be stored for, as the server fixed it. */
+/**
+ * The closed vocabulary of providers a credential may be stored for, as the server fixed it.
+ *
+ * <b>`github-webhook` is a second GitHub slot and it has to be.</b> The server holds one credential per
+ * provider for a scope, and the two GitHub secrets are not interchangeable: the `github` token
+ * authenticates Chronicleaf to GitHub when it reads a repository, and the webhook secret authenticates
+ * GitHub to Chronicleaf when it delivers a signed event. Reusing one slot would mean saving a webhook
+ * secret overwrote the read token, so they are two providers here as they are on the server - and this
+ * list is the client's copy of the server's, so the two cannot drift without this comment being a lie.
+ */
 export const CREDENTIAL_PROVIDERS = [
   'github',
+  'github-webhook',
   'openai',
   'gemini',
   'anthropic',
@@ -72,6 +82,8 @@ export function providerLabel(provider: string): string {
   switch (provider) {
     case 'github':
       return 'GitHub';
+    case 'github-webhook':
+      return 'GitHub webhook secret';
     case 'openai':
       return 'OpenAI';
     case 'gemini':
@@ -91,7 +103,13 @@ export function providerLabel(provider: string): string {
 
 /** What a provider's field placeholder says, and never what it holds. */
 export function providerHint(provider: CredentialProvider): string {
-  return provider === 'ollama'
-    ? 'Usually empty: a local model needs no key.'
-    : 'Paste a new token to replace whatever is stored.';
+  if (provider === 'ollama') {
+    return 'Usually empty: a local model needs no key.';
+  }
+
+  if (provider === 'github-webhook') {
+    return 'The secret from the repository webhook, not a personal access token. It authenticates GitHub to Chronicleaf, and it is the other half of the github token above.';
+  }
+
+  return 'Paste a new token to replace whatever is stored.';
 }

@@ -79,6 +79,7 @@ drafts_base_url="${CHRONICLEAF_DRAFTS_BASE_URL:-http://127.0.0.1:5088}"
 curation_base_url="${CHRONICLEAF_CURATION_BASE_URL:-http://127.0.0.1:5089}"
 timeline_base_url="${CHRONICLEAF_TIMELINE_BASE_URL:-http://127.0.0.1:5090}"
 review_base_url="${CHRONICLEAF_REVIEW_BASE_URL:-http://127.0.0.1:5091}"
+candidates_base_url="${CHRONICLEAF_CANDIDATES_BASE_URL:-http://127.0.0.1:5092}"
 log_file="$repo_root/$publish_dir/server.log"
 evidence_log_file="$repo_root/$publish_dir/server-evidence.log"
 credentials_log_file="$repo_root/$publish_dir/server-credentials.log"
@@ -90,6 +91,7 @@ drafts_log_file="$repo_root/$publish_dir/server-drafts.log"
 curation_log_file="$repo_root/$publish_dir/server-curation.log"
 timeline_log_file="$repo_root/$publish_dir/server-timeline.log"
 review_log_file="$repo_root/$publish_dir/server-review.log"
+candidates_log_file="$repo_root/$publish_dir/server-candidates.log"
 key_file=""
 
 # The operator key for this run: 32 random bytes in a temporary file outside the repository and
@@ -112,6 +114,7 @@ postgres_image="postgres:17.6-alpine"
 
 server_pid=""
 postgres_container=""
+postgres_database=""
 
 cleanup() {
   local exit_status=$?
@@ -169,7 +172,11 @@ start_suite() {
   local container="chronicleaf-e2e-postgres-${suffix}-$$"
   local port=""
 
+  # Both are published for the seeds that write rows directly: a suite that inserts its own fixture
+  # has to be able to read the rows back out of the same container it wrote them into, and a container
+  # name passed as an argument through three functions is a name a later edit will get wrong.
   postgres_container="$container"
+  postgres_database="$database_name"
 
   docker run --detach --rm \
     --name "$container" \
@@ -905,6 +912,223 @@ SQL
   fi
 }
 # ---------------------------------------------------------------------------------------------
+# seed_candidates creates the project the candidate panel is read on, connects it to a repository,
+# stores a webhook secret through the delivered vault, points the connection at it, and then writes
+# the candidates and receipts a run of real deliveries would have produced.
+#
+# Every step through a product route is read back and refused when it did not take, and the rows written
+# directly are counted back afterwards. That is the same rule the review seed follows and for the same
+# reason: a seed that quietly wrote nothing leaves a green suite over an empty panel, which is the same
+# failure class as a test filter that matches nothing, one layer down.
+#
+# The candidates are inserted directly, and that is stated rather than hidden. A candidate is produced by
+# a signed GitHub delivery, and a browser cannot send one: the HMAC is over bytes a server received from
+# GitHub, not over anything a page can hold. GithubReleaseCandidatesTests is where real signed bodies go
+# through the production comparison and the production outbox consumer; what this seed does is put the
+# rows those flows would have written in front of the panel, so the browser assertions are about the
+# panel and the routes rather than about GitHub.
+#
+# More candidates are written than the panel asks for in one page, so a panel that reported the page as
+# the total would be caught here. That distinction is the easiest thing about a bounded list to get wrong
+# and the hardest to notice until somebody has lost a hundred proposals to it.
+# ---------------------------------------------------------------------------------------------
+seed_candidates() {
+  local origin="$1"
+  local token="$2"
+  local cookie_jar
+  cookie_jar="$(mktemp -d)/cookies.txt"
+
+  local antiforgery
+  antiforgery="$(curl --silent --show-error --cookie-jar "$cookie_jar" --cookie "$cookie_jar" \
+    --data "{\"accessToken\":\"${token}\"}" \
+    -H 'Content-Type: application/json' \
+    "${origin}/api/session" >/dev/null && \
+    curl --silent --show-error --cookie-jar "$cookie_jar" --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/session/antiforgery" | jq -r '.token')"
+
+  if [ -z "$antiforgery" ] || [ "$antiforgery" = "null" ]; then
+    echo "the candidate seed could not read an antiforgery value from ${origin}" >&2
+    return 1
+  fi
+
+  local project_id
+  project_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"name":"Fieldnotes","description":"Releases worth recording."}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/projects" | jq -r '.id')"
+
+  if [ -z "$project_id" ] || [ "$project_id" = "null" ]; then
+    echo "the candidate seed could not create its project" >&2
+    return 1
+  fi
+
+  # The connection is stored by the delivered route, which describes the repository over the real
+  # transport at api.github.com. This suite therefore has the same outbound prerequisite suite 6 has, and
+  # it is stated rather than worked around: where that route cannot be reached the seed fails loudly,
+  # because a stubbed GitHub would let a pass stand in for a result only a real one can give. The
+  # repository is the same real public one suite 6 connects to: the route refuses a repository GitHub
+  # does not serve, so a fictional fixture name is a 422 here rather than a connection. The connection
+  # is what makes a candidate possible at all, so no fixture avoids it without also removing
+  # the thing under test.
+  local connection_id
+  connection_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"owner":"octocat","repository":"Hello-World"}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 0' \
+    "${origin}/api/projects/${project_id}/github-connection" | jq -r '.id')"
+
+  if [ -z "$connection_id" ] || [ "$connection_id" = "null" ]; then
+    echo "the candidate seed could not connect a repository" >&2
+    return 1
+  fi
+
+  # A webhook secret, stored through the delivered vault under this package's own provider. Nothing ever
+  # reads the value back: the delivered route publishes whether a provider is configured and not the
+  # value, which is what lets the panel offer to start listening without ever holding a secret. The
+  # revision presented is 0 because this installation has nothing stored for the provider yet, and the
+  # stored revision is read back rather than assumed.
+  local secret_id
+  secret_id="$(curl --silent --show-error --cookie "$cookie_jar" --request PUT \
+    --data '{"value":"whsec-chronicleaf-e2e-candidates-sentinel-5d7c1a3e9b0f","expectedRevision":0}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 0' \
+    "${origin}/api/settings/credentials/github-webhook" | jq -r '.id')"
+
+  if [ -z "$secret_id" ] || [ "$secret_id" = "null" ]; then
+    echo "the candidate seed could not store a webhook secret" >&2
+    return 1
+  fi
+
+  # The project's own revision, read back rather than assumed: storing a connection did not move it, and
+  # the subscription is conditional on the project as the route last published it.
+  local revision
+  revision="$(curl --silent --show-error --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/projects/${project_id}" | jq -r '.revision')"
+
+  local listening
+  listening="$(curl --silent --show-error --cookie "$cookie_jar" --request PUT \
+    --data "{\"credentialRef\":\"${secret_id}\"}" \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H "If-Match: ${revision}" \
+    "${origin}/api/projects/${project_id}/github-webhook" | jq -r '.enabled')"
+
+  if [ "$listening" != "true" ]; then
+    echo "the candidate seed could not subscribe the connection" >&2
+    return 1
+  fi
+
+  seed_candidate_rows "$postgres_container" "$postgres_database" "$project_id" "$connection_id"
+}
+
+# Writes the candidates and the receipts a run of real deliveries would have produced, and then counts
+# every one of them back.
+#
+# The values are the ones the store would write: the closed kind and source vocabularies, the three
+# disjoint key prefixes, a resolved commit rather than a branch name in a revision column, and an ignored
+# receipt that names its reason. One delivery produced no candidate at all - an unmerged pull request -
+# and its receipt is here for that reason: a delivery that produced nothing is still a record that it
+# arrived, and a panel that listed it would be proposing a reversal as an achievement.
+seed_candidate_rows() {
+  local container="$1"
+  local database="$2"
+  local project_id="$3"
+  local connection_id="$4"
+
+  docker exec -i "$container" psql --username=chronicleaf --dbname="$database" --quiet \
+    --set=ON_ERROR_STOP=1 >/dev/null <<SQL
+INSERT INTO github_webhook_deliveries
+    (id, scope_id, connection_id, project_id, delivery_id, event, action, status, reason,
+     candidate_count, received_at, proposals)
+SELECT gen_random_uuid(), p.scope_id, c.id, p.id, d.delivery_id, d.event, d.action, d.status, d.reason,
+       d.candidate_count, timestamptz '2026-09-30 08:00:00+00', '[]'::jsonb
+FROM projects p
+JOIN github_connections c ON c.project_id = p.id
+CROSS JOIN (VALUES
+    ('e2e-release',  'release',       'published', 'recorded', NULL,                1),
+    ('e2e-tag',      'create',        NULL,       'recorded', NULL,                1),
+    ('e2e-pull',     'pull_request',  'closed',   'recorded', NULL,                1),
+    ('e2e-star',     'star',          'created',  'recorded', NULL,                1),
+    ('e2e-unmerged', 'pull_request',  'closed',   'ignored',   'unsupported-action', 0)
+) AS d(delivery_id, event, action, status, reason, candidate_count)
+WHERE p.id = '${project_id}';
+
+INSERT INTO github_candidates
+    (id, scope_id, connection_id, project_id, source_key, kind, title, revision, source,
+     delivery_id, received_at)
+SELECT gen_random_uuid(), p.scope_id, c.id, p.id, k.source_key, k.kind, k.title, k.revision, 'webhook',
+       k.delivery, timestamptz '2026-09-30 08:00:00+00'
+FROM projects p
+JOIN github_connections c ON c.project_id = p.id
+CROSS JOIN (VALUES
+    ('release:9301', 'release', 'Fifth release',
+     '3333333333333333333333333333333333333333', 'e2e-release'),
+    ('tag:v6.0.0:3333333333333333333333333333333333333333', 'tag', 'v6.0.0',
+     '3333333333333333333333333333333333333333', 'e2e-tag'),
+    ('event:pull_request:7001:2026-09-30T08:00:00.0000000+00:00', 'pull-request',
+     'Add the reproducible pipeline', '2026-09-30T08:00:00.0000000+00:00', 'e2e-pull'),
+    ('event:star:4242:100', 'star', '100 stars', '100', 'e2e-star')
+) AS k(source_key, kind, title, revision, delivery)
+WHERE p.id = '${project_id}';
+
+-- Twenty-two more, so the stored total is twenty-six and the panel's page is twenty-five. A panel that
+-- reported the page as the total would tell this owner they had lost one proposal; a panel that
+-- reported twenty-six rows would be ignoring a bound the server set.
+INSERT INTO github_candidates
+    (id, scope_id, connection_id, project_id, source_key, kind, title, revision, source,
+     delivery_id, received_at)
+SELECT gen_random_uuid(), p.scope_id, c.id, p.id,
+       'release:' || (8000 + n)::text, 'release',
+       'Maintenance release ' || n::text,
+       '4444444444444444444444444444444444444444', 'poll', NULL,
+       timestamptz '2026-09-01 08:00:00+00' + (n || ' minutes')::interval
+FROM projects p
+JOIN github_connections c ON c.project_id = p.id
+CROSS JOIN generate_series(1, 22) AS n
+WHERE p.id = '${project_id}';
+SQL
+
+  # Every row is counted back, and the seed refuses unless each count is what it wrote. A seed that wrote
+  # nothing would leave a green suite over an empty panel, which is a green run proving nothing.
+  local candidates
+  candidates="$(count_rows "$container" "$database" "SELECT count(*) FROM github_candidates WHERE project_id = '${project_id}'")"
+  if [ "$candidates" != "26" ]; then
+    echo "the candidate seed stored ${candidates} candidates, expected 26" >&2
+    return 1
+  fi
+
+  local recorded
+  recorded="$(count_rows "$container" "$database" "SELECT count(*) FROM github_webhook_deliveries WHERE project_id = '${project_id}' AND status = 'recorded'")"
+  if [ "$recorded" != "4" ]; then
+    echo "the candidate seed stored ${recorded} recorded receipts, expected 4" >&2
+    return 1
+  fi
+
+  local ignored
+  ignored="$(count_rows "$container" "$database" "SELECT count(*) FROM github_webhook_deliveries WHERE project_id = '${project_id}' AND status = 'ignored' AND reason = 'unsupported-action'")"
+  if [ "$ignored" != "1" ]; then
+    echo "the candidate seed stored ${ignored} ignored receipts, expected 1" >&2
+    return 1
+  fi
+
+  local unlisted
+  unlisted="$(count_rows "$container" "$database" "SELECT count(*) FROM github_candidates WHERE kind = 'pull-request' AND title = 'Abandon the pipeline'")"
+  if [ "$unlisted" != "0" ]; then
+    echo "the candidate seed stored a candidate for the unmerged pull request" >&2
+    return 1
+  fi
+}
+
+count_rows() {
+  local container="$1"
+  local database="$2"
+  local sql="$3"
+
+  docker exec "$container" psql --username=chronicleaf --dbname="$database" --quiet --tuples-only \
+    --no-align --command "$sql" | tr -d '[:space:]'
+}
+
+# ---------------------------------------------------------------------------------------------
 # Suite 1: the shell, the access boundary, the projects and milestones lifecycle, and the
 # background operations panel. Its project list must be empty when it starts, which is why this
 # suite has a database to itself.
@@ -1140,4 +1364,30 @@ seed_review "$review_base_url" "$(cat "$repo_root/$publish_dir/access-token-revi
 echo "==> npm run test:e2e (real browser against $review_base_url)"
 run_suite "$review_base_url" "$review_log_file" "$repo_root/$publish_dir/access-token-review" \
   tests/markdown-review-export.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 12: the tag- and event-derived Milestone candidates. It needs a project with a repository
+# connection and stored candidates, and a connection cannot be removed through the UI and a
+# credential cannot be written twice, so its own installation, its own database and its own published
+# instance - for the same reason suites 5, 6, 7 and 11 each have one.
+#
+# What this suite claims is narrow and says so. The candidates are seeded, because a candidate is
+# produced by a signed GitHub delivery and a browser cannot send one; the real signed path, the real HMAC
+# comparison and the real outbox consumer are the .NET suite's, and this one asserts the panel. What a
+# pass here establishes is that the panel reads the server's candidates, renders each as a proposal with
+# its source and received instant, offers no control that could confirm one, tells a project with no
+# repository connected apart from a project with nothing proposed, and reports the stored total beside
+# the page rather than as the page. It is NOT evidence that GitHub sent a delivery, that a poll read a
+# repository, or that a candidate can be recorded - and the last of those is asserted negatively.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a twelfth disposable PostgreSQL and published application at $candidates_base_url"
+start_suite candidates "$candidates_base_url" "$candidates_log_file" "$repo_root/$publish_dir/access-token-candidates"
+
+echo "==> recording the project, connection, secret, subscription and candidates the panel reads"
+seed_candidates "$candidates_base_url" "$(cat "$repo_root/$publish_dir/access-token-candidates")"
+
+echo "==> npm run test:e2e (real browser against $candidates_base_url)"
+run_suite "$candidates_base_url" "$candidates_log_file" "$repo_root/$publish_dir/access-token-candidates" \
+  tests/github-release-candidates.spec.ts
 stop_suite

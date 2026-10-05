@@ -466,6 +466,35 @@ else
   # answer, no browser launched). The container bring-up, restart, backup and restore
   # cycle the file checks stand in for is scripts/verify-community.sh.
   step "community compose release tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~CommunityComposeReleaseTests"
+  # GITHUB-RELEASE-CANDIDATES-001/002. That a verified release event produces one candidate identifying
+  # its release source, and that an invalid HMAC - a wrong secret, a missing header, a SHA-1 header and
+  # a body edited after signing - is 401 with nothing recorded; that a redelivery returns the original
+  # receipt and no second candidate; that a star count records one candidate per crossed threshold of the
+  # two declared; that an unmerged pull request, a draft release, a deleted release, an opened issue, a
+  # created branch and a below-threshold star each get an ignored receipt naming why, with no milestone,
+  # evidence item, draft or media written; and that an archived connection acknowledges a delivery as
+  # ignored, keeps its receipts, and works again when re-subscribed. The poll is proven too: that a
+  # repository is read on two bounded resources on the pinned host with no write, that the `since` floor
+  # excludes an older release while the run log still counts it, that a second poll records no new
+  # candidate because the source key already exists, and that a 404, a 401, a 403 and a 422 each fail the
+  # job with its own code and record nothing. Also that a guessed connection id and a wrong signature are
+  # the same 401 with the same message, that a signed but unreadable body is a distinguishable 422, that
+  # an oversized body is a 413, that the outbox event names this package's own receipt row and a consumer
+  # handed it twice proposes once, and that the database itself refuses a second candidate per source key,
+  # a second receipt per delivery, a half-decided receipt, a reason outside the closed vocabulary and a
+  # second subscription for one connection - all against the same real disposable PostgreSQL and the real
+  # API host, over a real temporary operator key file.
+  #
+  # A simulation is refused as evidence here, and the refusal is specific. The shared fake is a real
+  # HttpMessageHandler underneath the one HttpClient the production registration builds, so the pinned
+  # host, the real handler settings, the real HMAC comparison, the real key builder, the real status
+  # mapping and the real outbox consumer all still execute; only the bytes on the wire are the test's.
+  # The webhook secret is really sealed by the delivered vault over a real key file and is asserted absent
+  # from every table this package writes, unaligned. No stage here may be read as evidence that GitHub
+  # works, that a repository is public, that a release has the shape these fixtures give it, or that a
+  # secret GitHub holds matches one an owner stored: what these scenarios establish is Chronicleaf's own
+  # handling of what GitHub answers.
+  step "github release candidates tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~GithubReleaseCandidatesTests"
 fi
 
 step "frontend install" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm ci'

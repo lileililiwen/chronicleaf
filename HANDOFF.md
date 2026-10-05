@@ -1,6 +1,6 @@
 # Chronicleaf handoff
 
-current_spec: content-asset-variants
+current_spec: screenshot-evolution-images
 
 ## Current state — 2026-10-05
 
@@ -36,6 +36,7 @@ next POST-MVP package in ROADMAP order after `html-content-export`.
 | 24 | `local-git-evidence` | `f7e4a81` | `openspec/specs/local-git-evidence/spec.md` |
 | 25 | `narrative-memory` | `a7d12f4` | `openspec/specs/narrative-memory/spec.md` |
 | 26 | `html-content-export` | `aae5181` | `openspec/specs/html-content-export/spec.md` |
+| 27 | `content-asset-variants` | `65309ac` | `openspec/specs/content-asset-variants/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -390,8 +391,19 @@ owner's words; the e2e seed's candidate rows name the two real capture jobs the 
 PNG behind all three. Deployment stays `deployable: false`; there is no remote, no push and no
 publication.
 
-Next: `current_spec` is `content-asset-variants`, the POST-MVP package ROADMAP orders immediately
-after `html-content-export`. `html-content-export` is archived (`aae5181`, canonical spec
+Next: `current_spec` is `screenshot-evolution-images`, the POST-MVP package ROADMAP orders
+immediately after `content-asset-variants`. `content-asset-variants` is archived (`65309ac`,
+canonical spec `openspec/specs/content-asset-variants/spec.md`): seven deterministic formats
+(changelog, technical-blog, social-short, github-release, readme-update, portfolio,
+weekly-progress) derived from an approved Markdown story through fixed templates with no
+provider and no new tables - variants are new `content_assets` rows bound to the source evidence
+head and the current voice snapshot, each a draft until separately approved (never approved is
+`approval_required`, moved evidence is `approval_stale`). Read that package's own boundary
+before extending it, and note the two derivation defects its tests found: the narrative context
+builder's composed lines carry machine tokens (dates, entry refs, evidence ids) no
+evidence-cited body may contain, so history arrives as structured exportable entry texts with
+unverifiable figures omitted; and the technical-blog limitations section is `Limitations`, not
+`Known limitations`. `html-content-export` is archived (`aae5181`, canonical spec
 `openspec/specs/html-content-export/spec.md`): sanitized portable HTML export of the approved
 revision through the same approval bindings the Markdown export re-checks (never approved is
 `approval_required`, moved head is `approval_stale`), rendered by the pure
@@ -502,6 +514,45 @@ without `--skip-specs`, then make the implementation commit and the HANDOFF-only
 stop. Do not push.
 
 ## Package notes
+
+`content-asset-variants` is archived (`65309ac`, canonical spec
+`openspec/specs/content-asset-variants/spec.md`). Read that package's own boundary before
+extending it, and note what it decided that a later reader would otherwise have to rediscover.
+
+**Release evidence (`content-asset-variants`, commit `65309ac`, all run by the implementer
+rather than taken on report).** `CHRONICLEAF_E2E=1 bash scripts/verify.sh` exit 0
+(`GATE_EXIT=0`) with the platform-feed stage and twenty-eight filtered stages (the prior
+twenty-seven plus `content asset variant tests`) each asserted to select at least one test,
+including **10/10 content asset variants** run directly against the same real disposable
+PostgreSQL. `npm ci`, `tsc` and `vite build` all green. `bash scripts/e2e.sh`
+green including **2/2 Playwright in suite 14** (fourteenth disposable PostgreSQL + published
+application on port 5094): an approved story derives a changelog with its sections, citations
+and its own approval, and a readme-update derivation names its proposal as one.
+`dotnet build --nologo --no-incremental` 0 errors with the same 2 pre-existing warnings at
+HEAD. Name preflight exit 0; `openspec validate --all --strict --no-interactive` 54/54 before
+and after the archive, which used no `--skip-specs`.
+
+**A variant is a derivation, never a generation.** `POST /api/milestones/{id}/assets`
+answers 201 synchronously through the deterministic `ContentVariantRenderer` (template version
+`content-variants/1` recorded as the revision's prompt version): no provider, no credential, no
+consent, no job, no new tables - variants are new rows in the drafts package's own
+`content_assets`/`content_revisions` keyed by the unique `(scope, milestone, type)` index, so
+no migration was added. The source must be the milestone's approved `markdown-story` carrying
+a live approval that still binds the head revision, the body hash and the evidence head
+(never approved is `approval_required`, moved evidence is `approval_stale`, a moved request
+revision is `revision_conflict`); the derivative starts with no approval row, so approving the
+source never approves the variant and the variant's own approval binds and stales exactly like
+its source's through the review package's unchanged routes. Voice precedence is structural:
+the renderer receives the profile's resolved effective values and cuts the title to the
+effective `TitleMaxChars`, so a project override shortens the preset's limit on the variant.
+Narrative history arrives as structured exportable entry texts (private entries stay absent;
+lines with figures the cited evidence never stated are omitted), with entry ids in the audit
+row rather than the body. The rendered body is held to the same `MarkdownDraftValidator`
+citation/numeral rules as a generated draft before anything is stored. The panel
+(`ContentVariantPanel` under the review panel) lists, derives, previews inertly through the
+review package's own renderer, and approves each variant on its own revision; readme-update
+carries its own proposal notice element. Deployment stays `deployable: false`; there is no
+remote, no push and no publication.
 
 `html-content-export` is archived (`aae5181`, canonical spec
 `openspec/specs/html-content-export/spec.md`). Read that package's own boundary before extending

@@ -2,10 +2,11 @@
 
 ## Current state — 2026-10-05
 
-Twenty-three changes implemented, verified and archived, each with exactly two commits (implementation/
-tests/archive, then this HANDOFF-only pointer). No `current_spec` remains: `community-compose-release`
-was the MVP-RELEASE gate and every MVP dependency is archived; the changes still listed by
-`openspec list` are POST-MVP, CLOUD or DEMAND-GATED follow-ups with no selected next spec.
+Twenty-four changes implemented, verified and archived, each with exactly two commits (implementation/
+tests/archive, then this HANDOFF-only pointer). No `current_spec` remains: `local-git-evidence` was the
+first of the remaining POST-MVP follow-ups, `community-compose-release` was the MVP-RELEASE gate, and every
+MVP dependency is archived. The changes still listed by `openspec list` are POST-MVP, CLOUD or
+DEMAND-GATED follow-ups and none is selected.
 
 | # | Change | Implementation commit | Canonical spec |
 |---|---|---|---|
@@ -32,6 +33,7 @@ was the MVP-RELEASE gate and every MVP dependency is archived; the changes still
 | 21 | `llm-ollama-adapter` | `efed7af` | `openspec/specs/llm-ollama-adapter/spec.md` |
 | 22 | `markdown-review-export` | `64d6868` | `openspec/specs/markdown-review-export/spec.md` |
 | 23 | `community-compose-release` | `5a40d46` | `openspec/specs/community-compose-release/spec.md` |
+| 24 | `local-git-evidence` | `f7e4a81` | `openspec/specs/local-git-evidence/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -386,7 +388,10 @@ owner's words; the e2e seed's candidate rows name the two real capture jobs the 
 PNG behind all three. Deployment stays `deployable: false`; there is no remote, no push and no
 publication.
 
-Next: no `current_spec` remains. `community-compose-release` was the MVP-RELEASE gate and is
+Next: no `current_spec` remains. `local-git-evidence` is archived (`f7e4a81`, canonical spec
+`openspec/specs/local-git-evidence/spec.md`) and its own notes are in the package section above, including
+the registration shape, the two diff numbers and the one registration name a later transport must not
+reuse. `community-compose-release` was the MVP-RELEASE gate and is
 archived (`5a40d46`, canonical spec `openspec/specs/community-compose-release/spec.md`):
 reproducible two-service Community packaging (application + PostgreSQL on the pinned digest,
 no Redis), operator quickstart, container entrypoint with best-effort capture firewall, and
@@ -482,6 +487,112 @@ change surface, not only the files you wrote.
 Read only that package, keep one `current_spec`, implement, verify locally, strictly validate, archive
 without `--skip-specs`, then make the implementation commit and the HANDOFF-only pointer commit, and
 stop. Do not push.
+
+## Package notes
+
+`local-git-evidence` is archived (`f7e4a81`, canonical spec
+`openspec/specs/local-git-evidence/spec.md`). Read that package's own boundary before extending it, and
+note six things it decided that a later reader would otherwise have to rediscover.
+
+**The read is committed revisions only, and that is structural rather than a filter.** Every Git command
+after the two `rev-parse` resolutions takes two SHAs — `git log <base>..<head>`, `git diff <base>..<head>
+-- <paths>` — so an untracked file, a staged change and a dirty edit are not candidates for anything, and
+there is no point in the code where they could be read and then decided against. The working tree is
+touched exactly once, by a `status` whose lines are counted and dropped: the bundle says *N uncommitted
+changes, deliberately not read*, and it is a number because one of those names could be a file nobody meant
+to publish, and because a count is the only claim that stays true about an instant. A range log holds the
+commits *after* the base, so a bundle carries the base in its metadata item and the head as a commit row —
+asserting two commit rows would be a claim about a different collection, and the suite says so where it
+asserts one.
+
+**The read-only claim is enforced by a closed verb set, and proven by bytes.** `GitCommandRunner` refuses
+any subcommand outside `rev-parse`, `log`, `diff` and `status` before a process exists, so there is no code
+path by which this product fetches, pushes, checks out, resets, cleans or gc's a repository. Each process is
+started from an `ArgumentList` — never a composed string, so there is no shell — with the pager,
+`credential.helper`, `diff.external`, textconv and `core.hooksPath` all off, and standard input closed. The
+scenarios prove it by hashing every byte under the repository including `.git` before and after a
+collection, not by counting commands: a count of commands only proves this repository's own idea of what a
+mutating command is. `git diff` is given a range and then `--` and *then* the paths, in that order, because
+Git reads everything after a bare `--` as a pathspec — a range placed after it produces an empty diff, an
+exit code of zero and no error anywhere, which is the same silent-no-op class as a filter that matches
+nothing, one layer down.
+
+**Containment is asked twice, and a symlink is followed one segment at a time.** `RepoRef.Local` refuses
+traversal as pure text; `LocalGitPolicy.ResolveWithin` then resolves the path segment by segment, following
+links and re-testing containment after each step, so `root/link/notes.md` is refused at the step the link is
+followed rather than at the end — a check that resolved only the final component would call it contained.
+The check runs again immediately before every read, because a path inside a root when it was registered can
+be a link out of it by the time a job runs, and that case has its own scenario. An absent path and an
+escaping path are different answers on purpose: one is a fact about a directory (`not_a_repository`, 422)
+and one is a refusal to look outside (`outside_root`, 403). The same reasoning fixes the statuses: an
+unregistered alias is a 404, because the request named a root that does not exist here rather than a
+malformed body, and a 422 would send the caller to change a name that was fine. `.` is the one accepted dot
+segment and it means the registered root itself, and the database check constraint agrees.
+
+**One transport, two registration names, because a shadowed slot is a silent no-op.** `LocalGitEvidenceSource`
+satisfies the delivered `IGitEvidenceSource` *and* the new `ILocalGitSource`, and the composition root
+registers it under the local name only — `IGitEvidenceSource` is the hosted transport's, and a second
+registration under that name would move every GitHub collection onto a directory. This repository has been
+bitten by the same class three times, so the suite asserts it from the other side: in a production-built
+container, `IGitEvidenceSource` is still `GitHubEvidenceClient` and `ILocalGitSource` is the local one.
+A future package that wants a third transport should give it its own registration name and assert the
+others are still what they were.
+
+**A moved head is a permanent, named outcome, and it must be checked before the generic classification.**
+`GitEvidenceOutcome.Superseded` was added to the leaf contract for this, because a local collection is
+several commands over some seconds rather than one HTTP call: a commit made in the middle would otherwise
+produce a bundle whose items name one revision and hold facts from another. `ThrowFor` handles it *and*
+`CollectAsync` checks it before calling `ThrowFor`, because the first version of this package had only the
+second and the `default:` arm of `ThrowFor` turned a moved head into `local_git_job_git_unavailable` —
+transient, retried, and on the retry it succeeded by collecting a revision the owner never asked for. The
+scenario that proves it uses the one seam these tests allow: a runner that *delegates* to the production one
+and can move a head between two commands, because a race nothing outside the process can schedule has to be
+scheduled from inside it.
+
+**Two diff numbers, and the smaller one is the one that had to be chosen.** 256 KiB is the design's
+*output* cap and bounds the pipe; a read the pipe truncated is a dependency failure, because a prefix of a
+diff with nothing in it saying what is missing is exactly what the evidence contract exists to prevent. The
+*evidence* budget is 128 KiB — half the delivered bundle's own text limit — because a patch budget equal to
+the whole bundle limit leaves no room for the repository metadata, the commits, the exclusions and the
+truncation records, and a repository with a large diff would fail the append instead of producing the honest
+truncated bundle this package promises. The file cap counts every file recorded, an excluded one included:
+counting only the readable ones would let a repository of a thousand secrets blow past the cap while
+recording nothing about them.
+
+**Release evidence (`local-git-evidence`, commit `f7e4a81`, all run by the implementer rather than taken on
+report).** `bash scripts/verify.sh` exit 0 with the platform-feed stage and twenty-three filtered stages
+each asserted to select at least one test: 15/15 shell, 24/24 persistence, 23/23 access, 19/19 projects,
+12/12 jobs, 9/9 media, 14/14 evidence, 32/32 vault, 22/22 voice, 26/26 provider contract, 23/23 OpenAI,
+24/24 Gemini, 24/24 Anthropic, 23/23 OpenRouter, 26/26 Ollama, 27/27 GitHub evidence, **21/21 local Git**,
+52/52 capture, 18/18 curation, 30/30 drafts, 7/7 timeline, 11/11 review-export, 10/10 compose-release —
+467 in total. `npm ci`, `tsc` and `vite build` all green. `dotnet build --nologo` succeeds with the
+**same two warnings that are already at HEAD** (`ScreenshotCandidate._displayOrder` never assigned and the
+one obsolete `HasCheckConstraint` in the curation configuration) and 0 errors; this package adds none, and
+`--no-incremental` was used to make that claim a real one rather than a consequence of an incremental build
+reporting nothing. Name preflight exit 0; `openspec validate --all --strict --no-interactive` 54/54 before
+and after the archive, which used no `--skip-specs`.
+
+**About that 2-warning baseline, recorded because HANDOFF's own numbers were wrong.** This file has
+repeatedly claimed "0 warnings" for a build that never had them. The first full-gate run of
+`local-git-evidence` printed both, on the *first* compile of `Chronicleaf.Core` and
+`Chronicleaf.Infrastructure`; a second `dotnet build` in the same tree prints none, because nothing
+recompiles. So a green `dotnet build` after a previous one is not evidence about warnings at all, and the
+`--no-incremental` run above is the only form of that check that says anything. Both warnings are in
+delivered, archived code and were not touched here.
+
+**What the local-git stage is, and what it is not.** There is no double anywhere in it. The repository on
+disk was created by a real `git` in a real temporary directory by a fixture with its own independent `git`
+invocation (so a bug in the production runner cannot produce an empty repository that the scenario then
+"proves" was read correctly), the application reads it through the production runner over the real
+`GitCommandRunner`, and the only seam is the delegating head-mover used by one scenario. What it is not
+evidence for: that Git works, that any particular repository is well formed, or that one distribution's Git
+behaves as another's. `CHRONICLEAF_E2E=1` was **not** run, so there is no browser fixture for the new
+panels and no Playwright evidence; `tsc` and `vite build` are the frontend evidence, and a suite is one
+`scripts/e2e.sh` invocation plus its own seed away. Two other records: `git diff --check` reports the
+trailing blank line on the generated canonical spec, which is the tool's archive output and is true of all
+twenty-four; and eleven of the twenty-four canonical specs carry openspec's own `TBD - created by archiving`
+purpose line, including the three before this one, so leaving it is the repository's existing behaviour
+rather than a gap.
 
 # Bootstrap handoff
 

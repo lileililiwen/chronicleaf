@@ -1,6 +1,6 @@
 # Chronicleaf handoff
 
-current_spec: screenshot-evolution-images
+current_spec: static-blog-export
 
 ## Current state — 2026-10-05
 
@@ -37,6 +37,7 @@ next POST-MVP package in ROADMAP order after `html-content-export`.
 | 25 | `narrative-memory` | `a7d12f4` | `openspec/specs/narrative-memory/spec.md` |
 | 26 | `html-content-export` | `aae5181` | `openspec/specs/html-content-export/spec.md` |
 | 27 | `content-asset-variants` | `65309ac` | `openspec/specs/content-asset-variants/spec.md` |
+| 28 | `screenshot-evolution-images` | `f2916e1` | `openspec/specs/screenshot-evolution-images/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -391,8 +392,23 @@ owner's words; the e2e seed's candidate rows name the two real capture jobs the 
 PNG behind all three. Deployment stays `deployable: false`; there is no remote, no push and no
 publication.
 
-Next: `current_spec` is `screenshot-evolution-images`, the POST-MVP package ROADMAP orders
-immediately after `content-asset-variants`. `content-asset-variants` is archived (`65309ac`,
+Next: `current_spec` is `static-blog-export`, the POST-MVP package ROADMAP orders
+immediately after `screenshot-evolution-images`. `screenshot-evolution-images` is archived
+(`f2916e1`, canonical spec `openspec/specs/screenshot-evolution-images/spec.md`): derived
+comparison PNGs (before-after, horizontal-timeline, vertical-long, gallery) rendered from
+SELECTED screenshots across 2..12 confirmed milestones through a BCL-only composer (native-size
+cells on neutral padding, no resampling, gaps as unavailable bands), each row carrying a
+re-derivable manifest citing the media, caption and evidence revisions every cell was built
+from; candidates are never compared and no render promotes one. The artifact is a draft until
+a human approves the exact selection and artifact hashes (preview is reviewable, download is
+gated under the review package's `approval_required`/`approval_stale`); a caption edit
+supersedes the render as `revision_conflict` and an oversized canvas is `payload_too_large`
+with nothing stored. Read that package's own boundary before extending it, and note the three
+defects its tests found: feature exceptions need explicit middleware type-arms (status-code
+mapping alone still answers 500); EF's FK-index convention must appear in the hand-written
+Designer or readiness fails `PendingModelChangesWarning`; and comparison cells are uniform
+(max-dimension) grid cells, so a narrower source sits centered rather than packed.
+`content-asset-variants` is archived (`65309ac`,
 canonical spec `openspec/specs/content-asset-variants/spec.md`): seven deterministic formats
 (changelog, technical-blog, social-short, github-release, readme-update, portfolio,
 weekly-progress) derived from an approved Markdown story through fixed templates with no
@@ -514,6 +530,40 @@ without `--skip-specs`, then make the implementation commit and the HANDOFF-only
 stop. Do not push.
 
 ## Package notes
+
+`screenshot-evolution-images` is archived (`f2916e1`, canonical spec
+`openspec/specs/screenshot-evolution-images/spec.md`). Read that package's own boundary before
+extending it, and note what it decided that a later reader would otherwise have to rediscover.
+
+**Release evidence (`screenshot-evolution-images`, commit `f2916e1`, all run by the implementer
+rather than taken on report).** `CHRONICLEAF_E2E=1 bash scripts/verify.sh` exit 0
+(`GATE_EXIT=0`) with the platform-feed stage and twenty-nine filtered stages (the prior
+twenty-eight plus `screenshot evolution image tests`) each asserted to select at least one
+test, including **12/12 screenshot evolution images** run directly against the same real
+disposable PostgreSQL and the real API host (pixel-equality assertions on decoded canvas
+regions, gap-band fill assertions, idempotency replay/conflict, viewport-mismatch vs gallery
+labels, 413 with an empty list afterwards, renderer unit cases for the pixel ceiling and gap
+composition). `npm ci`, `tsc` and `vite build` all green, and `bash scripts/e2e.sh` green
+across all fourteen database-isolated browser suites (no new suite: this package ships no UI).
+`dotnet build --nologo --no-incremental` 0 errors with the same 2 pre-existing warnings at
+HEAD. Name preflight exit 0; `openspec validate --all --strict --no-interactive` 54/54 before
+and after the archive, which used no `--skip-specs`.
+
+**A comparison depicts selected pictures and nothing else.** Every depicted cell is read
+through the curation store with its selection state: naming a candidate is 422
+`validation_failed` on `selectedScreenshotIds`, never a promotion, and a milestone with no
+selected picture is an `unavailable` gap band in the manifest and on the canvas, never an
+interpolation. Mixed viewports outside the gallery are 422
+`comparison_viewport_mismatch`; the gallery labels each cell's viewport. The PNG is composed
+by BCL code only (grey/RGB/RGBA 8-bit decode with all five filters, uniform max-dimension
+cells, neutral padding, deterministic grey re-encode the delivered media store accepts), so
+there is no image library to pin and no resampling that could invent a before screenshot.
+The artifact's media is stored first and the row second (the capture package's order), with a
+quiet retire when the row loses its insert; source bytes stay pinned by the evidence
+screenshot items curation already publishes, so this row pins only its own derivation.
+Approval binds the selection hash and the artifact hash on the same row through the review
+package's own codes, and the export re-checks both live before serving the exact bytes.
+Deployment stays `deployable: false`; there is no remote, no push and no publication.
 
 `content-asset-variants` is archived (`65309ac`, canonical spec
 `openspec/specs/content-asset-variants/spec.md`). Read that package's own boundary before

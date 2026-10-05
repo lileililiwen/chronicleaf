@@ -1578,21 +1578,24 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
 
         foreach (var slot in supported.Where(slot => slot.GetProperty("id").GetString() != ProviderId))
         {
-            if (slot.GetProperty("id").GetString() == GenerationProviderIds.OpenAI)
+            var slotId = slot.GetProperty("id").GetString();
+
+            if (slotId == GenerationProviderIds.OpenAI || slotId == GenerationProviderIds.Gemini)
             {
-                // The one slot that is different on every host built from the production composition
-                // root, because llm-openai-adapter registered a real adapter for it. Its capability is
-                // therefore present here, copied verbatim from that adapter and not from this host's
-                // double - which is the delivered rule, and the reason this assertion is written as an
-                // exception rather than as a blanket "every other slot is empty".
+                // The two slots that are different on every host built from the production composition
+                // root, because llm-openai-adapter and llm-gemini-adapter each registered a real adapter
+                // for theirs. Each capability is therefore present here, copied verbatim from that
+                // adapter and not from this host's double - which is the delivered rule, and the reason
+                // this assertion is written as an exception rather than as a blanket "every other slot
+                // is empty".
                 Assert.True(slot.GetProperty("adapterInstalled").GetBoolean());
                 Assert.Equal(
-                    GenerationProviderIds.OpenAI,
+                    slotId,
                     slot.GetProperty("capability").GetProperty("id").GetString());
                 continue;
             }
 
-            // The three slots no package has implemented yet. Each is supported by the contract and not
+            // The two slots no package has implemented yet. Each is supported by the contract and not
             // reachable, and each says which of the two reasons applies.
             Assert.False(slot.GetProperty("adapterInstalled").GetBoolean());
 
@@ -1610,8 +1613,8 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
 
         // The production composition root: every service this package registers, plus whatever adapters
         // later packages added. Anthropic is still a separate roadmap package, so this host has none for
-        // it - and the openai slot is asserted below to have one, which is what makes this a claim about
-        // one slot rather than about the registry being empty.
+        // it - and the openai and gemini slots are asserted below to have one each, which is what makes
+        // this a claim about one slot rather than about the registry being empty.
         await using var host = LlmProviderApiHost.StartProduction(database, new FixedTimeProvider(Clock), keyFile.FilePath);
         using var owner = await OwnerClient.CreateAsync(host);
 
@@ -1632,9 +1635,9 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
         Assert.Empty(catalogue.RootElement.GetProperty("usable").EnumerateArray());
 
         // The registry is no longer empty, and this is the assertion that says so. It is stated here
-        // rather than left implicit because a future reader who finds openai installed must be able to
-        // tell whether that was intended: it was, by llm-openai-adapter, and the four remaining slots
-        // are the ones still to come.
+        // rather than left implicit because a future reader who finds openai and gemini installed must
+        // be able to tell whether that was intended: it was, by llm-openai-adapter and
+        // llm-gemini-adapter, and the three remaining slots are the ones still to come.
         var installed = catalogue.RootElement.GetProperty("supported")
             .EnumerateArray()
             .Where(entry => entry.GetProperty("adapterInstalled").GetBoolean())
@@ -1642,9 +1645,9 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal([GenerationProviderIds.OpenAI], installed);
+        Assert.Equal([GenerationProviderIds.Gemini, GenerationProviderIds.OpenAI], installed);
         Assert.Equal(
-            4,
+            3,
             catalogue.RootElement.GetProperty("supported")
                 .EnumerateArray()
                 .Count(entry => !entry.GetProperty("adapterInstalled").GetBoolean()));

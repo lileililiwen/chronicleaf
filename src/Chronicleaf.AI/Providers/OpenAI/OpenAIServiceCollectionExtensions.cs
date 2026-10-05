@@ -57,10 +57,13 @@ public static class OpenAIServiceCollectionExtensions
 
         services.TryAddSingleton(settings);
 
-        // Registered as itself rather than through a factory so a host that also needs the settings -
-        // a test asserting the allowlist, or a future settings surface - resolves the same instance
-        // the adapter was built with.
-        services.TryAddSingleton<ILLMProvider>(provider => new OpenAIProvider(
+        // Plain Add, not TryAdd, and the distinction is load-bearing. TryAdd keys on the service
+        // type, and every adapter in this repository registers the same one - ILLMProvider - so the
+        // second adapter package to use TryAdd would silently not register at all, leaving its slot
+        // uninstalled in production while every test host that re-registers explicitly stayed green.
+        // A duplicate registration of this same package is harmless instead: the resolver keeps the
+        // first adapter per slot, so registering twice resolves once.
+        services.AddSingleton<ILLMProvider>(provider => new OpenAIProvider(
             BuildHandler(),
             provider.GetRequiredService<IOpenAIApiKeySource>(),
             provider.GetRequiredService<OpenAIProviderSettings>(),

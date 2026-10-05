@@ -20,6 +20,7 @@ using Chronicleaf.Api.Projects;
 using Chronicleaf.Api.Secrets;
 using Chronicleaf.Api.Timeline;
 using Chronicleaf.Api.Voice;
+using Chronicleaf.AI.Gemini;
 using Chronicleaf.AI.OpenAI;
 using Chronicleaf.Infrastructure.Access;
 using Chronicleaf.Infrastructure.AI;
@@ -125,6 +126,16 @@ builder.Services.AddAIGeneration();
 // four remaining slots are still separate roadmap packages and stay unclaimed.
 builder.Services.AddSingleton<IOpenAIApiKeySource, VaultOpenAIApiKeySource>();
 builder.Services.AddOpenAIProvider(builder.Configuration);
+
+// LLM-GEMINI-ADAPTER-001/002. The second real transport behind the generation contract: one
+// ILLMProvider for the `gemini` slot, a fixed HTTPS origin with redirects refused, and a leased
+// key that is used for one header and returned. The same shape as the OpenAI registration above,
+// and the same rollback rule: removing it un-installs the transport and leaves stored previews,
+// stored credentials and stored audit rows where they are. The accepted-model allowlist is
+// configuration and is empty unless an operator filled it in. The three remaining slots are still
+// separate roadmap packages and stay unclaimed.
+builder.Services.AddSingleton<IGeminiApiKeySource, VaultGeminiApiKeySource>();
+builder.Services.AddGeminiProvider(builder.Configuration);
 
 // GITHUB-EVIDENCE-001/002. The read-only GitHub transport, pinned to the API host with redirects
 // refused, plus the two stores, the service and the one job handler that appends collected evidence

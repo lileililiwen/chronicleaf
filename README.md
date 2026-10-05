@@ -6,33 +6,48 @@
 
 ## Status
 
-Ten of the 53 dependency-ordered OpenSpec packages are implemented, verified and archived:
+Twenty-three of the dependency-ordered OpenSpec packages are implemented, verified and archived:
 `community-foundation` (runtime shell), `community-persistence` (PostgreSQL data foundation),
 `community-access` (single-user owner sessions), `projects-and-milestones` (Project and Milestone
 records with a real web UI), `background-jobs` (durable bounded operations), `local-media-storage`
 (private media on `Platform.Storage`), `platform-jobs-adoption` (the same, on `Platform.Jobs`),
-`milestone-evidence` (immutable evidence bundles), `credential-vault` (encrypted BYOK secrets) and
-`voice-profiles` (owner voice, snapshots, deterministic findings). The tenth plus the adoption change
-are tracked in ROADMAP.md; the adoption change is not one of the original 53 and exists because
-`background-jobs` had been built on a false premise about platform package availability.
+`milestone-evidence` (immutable evidence bundles), `credential-vault` (encrypted BYOK secrets),
+`voice-profiles` (owner voice, snapshots, deterministic findings), `llm-provider-contract`
+(provider-neutral consented generation), `github-evidence` (bounded GitHub import),
+`screenshot-capture` (controlled capture jobs), `llm-openai-adapter`, `llm-gemini-adapter`,
+`llm-anthropic-adapter`, `llm-openrouter-adapter`, `llm-ollama-adapter` (all five BYOK transports),
+`grounded-markdown-drafts` (evidence-grounded drafts), `screenshot-curation` (human selection),
+`milestone-timeline` (private chronological timeline), `markdown-review-export` (human
+approval and export) and `community-compose-release` (two-service Community packaging with
+restore evidence). The eleventh plus the adoption change are tracked in ROADMAP.md; the adoption
+change is not one of the original 53 and exists because `background-jobs` had been built on a
+false premise about platform package availability.
 
 What exists today: a .NET 10 API serving a credential-free `/api/health` and an honest `/api/ready`,
 hosting the built React client, persisting installation/audit/outbox/projects/milestones/evidence/
-operations/credentials/voices in a real PostgreSQL through EF Core migrations, requiring an owner
-session with origin and antiforgery checks on every mutation, executing background work through
-`Platform.Jobs` on Hangfire with bounded retries, leases and cancellation, and storing credentials as
-AES-256-GCM ciphertext under an operator-supplied key that is never in the database, the repository
-or the image. The web UI covers login/logout, a dashboard, projects, milestone editing with
-human-only confirm/dismiss, evidence bundles with visible unavailable sources, credential settings
-that never display a stored value, an operations panel, and voice profiles with actionable findings.
-Some guarantees are enforced by PostgreSQL rather than by application convention: evidence is
-append-only by trigger, and four check constraints make it impossible to record a collected fact that
-was not collected.
+operations/credentials/voices/generation-previews/content-revisions/approvals in a real PostgreSQL
+through EF Core migrations, requiring an owner session with origin and antiforgery checks on every
+mutation, executing background work through `Platform.Jobs` on Hangfire with bounded retries,
+leases and cancellation, storing credentials as AES-256-GCM ciphertext under an operator-supplied
+key that is never in the database, the repository or the image, and shipping a `compose.yaml`
+plus `docs/community-quickstart.md` that bring up the app and PostgreSQL, migrate, provision,
+and prove restore-identical timeline and evidence heads. The web UI covers login/logout, a
+dashboard, projects, milestone editing with human-only confirm/dismiss, evidence bundles with
+visible unavailable sources, credential settings that never display a stored value, an operations
+panel, voice profiles with actionable findings, a provider catalogue, GitHub sync, screenshot
+capture and curation, a chronological project Timeline, grounded drafts, and human review with
+revision-bound approval and byte-exact Markdown export. Some guarantees are enforced by
+PostgreSQL rather than by application convention: evidence is append-only by trigger, content
+revisions are append-only by trigger, one primary screenshot per milestone is a partial unique
+index, and check constraints refuse ungrounded or malformed rows.
 
-What does not exist yet: GitHub integration, screenshot capture, AI generation, Markdown drafts,
-review/approval, export, and the Milestone Timeline. The first complete workflow (GitHub → confirmed
-Milestone → screenshot → grounded Markdown → human approval → export) is therefore **not** deliverable
-yet, and `deployable` remains `false`.
+What does not exist yet: local-git evidence, release candidates, GraphQL enrichment, narrative
+memory, HTML/static-blog export, evolution images, public journey, publishers, video scripts,
+agency/Cloud/Hosted capabilities and the demand-gated content packs. The first complete workflow
+(GitHub → confirmed Milestone → screenshot → grounded Markdown → human approval → export, plus
+the Milestone Timeline) is implemented and proven by `scripts/verify-community.sh`, but
+`deployable` remains `false`: this host cannot confine a browser kernel sandbox, so screenshot
+success is unproven here, and the credential-gated live provider smoke was not performed.
 
 ## MVP
 

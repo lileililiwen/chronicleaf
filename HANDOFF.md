@@ -1,10 +1,10 @@
-current_spec: llm-ollama-adapter
+current_spec: markdown-review-export
 
 # Chronicleaf handoff
 
-## Current state — 2026-10-04
+## Current state — 2026-10-05
 
-Twenty changes implemented, verified and archived, each with exactly two commits (implementation/
+Twenty-one changes implemented, verified and archived, each with exactly two commits (implementation/
 tests/archive, then this HANDOFF-only pointer):
 
 | # | Change | Implementation commit | Canonical spec |
@@ -29,6 +29,7 @@ tests/archive, then this HANDOFF-only pointer):
 | 18 | `llm-gemini-adapter` | `b5f74ac` | `openspec/specs/llm-gemini-adapter/spec.md` |
 | 19 | `llm-anthropic-adapter` | `ab23ace` | `openspec/specs/llm-anthropic-adapter/spec.md` |
 | 20 | `llm-openrouter-adapter` | `c51dbd7` | `openspec/specs/llm-openrouter-adapter/spec.md` |
+| 21 | `llm-ollama-adapter` | `efed7af` | `openspec/specs/llm-ollama-adapter/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -366,10 +367,21 @@ owner's words; the e2e seed's candidate rows name the two real capture jobs the 
 PNG behind all three. Deployment stays `deployable: false`; there is no remote, no push and no
 publication.
 
-Next: implement `llm-ollama-adapter` only. Its dependency — `llm-provider-contract` — is
-archived, so the last BYOK transport can now be built on the consented generation contract. After
-it: `markdown-review-export` → `community-compose-release`, which
+Next: implement `markdown-review-export` only. Its dependencies — `grounded-markdown-drafts`,
+`screenshot-curation` and `milestone-timeline` — are archived, so human editing, approval and
+export can now be built on the stored drafts. After it: `community-compose-release`, which
 is the first complete workflow.
+`llm-ollama-adapter` is archived (`efed7af`, canonical spec
+`openspec/specs/llm-ollama-adapter/spec.md`): the fifth BYOK transport posts the consented payload
+to the operator-allowlisted origin's chat resource with an optional per-call bearer lease -
+a consent without a credential is a keyless call, not a refusal - carries no request id because
+Ollama supplies none, and reports a local endpoint with no credential required and no native
+schema support, so the schema rides in the prompt and the text is validated locally. An
+unfinished generation, a truncation and an unrecognised stop are all invalid, never a draft,
+and prose refusals arrive as text the adapter cannot classify. Read that package's own boundary
+before extending it, and note the last slot migration it forced: both doubles sat on `ollama`,
+so both hosts now insert their double first and the drafts guard proves the double shadows the
+real adapter. The contract panel gained a conditional endpoint field for local-endpoint slots.
 `llm-openrouter-adapter` is archived (`c51dbd7`, canonical spec
 `openspec/specs/llm-openrouter-adapter/spec.md`): the fourth BYOK transport posts the consented payload
 to the fixed chat completions resource at the OpenRouter origin with a per-call bearer lease, records
@@ -378,8 +390,8 @@ the schema rides in the prompt and the text is validated locally. A truncation i
 prefix, because the ceiling may be an upstream hop's rather than the named model's. Read that
 package's own boundary before extending it, and note the slot migration it forced: the double in
 `LlmProviderContractTests` moved from `openrouter` to `ollama` - asserted by that suite's own
-catalogue guards. Both doubles (contract suite and grounded drafts) now sit on `ollama`, so the
-`llm-ollama-adapter` package will have to relocate them when production claims the last slot.
+catalogue guards. Both doubles then sat on `ollama` until `llm-ollama-adapter` claimed the last
+slot and moved both hosts to insert-first registration (see that package's note above).
 `llm-anthropic-adapter` is archived (`ab23ace`, canonical spec
 `openspec/specs/llm-anthropic-adapter/spec.md`): the third BYOK transport posts the consented payload
 to the fixed messages resource at the Anthropic origin with a per-call `x-api-key` lease beside the

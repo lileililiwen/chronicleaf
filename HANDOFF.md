@@ -1,10 +1,10 @@
-current_spec: llm-gemini-adapter
+current_spec: llm-anthropic-adapter
 
 # Chronicleaf handoff
 
 ## Current state — 2026-10-04
 
-Sixteen changes implemented, verified and archived, each with exactly two commits (implementation/
+Eighteen changes implemented, verified and archived, each with exactly two commits (implementation/
 tests/archive, then this HANDOFF-only pointer):
 
 | # | Change | Implementation commit | Canonical spec |
@@ -26,6 +26,7 @@ tests/archive, then this HANDOFF-only pointer):
 | 15 | `grounded-markdown-drafts` | `32f3e6f` | `openspec/specs/grounded-markdown-drafts/spec.md` |
 | 16 | `screenshot-curation` | `9c1ce4a` | `openspec/specs/screenshot-curation/spec.md` |
 | 17 | `milestone-timeline` | `4cfa8c3` | `openspec/specs/milestone-timeline/spec.md` |
+| 18 | `llm-gemini-adapter` | `b5f74ac` | `openspec/specs/llm-gemini-adapter/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -363,11 +364,19 @@ owner's words; the e2e seed's candidate rows name the two real capture jobs the 
 PNG behind all three. Deployment stays `deployable: false`; there is no remote, no push and no
 publication.
 
-Next: implement `llm-gemini-adapter` only. Its dependency — `llm-provider-contract` — is
-archived, so the Gemini BYOK transport can now be built on the consented generation contract. After
-it: the remaining adapters (`llm-anthropic-adapter`, `llm-openrouter-adapter`, `llm-ollama-adapter`)
-stay independently deliverable, then `markdown-review-export` → `community-compose-release`, which
+Next: implement `llm-anthropic-adapter` only. Its dependency — `llm-provider-contract` — is
+archived, so the Anthropic BYOK transport can now be built on the consented generation contract. After
+it: the remaining adapters (`llm-openrouter-adapter`, `llm-ollama-adapter`) stay independently
+deliverable, then `markdown-review-export` → `community-compose-release`, which
 is the first complete workflow.
+`llm-gemini-adapter` is archived (`b5f74ac`, canonical spec
+`openspec/specs/llm-gemini-adapter/spec.md`): the second BYOK transport posts the consented payload
+to the model's generateContent resource at the fixed Google origin with a per-call `x-goog-api-key`
+lease, no request id is invented where the provider supplies none, and a safety stop is a refusal
+with its partial text discarded. Read that package's own boundary before extending it, and note the
+registration defect it exposed: `TryAddSingleton<ILLMProvider>` keys on the service type, so a
+second adapter using it silently installs nothing in production — every adapter extension now uses
+plain `AddSingleton` and the resolver keeps the first adapter per slot.
 `milestone-timeline` is archived (`4cfa8c3`, canonical spec
 `openspec/specs/milestone-timeline/spec.md`): a project's confirmed history now reads oldest
 first on a private route with a cursor bound to scope, project and the candidate filter, and the

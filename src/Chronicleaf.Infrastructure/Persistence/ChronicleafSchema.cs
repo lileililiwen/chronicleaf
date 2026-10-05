@@ -159,6 +159,17 @@ public static class ChronicleafSchema
     /// </summary>
     public const string GitHubGraphqlEnrichmentMigrationId = "20261010090000_AddGitHubGraphqlEnrichment";
 
+    /// <summary>
+    /// The forward migration that adds the <c>narrative_entries</c>, <c>project_summaries</c> and
+    /// <c>narrative_refresh_requests</c> tables (NARRATIVE-MEMORY-001/002): one owner-written,
+    /// attributed line of history per entry with its revision compare-and-set, one generated
+    /// summary per project with its input hash and stale mark, and one durable refresh request per
+    /// job. A database that has never applied it has nowhere to record narrative history, so its
+    /// narrative routes would fail against missing tables; readiness says so by name rather than
+    /// answering 200 and failing on the first request.
+    /// </summary>
+    public const string NarrativeMemoryMigrationId = "20261011090000_AddNarrativeMemory";
+
     /// <summary>Every migration a database must carry before this build calls itself ready.</summary>
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
@@ -179,6 +190,7 @@ public static class ChronicleafSchema
         LocalGitEvidenceMigrationId,
         GitHubReleaseCandidatesMigrationId,
         GitHubGraphqlEnrichmentMigrationId,
+        NarrativeMemoryMigrationId,
     ];
 
     /// <summary>
@@ -186,7 +198,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = GitHubGraphqlEnrichmentMigrationId;
+    public const string ExpectedMigrationId = NarrativeMemoryMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

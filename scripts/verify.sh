@@ -464,6 +464,19 @@ else
   # real API host, with the reviewed draft produced by a real generation job behind the delivered
   # provider seam.
   step "markdown review export tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~MarkdownReviewExportTests"
+  # NARRATIVE-MEMORY-001/002. That SQLite and PostgreSQL history recorded before a refresh lands
+  # in the summary as attributed transition lines citing owned evidence ids without reintroducing
+  # the project as new; that missing feedback reads as unknown rather than invented users; that
+  # a retrospective cutoff excludes later milestones from the body and the through milestone;
+  # that a corrected source decision marks the prior summary stale until regeneration advances
+  # the revision; that a failed regeneration keeps the prior body available labelled stale with
+  # the build code on the operation; that private feedback without an explicit selection is
+  # absent from the body and present with one; and that a stale writer loses with 409, a
+  # missing If-Match is 428, and foreign evidence or a foreign project is 404 - all proven
+  # against the same real disposable PostgreSQL through the real API host and the real
+  # operation queue, with the one declared substitution the package names (a throwing summary
+  # builder for the failure scenario; the delivered builder reaches no provider).
+  step "narrative memory tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~NarrativeMemoryTests"
   # COMMUNITY-COMPOSE-RELEASE-001/002. That a clean install completes the
   # milestone-to-approved-Markdown flow with the timeline telling it back; that the compose
   # file describes exactly app plus postgres on the pinned digest with named volumes, a
@@ -516,8 +529,8 @@ if [ "${CHRONICLEAF_E2E:-0}" = "1" ]; then
   # Publishes the real application, starts a disposable PostgreSQL per suite, applies the committed
   # migrations, and drives the shell, access, projects-and-milestones, background-jobs,
   # milestone-evidence, credential-vault, voice-profiles, llm-provider-contract, github-evidence,
-  # screenshot-capture, grounded-markdown-drafts, screenshot-curation, milestone-timeline and
-  # markdown-review-export fixtures in a real browser.
+  # screenshot-capture, grounded-markdown-drafts, screenshot-curation, milestone-timeline,
+  # markdown-review-export and narrative-memory fixtures in a real browser.
   # The suites after the shell are included by scripts/e2e.sh, which names each fixture file, so a
   # file that stops being matched shows up as a Playwright "no tests found" failure rather than as
   # a suite quietly passing with nothing in it; this stage

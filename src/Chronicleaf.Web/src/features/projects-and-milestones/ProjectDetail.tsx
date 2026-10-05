@@ -15,6 +15,7 @@ import { LocalGitSyncPanel } from '../local-git-evidence/LocalGitSyncPanel';
 import { LocalRepositoryPanel } from '../local-git-evidence/LocalRepositoryPanel';
 import { GroundedMarkdownDraftPanel } from '../grounded-markdown-drafts/GroundedMarkdownDraftPanel';
 import { MarkdownReviewPanel } from '../markdown-review-export/MarkdownReviewPanel';
+import { NarrativeMemoryPanel } from '../narrative-memory/NarrativeMemoryPanel';
 import { MilestoneEvidencePanel } from '../milestone-evidence/MilestoneEvidencePanel';
 import { LlmProviderArea } from '../llm-provider-contract/LlmProviderArea';
 import { ProjectTimeline } from '../milestone-timeline/ProjectTimeline';
@@ -222,6 +223,16 @@ export function ProjectDetail({
             candidate somebody did not act on is a fact about the repository and not about the project.
           */}
           <GitHubCandidatePanel projectId={record.id} archived={archived} />
+
+          {/*
+            NARRATIVE-MEMORY-001/002. The explicit history the owner wrote and the generated
+            summary the last refresh concluded, rendered as different facts in separate sections.
+            It sits beside the candidate panel because a narrative is about the project, not about
+            any one milestone: nothing in it can be confirmed from here, so there is no milestone
+            to scope it to. An archived project still shows what was recorded, read-only, because
+            history somebody did not act on is still history.
+          */}
+          <NarrativeMemoryPanel projectId={record.id} archived={archived} />
         </header>
       )}
 

@@ -18,6 +18,7 @@ using Chronicleaf.Api.GitHub;
 using Chronicleaf.Api.GitHubEnrichment;
 using Chronicleaf.Api.Candidates;
 using Chronicleaf.Api.Media;
+using Chronicleaf.Api.Narrative;
 using Chronicleaf.Api.Operations;
 using Chronicleaf.Api.Projects;
 using Chronicleaf.Api.Secrets;
@@ -39,6 +40,7 @@ using Chronicleaf.Infrastructure.GitHub;
 using Chronicleaf.Infrastructure.GitHubEnrichment;
 using Chronicleaf.Infrastructure.GitHubCandidates;
 using Chronicleaf.Infrastructure.Media;
+using Chronicleaf.Infrastructure.Narrative;
 using Chronicleaf.Infrastructure.Operations;
 using Chronicleaf.Infrastructure.Persistence;
 using Chronicleaf.Infrastructure.Projects;
@@ -251,6 +253,14 @@ builder.Services.AddGroundedMarkdownDrafts();
 // reports schema_mismatch at /api/ready.
 builder.Services.AddMarkdownReviewExport();
 
+// NARRATIVE-MEMORY-001/002. The narrative store, service, deterministic summary builder and
+// refresh job handler: owner-written history attributed to owned evidence, revision-aware edits
+// that a stale writer loses, and generated summaries bound to an input hash with a stale mark.
+// It registers no provider, no credential and no publisher: a refresh builds deterministically
+// from sources the owner already owns. A database without the narrative-memory migration reports
+// schema_mismatch at /api/ready.
+builder.Services.AddNarrativeMemory();
+
 // The rotation guard is applied once at start-up, so an access token that was changed since the
 // last run revokes every existing session before this process serves anything.
 builder.Services.AddHostedService<AccessTokenRotationStartup>();
@@ -389,6 +399,12 @@ app.MapContentDraftEndpoints();
 // human revision, an approval binds a revision and a body hash, and an export serves approved
 // bytes as an attachment the owner chose to download.
 app.MapContentReviewEndpoints();
+
+// NARRATIVE-MEMORY-001/002: the private narrative read, create, edit and refresh routes. None of
+// them is marked public, so the access package's default-deny boundary already covers every one
+// of them. There is no approve route here and no field that could report one: a summary is a
+// generated document bound to its input hash, and approval stays the review package's.
+app.MapNarrativeEndpoints();
 
 // SHELL-001/SHELL-002: every unmatched path is either an unknown API path, an unknown
 // static asset, or a client route. Only the last one falls back to the SPA entry point. This

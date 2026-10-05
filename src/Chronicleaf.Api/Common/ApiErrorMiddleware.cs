@@ -9,6 +9,7 @@ using Chronicleaf.Application.GitHub;
 using Chronicleaf.Application.GitHubCandidates;
 using Chronicleaf.Application.Media;
 using Chronicleaf.Application.Milestones;
+using Chronicleaf.Application.Narrative;
 using Chronicleaf.Application.Operations;
 using Chronicleaf.Application.Secrets;
 // `ApiError` also names the runtime shell's compact not_found/web_assets_unavailable record in
@@ -480,6 +481,28 @@ public sealed class ApiErrorMiddleware(
                     Envelope.Create(
                         CandidateError.DeliveryTooLarge,
                         deliveryTooLarge.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            // NARRATIVE-MEMORY-001/002. Written here for the same reason as every other feature
+            // package's refusals: this package raises them and this middleware is still the only
+            // place an envelope is written. The messages are authored in the narrative package
+            // and name no entry text, no milestone notes and no summary body - a foreign
+            // citation says which position failed without echoing the id, and an oversized
+            // context names the byte counts without carrying the prose. The 404 is deliberately
+            // the already-delivered not-found, so a caller cannot probe another installation's
+            // evidence by comparing codes; the 422 says the remedy is to narrow the cutoff or
+            // shorten entries.
+            case NarrativeForeignEvidenceException foreignEvidence:
+                return (
+                    Envelope.Create(Envelope.NotFound, foreignEvidence.Message, traceId),
+                    LogLevel.Information);
+
+            case NarrativeContextTooLargeException contextTooLarge:
+                return (
+                    Envelope.Create(
+                        NarrativeError.ContextTooLarge,
+                        contextTooLarge.Message,
                         traceId),
                     LogLevel.Information);
 

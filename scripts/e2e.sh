@@ -80,6 +80,7 @@ curation_base_url="${CHRONICLEAF_CURATION_BASE_URL:-http://127.0.0.1:5089}"
 timeline_base_url="${CHRONICLEAF_TIMELINE_BASE_URL:-http://127.0.0.1:5090}"
 review_base_url="${CHRONICLEAF_REVIEW_BASE_URL:-http://127.0.0.1:5091}"
 candidates_base_url="${CHRONICLEAF_CANDIDATES_BASE_URL:-http://127.0.0.1:5092}"
+narrative_base_url="${CHRONICLEAF_NARRATIVE_BASE_URL:-http://127.0.0.1:5093}"
 log_file="$repo_root/$publish_dir/server.log"
 evidence_log_file="$repo_root/$publish_dir/server-evidence.log"
 credentials_log_file="$repo_root/$publish_dir/server-credentials.log"
@@ -92,6 +93,7 @@ curation_log_file="$repo_root/$publish_dir/server-curation.log"
 timeline_log_file="$repo_root/$publish_dir/server-timeline.log"
 review_log_file="$repo_root/$publish_dir/server-review.log"
 candidates_log_file="$repo_root/$publish_dir/server-candidates.log"
+narrative_log_file="$repo_root/$publish_dir/server-narrative.log"
 key_file=""
 
 # The operator key for this run: 32 random bytes in a temporary file outside the repository and
@@ -1390,4 +1392,29 @@ seed_candidates "$candidates_base_url" "$(cat "$repo_root/$publish_dir/access-to
 echo "==> npm run test:e2e (real browser against $candidates_base_url)"
 run_suite "$candidates_base_url" "$candidates_log_file" "$repo_root/$publish_dir/access-token-candidates" \
   tests/github-release-candidates.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 13: the project narrative. It needs a project it records history into, and neither a
+# project nor a narrative entry can be removed through the UI - an entry is the owner's own
+# words, and history somebody did not act on is still history - so its own installation, its own
+# database and its own published instance, for the same reason suites 10 to 12 each have one.
+#
+# Nothing here is seeded: every project and every entry is recorded by the same clicks an owner
+# would make, and every refresh runs in the delivered queue on the published server - the panel
+# follows the job until the operations route settles it, which is what the suite asserts it does.
+# What a pass here establishes is that a project with no history shows honest empty states, that
+# a recorded entry reads as attributed history in its own section, that a refresh concludes a
+# generated summary in a different section with its revision, that an edit marks the prior summary
+# stale until the next refresh advances the revision, and that the server says the same thing the
+# panel does. It is NOT evidence that any provider was called: the delivered summary builder is
+# deterministic and reaches no provider, and a summary is an arrangement of attributed sources
+# rather than generated prose.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a thirteenth disposable PostgreSQL and published application at $narrative_base_url"
+start_suite narrative "$narrative_base_url" "$narrative_log_file" "$repo_root/$publish_dir/access-token-narrative"
+
+echo "==> npm run test:e2e (real browser against $narrative_base_url)"
+run_suite "$narrative_base_url" "$narrative_log_file" "$repo_root/$publish_dir/access-token-narrative" \
+  tests/narrative-memory.spec.ts
 stop_suite

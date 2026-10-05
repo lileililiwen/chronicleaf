@@ -99,6 +99,12 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     public DbSet<GitHubCandidateRun> GitHubCandidateRuns => Set<GitHubCandidateRun>();
 
+    public DbSet<NarrativeEntry> NarrativeEntries => Set<NarrativeEntry>();
+
+    public DbSet<ProjectSummary> ProjectSummaries => Set<ProjectSummary>();
+
+    public DbSet<NarrativeRefreshRequestRow> NarrativeRefreshRequests => Set<NarrativeRefreshRequestRow>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Installation>(entity =>
@@ -1967,6 +1973,157 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_github_candidate_runs_project_id");
         });
+
+        // NARRATIVE-MEMORY-001: one explicit, owner-written line of project history, attributed to
+        // the evidence items it is drawn from. The scope is the owning project's scope, checked
+        // through the project on every read and write; the revision is the compare-and-set token a
+        // stale writer loses with.
+        modelBuilder.Entity<NarrativeEntry>(entity =>
+        {
+            entity.ToTable("narrative_entries");
+            entity.HasKey(entry => entry.Id);
+            entity.Property(entry => entry.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(entry => entry.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(entry => entry.Kind)
+                .HasColumnName("kind")
+                .HasMaxLength(NarrativeKindMaxLength)
+                .IsRequired();
+            entity.Property(entry => entry.OccurredAt)
+                .HasColumnName("occurred_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(entry => entry.Text)
+                .HasColumnName("text")
+                .HasMaxLength(NarrativeEntry.TextMaxLength)
+                .IsRequired();
+            entity.Property(entry => entry.SourceEvidenceIds)
+                .HasColumnName("source_evidence_ids")
+                .HasColumnType("uuid[]")
+                .IsRequired();
+            entity.Property(entry => entry.Revision).HasColumnName("revision").IsRequired();
+            entity.Property(entry => entry.Visibility)
+                .HasColumnName("visibility")
+                .HasMaxLength(NarrativeVisibilityMaxLength)
+                .IsRequired();
+
+            entity.Property(entry => entry.Revision).IsConcurrencyToken();
+
+            // One project's entries read oldest first, so the index leads with the project and the
+            // order every read uses.
+            entity.HasIndex(entry => new { entry.ProjectId, entry.OccurredAt, entry.Id })
+                .HasDatabaseName("ix_narrative_entries_project_id_occurred_at_id");
+
+            // The kind is one of the six this build knows. A value outside the vocabulary is not a
+            // kind to be guessed at: it means the row was written by a build with different words.
+            entity.ToTable(
+                table =>
+                {
+                    table.HasCheckConstraint(
+                        "ck_narrative_entries_kind",
+                        "kind IN ('origin', 'audience', 'technical-route', 'decision', 'problem', 'feedback')");
+                    table.HasCheckConstraint(
+                        "ck_narrative_entries_visibility",
+                        "visibility IN ('private', 'exportable')");
+                    table.HasCheckConstraint(
+                        "ck_narrative_entries_revision_at_least_one",
+                        "revision >= 1");
+                });
+
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(entry => entry.ProjectId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_narrative_entries_project_id");
+        });
+
+        // NARRATIVE-MEMORY-002: the generated project summary, one row per project. A refresh
+        // recomputes the input hash from the sources and either keeps this row or regenerates it;
+        // the stale mark says a source moved after the body was built.
+        modelBuilder.Entity<ProjectSummary>(entity =>
+        {
+            entity.ToTable("project_summaries");
+            entity.HasKey(summary => summary.Id);
+            entity.Property(summary => summary.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(summary => summary.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(summary => summary.ThroughMilestoneId).HasColumnName("through_milestone_id");
+            entity.Property(summary => summary.InputHash)
+                .HasColumnName("input_hash")
+                .HasMaxLength(Sha256HexMaxLength)
+                .IsRequired();
+            entity.Property(summary => summary.BodyJson)
+                .HasColumnName("body_json")
+                .HasColumnType("jsonb")
+                .IsRequired();
+            entity.Property(summary => summary.Revision).HasColumnName("revision").IsRequired();
+            entity.Property(summary => summary.Stale).HasColumnName("stale").IsRequired();
+            entity.Property(summary => summary.UpdatedAt)
+                .HasColumnName("updated_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            entity.Property(summary => summary.Revision).IsConcurrencyToken();
+
+            // One summary per project: two refreshes that race still leave one row, and the loser
+            // re-reads rather than writing a second.
+            entity.HasIndex(summary => summary.ProjectId)
+                .IsUnique()
+                .HasDatabaseName("ux_project_summaries_project_id");
+
+            entity.ToTable(
+                table =>
+                {
+                    table.HasCheckConstraint(
+                        "ck_project_summaries_revision_at_least_one",
+                        "revision >= 1");
+                    table.HasCheckConstraint(
+                        "ck_project_summaries_input_hash_sha256_hex",
+                        "input_hash ~ '^[0-9a-f]{64}$'");
+                });
+
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(summary => summary.ProjectId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_project_summaries_project_id");
+        });
+
+        // NARRATIVE-MEMORY-002: the values an owner stated when they asked for a refresh, kept
+        // where the job that runs can read them. A queued job carries an operation id and nothing
+        // else, so this row is the only way the worker learns the cutoff and the consented
+        // private-entry selection.
+        modelBuilder.Entity<NarrativeRefreshRequestRow>(entity =>
+        {
+            entity.ToTable("narrative_refresh_requests");
+            entity.HasKey(request => request.Id);
+            entity.Property(request => request.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(request => request.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(request => request.OperationId).HasColumnName("operation_id").IsRequired();
+            entity.Property(request => request.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(request => request.Cutoff)
+                .HasColumnName("cutoff")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(request => request.SelectedEntryIds)
+                .HasColumnName("selected_entry_ids")
+                .HasColumnType("uuid[]")
+                .IsRequired();
+            entity.Property(request => request.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            // One request per job: a re-run reads the same authorized values rather than a second
+            // row that could disagree with the first.
+            entity.HasIndex(request => new { request.ScopeId, request.OperationId })
+                .IsUnique()
+                .HasDatabaseName("ux_narrative_refresh_requests_scope_id_operation_id");
+
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(request => request.ProjectId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_narrative_refresh_requests_project_id");
+        });
     }
 
     /// <summary>At most 40 characters for a content kind, matching the Core record's own bound.</summary>
@@ -2126,6 +2283,12 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     /// <summary>At most 16 characters; the longest status is <c>dismissed</c>.</summary>
     private const int MilestoneStatusMaxLength = 16;
+
+    /// <summary>At most 15 characters; the longest narrative kind is <c>technical-route</c>.</summary>
+    private const int NarrativeKindMaxLength = 15;
+
+    /// <summary>At most 10 characters; the longest narrative visibility is <c>exportable</c>.</summary>
+    private const int NarrativeVisibilityMaxLength = 10;
 
     /// <summary>
     /// Refuses a stored status this build does not know. A value that is not one of the six is not a

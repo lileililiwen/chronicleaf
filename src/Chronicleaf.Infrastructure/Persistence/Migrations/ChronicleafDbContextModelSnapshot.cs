@@ -1516,6 +1516,105 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.ToTable("milestones", (string)null);
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.NarrativeEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(15)
+                        .HasColumnType("character varying(15)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.PrimitiveCollection<Guid[]>("SourceEvidenceIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("source_evidence_ids");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)")
+                        .HasColumnName("text");
+
+                    b.Property<string>("Visibility")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("visibility");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId", "OccurredAt", "Id")
+                        .HasDatabaseName("ix_narrative_entries_project_id_occurred_at_id");
+
+                    b.ToTable("narrative_entries", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_narrative_entries_kind", "kind IN ('origin', 'audience', 'technical-route', 'decision', 'problem', 'feedback')");
+
+                            t.HasCheckConstraint("ck_narrative_entries_revision_at_least_one", "revision >= 1");
+
+                            t.HasCheckConstraint("ck_narrative_entries_visibility", "visibility IN ('private', 'exportable')");
+                        });
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.NarrativeRefreshRequestRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("Cutoff")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cutoff");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.PrimitiveCollection<Guid[]>("SelectedEntryIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("selected_entry_ids");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("ScopeId", "OperationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_narrative_refresh_requests_scope_id_operation_id");
+
+                    b.ToTable("narrative_refresh_requests", (string)null);
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.Operation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1719,6 +1818,58 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_projects_scope_id_name");
 
                     b.ToTable("projects", (string)null);
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.ProjectSummary", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BodyJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("body_json");
+
+                    b.Property<string>("InputHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("input_hash");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<bool>("Stale")
+                        .HasColumnType("boolean")
+                        .HasColumnName("stale");
+
+                    b.Property<Guid?>("ThroughMilestoneId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("through_milestone_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_project_summaries_project_id");
+
+                    b.ToTable("project_summaries", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_project_summaries_input_hash_sha256_hex", "input_hash ~ '^[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("ck_project_summaries_revision_at_least_one", "revision >= 1");
+                        });
                 });
 
             modelBuilder.Entity("Chronicleaf.Core.ScreenshotCandidate", b =>
@@ -2272,6 +2423,36 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_media_project_id");
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.NarrativeEntry", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_narrative_entries_project_id");
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.NarrativeRefreshRequestRow", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_narrative_refresh_requests_project_id");
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.ProjectSummary", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_project_summaries_project_id");
                 });
 
             modelBuilder.Entity("Chronicleaf.Core.ScreenshotCandidate", b =>

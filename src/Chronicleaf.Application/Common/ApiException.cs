@@ -158,6 +158,14 @@ public static class ApiErrorStatus
         Content.ReviewError.ApprovalStale => 409,
         Content.ReviewError.ApprovalBlocked => 422,
 
+        // The narrative-memory package's codes. Additive in the same way. 422 for a context that
+        // does not fit the byte budget without losing a pinned fact, because the remedy is to
+        // narrow the cutoff or shorten entries - the same shape as every other semantic refusal
+        // in this file. The foreign-evidence refusal deliberately reuses the delivered NotFound
+        // above, and the three job codes deliberately have no arm: they are written to the
+        // operation row, and no route answers a refresh that already failed.
+        Narrative.NarrativeError.ContextTooLarge => 422,
+
         // The github-release-candidates package's codes. Additive in the same way, and the choices are
         // this package's failure policy rather than defaults. 401 for a delivery that did not
         // authenticate - and deliberately the same 401 for an unknown connection id, a connection with

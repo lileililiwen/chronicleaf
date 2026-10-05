@@ -1,14 +1,12 @@
 # Chronicleaf handoff
 
-current_spec: narrative-memory
+current_spec: html-content-export
 
 ## Current state — 2026-10-05
 
-Twenty-four changes implemented, verified and archived, each with exactly two commits (implementation/
-tests/archive, then this HANDOFF-only pointer). No `current_spec` remains: `local-git-evidence` was the
-first of the remaining POST-MVP follow-ups, `community-compose-release` was the MVP-RELEASE gate, and every
-MVP dependency is archived. The changes still listed by `openspec list` are POST-MVP, CLOUD or
-DEMAND-GATED follow-ups and none is selected.
+Twenty-five changes implemented, verified and archived, each with exactly two commits (implementation/
+tests/archive, then this HANDOFF-only pointer). `current_spec` selects `html-content-export`, the
+next POST-MVP package in ROADMAP order after `narrative-memory`.
 
 | # | Change | Implementation commit | Canonical spec |
 |---|---|---|---|
@@ -36,6 +34,7 @@ DEMAND-GATED follow-ups and none is selected.
 | 22 | `markdown-review-export` | `64d6868` | `openspec/specs/markdown-review-export/spec.md` |
 | 23 | `community-compose-release` | `5a40d46` | `openspec/specs/community-compose-release/spec.md` |
 | 24 | `local-git-evidence` | `f7e4a81` | `openspec/specs/local-git-evidence/spec.md` |
+| 25 | `narrative-memory` | `a7d12f4` | `openspec/specs/narrative-memory/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -390,7 +389,8 @@ owner's words; the e2e seed's candidate rows name the two real capture jobs the 
 PNG behind all three. Deployment stays `deployable: false`; there is no remote, no push and no
 publication.
 
-Next: no `current_spec` remains. `local-git-evidence` is archived (`f7e4a81`, canonical spec
+Next: `current_spec` is `html-content-export`, the POST-MVP package ROADMAP orders immediately
+after `narrative-memory` (sanitized portable HTML export on `markdown-review-export`). `local-git-evidence` is archived (`f7e4a81`, canonical spec
 `openspec/specs/local-git-evidence/spec.md`) and its own notes are in the package section above, including
 the registration shape, the two diff numbers and the one registration name a later transport must not
 reuse. `community-compose-release` was the MVP-RELEASE gate and is
@@ -491,6 +491,50 @@ without `--skip-specs`, then make the implementation commit and the HANDOFF-only
 stop. Do not push.
 
 ## Package notes
+
+`narrative-memory` is archived (`a7d12f4`, canonical spec
+`openspec/specs/narrative-memory/spec.md`). Read that package's own boundary before extending it,
+and note what it decided that a later reader would otherwise have to rediscover.
+
+**Release evidence (`narrative-memory`, commit `a7d12f4`, all run by the implementer rather than
+taken on report).** `CHRONICLEAF_E2E=1 bash scripts/verify.sh` exit 0 with the platform-feed stage
+and twenty-six filtered stages each asserted to select at least one test: 15/15 shell, 24/24
+persistence, 23/23 access, 19/19 projects, 12/12 jobs, 9/9 media, 14/14 evidence, 32/32 vault,
+22/22 voice, 26/26 provider contract, 23/23 OpenAI, 24/24 Gemini, 24/24 Anthropic, 23/23
+OpenRouter, 26/26 Ollama, 27/27 GitHub evidence, 18/18 GraphQL enrichment, 21/21 local Git,
+52/52 capture, 18/18 curation, 30/30 drafts, 7/7 timeline, 11/11 review-export, **7/7 narrative
+memory**, 10/10 compose-release, 40/40 release candidates — 557 in total. `npm ci`, `tsc` and
+`vite build` all green. `bash scripts/e2e.sh` green: 65/65 Playwright across thirteen
+database-isolated browser suites (21/21 shell/access/projects/jobs, 3/3 evidence, 6/6 vault, 4/4
+voice, 4/4 providers, 3/3 GitHub, 3/3 capture, 4/4 drafts, 4/4 curation, 3/3 timeline, 2/2
+review-export, 5/5 candidates, **3/3 narrative**). `dotnet build --nologo --no-incremental` 0
+errors with the same 2 pre-existing warnings at HEAD. Name preflight exit 0;
+`openspec validate --all --strict --no-interactive` 54/54 before and after the archive, which
+used no `--skip-specs`.
+
+**Inheritance note.** This package was delivered across two worker passes because the first was
+killed mid-flight by a server restart and left a substantial uncommitted implementation behind
+(backend, migration, panel, 7 backend tests). The second pass verified it as inherited
+(`dotnet build --nologo --no-incremental` 0 errors, 7/7 green on first run) and completed rather
+than restarted it: the only new code is the browser suite (`tests/narrative-memory.spec.ts`,
+suite 13 in `scripts/e2e.sh` on port 5093) plus one-line `verify.sh` comment coverage. No
+inherited defect was found; nothing inherited was rewritten.
+
+**One gate flake, recorded rather than hidden.** The first full-gate run failed the browser stage
+while the standalone `scripts/e2e.sh` passed immediately before and twice after; the rerun gate
+passed end to end (GATE_EXIT=0). The filtered gate output did not identify which suite tripped,
+so no suite is blamed here — but a browser stage that fails once under full-gate load and passes
+in isolation is load contention, not product behavior, until a second occurrence says otherwise.
+
+**What the database now guarantees, not just the code.** `narrative_entries` carries the owner's
+words with kind/visibility check constraints and a revision compare-and-set; `project_summaries`
+is one row per project (unique index) with a SHA-256-hex input hash and a stale mark; a refresh
+recomputes the hash from entry revisions, milestone revisions, evidence heads and live approval
+excerpts, so a corrected decision, a revised milestone or a new bundle all invalidate the stored
+body at the next run. Entry writes mark the summary stale; a failed build keeps the prior body
+under the stale mark with `narrative_summary_build_failed` on the operation. `IProjectNarrativeContext`
+is registered for future drafts callers but no drafts path consumes it yet — wiring it into
+generation would change consented payloads, so it waits for an explicit package.
 
 `local-git-evidence` is archived (`f7e4a81`, canonical spec
 `openspec/specs/local-git-evidence/spec.md`). Read that package's own boundary before extending it, and

@@ -5,7 +5,8 @@
 # LLM-PROVIDER-CONTRACT-001/002, GITHUB-EVIDENCE-001/002, LLM-OPENAI-ADAPTER-001/002,
 # LLM-OLLAMA-ADAPTER-001/002,
 # SCREENSHOT-CAPTURE-001/002, SCREENSHOT-CURATION-001/002, GROUNDED-MARKDOWN-DRAFTS-001/002,
-# MILESTONE-TIMELINE-001/002, MARKDOWN-REVIEW-EXPORT-001/002).
+# MILESTONE-TIMELINE-001/002, MARKDOWN-REVIEW-EXPORT-001/002,
+# COMMUNITY-COMPOSE-RELEASE-001/002).
 #
 # Required chain, in order:
 #   1. platform feed           - the committed packages/platform-feed is what the build resolves, from
@@ -422,6 +423,20 @@ else
   # real API host, with the reviewed draft produced by a real generation job behind the delivered
   # provider seam.
   step "markdown review export tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~MarkdownReviewExportTests"
+  # COMMUNITY-COMPOSE-RELEASE-001/002. That a clean install completes the
+  # milestone-to-approved-Markdown flow with the timeline telling it back; that the compose
+  # file describes exactly app plus postgres on the pinned digest with named volumes, a
+  # loopback default and a read-only key mount and no third runtime; that all five provider
+  # transports are installed in production; that a private capture destination is refused
+  # before any job exists and a missing sandbox is a visible 503 rather than a silent
+  # downgrade; that a restart on the retained database serves identical export and timeline
+  # bytes; that readiness distinguishes a live process from a usable install; that export
+  # without approval stays refused; and that no release script publishes the repository -
+  # all proven against the same real disposable PostgreSQL through the real API host, with
+  # the same two declared substitutions the owning packages name (a scripted provider
+  # answer, no browser launched). The container bring-up, restart, backup and restore
+  # cycle the file checks stand in for is scripts/verify-community.sh.
+  step "community compose release tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~CommunityComposeReleaseTests"
 fi
 
 step "frontend install" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm ci'

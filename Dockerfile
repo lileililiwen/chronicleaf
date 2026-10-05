@@ -86,13 +86,27 @@ COPY global.json Directory.Build.props ./
 # dotnet-platform-libs. scripts/pack-platform.sh re-packs the feed and is never part of a build.
 COPY nuget.config ./
 COPY packages/platform-feed/ ./packages/platform-feed/
-# Core -> Application -> Infrastructure -> Api, the layering the composition root depends on.
+# Core -> Application -> Infrastructure -> Api, the layering the composition root depends on,
+# plus the leaf projects the composition root references directly: the provider contract and
+# its five BYOK adapters (Chronicleaf.AI), the GitHub transport (Chronicleaf.GitHub) and the
+# capture sandbox (Chronicleaf.Capture, referenced by Infrastructure).
 COPY src/Chronicleaf.Core/Chronicleaf.Core.csproj src/Chronicleaf.Core/
+COPY src/Chronicleaf.AI/Chronicleaf.AI.csproj src/Chronicleaf.AI/
+COPY src/Chronicleaf.AI/Providers/OpenAI/Chronicleaf.AI.OpenAI.csproj src/Chronicleaf.AI/Providers/OpenAI/
+COPY src/Chronicleaf.AI/Providers/Gemini/Chronicleaf.AI.Gemini.csproj src/Chronicleaf.AI/Providers/Gemini/
+COPY src/Chronicleaf.AI/Providers/Anthropic/Chronicleaf.AI.Anthropic.csproj src/Chronicleaf.AI/Providers/Anthropic/
+COPY src/Chronicleaf.AI/Providers/OpenRouter/Chronicleaf.AI.OpenRouter.csproj src/Chronicleaf.AI/Providers/OpenRouter/
+COPY src/Chronicleaf.AI/Providers/Ollama/Chronicleaf.AI.Ollama.csproj src/Chronicleaf.AI/Providers/Ollama/
+COPY src/Chronicleaf.GitHub/Chronicleaf.GitHub.csproj src/Chronicleaf.GitHub/
+COPY src/Chronicleaf.Capture/Chronicleaf.Capture.csproj src/Chronicleaf.Capture/
 COPY src/Chronicleaf.Application/Chronicleaf.Application.csproj src/Chronicleaf.Application/
 COPY src/Chronicleaf.Infrastructure/Chronicleaf.Infrastructure.csproj src/Chronicleaf.Infrastructure/
 COPY src/Chronicleaf.Api/Chronicleaf.Api.csproj src/Chronicleaf.Api/
 RUN dotnet restore src/Chronicleaf.Api/Chronicleaf.Api.csproj
 COPY src/Chronicleaf.Core/ src/Chronicleaf.Core/
+COPY src/Chronicleaf.AI/ src/Chronicleaf.AI/
+COPY src/Chronicleaf.GitHub/ src/Chronicleaf.GitHub/
+COPY src/Chronicleaf.Capture/ src/Chronicleaf.Capture/
 COPY src/Chronicleaf.Application/ src/Chronicleaf.Application/
 COPY src/Chronicleaf.Infrastructure/ src/Chronicleaf.Infrastructure/
 COPY src/Chronicleaf.Api/ src/Chronicleaf.Api/
@@ -102,15 +116,25 @@ COPY --from=web /web/dist/ /out/wwwroot/
 FROM ${DOTNET_ASPNET_IMAGE} AS runtime
 WORKDIR /app
 COPY --from=build /out ./
+# Container initialization for the two-service Community install: directory ownership, the
+# best-effort capture-UID egress firewall, then the non-root API. The script execs the same
+# assembly the previous ENTRYPOINT ran, so the refusal contract is unchanged: without
+# CAP_NET_ADMIN the server still starts and capture jobs answer capture_sandbox_unavailable.
+COPY scripts/chronicleaf-entrypoint.sh /app/chronicleaf-entrypoint.sh
+# curl is the Compose healthcheck's only dependency: the app service probes
+# /api/health with it, and the aspnet runtime image does not ship one.
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+  && rm -rf /var/lib/apt/lists \
+  && chmod +x /app/chronicleaf-entrypoint.sh
 # The default MediaRoot. Created here and handed to the runtime user, because the image runs
 # non-root and would otherwise fail its first start trying to create it under a root-owned /app.
 # A deployment that mounts its own volume at this path overrides it and the operator keeps the
 # images across container replacements.
-RUN mkdir -p /app/runtime/media && chown -R $APP_UID /app/runtime
+RUN mkdir -p /app/runtime/media /app/runtime/browser-jobs && chown -R $APP_UID /app/runtime
 # Required configuration. Supply it at run time; the image carries no credential. The encryption key
 # in particular is never generated, copied or defaulted here: Chronicleaf__EncryptionKeyFile names a
 # file the operator mounts, and a key inside this image would be a key inside every copy of it.
 ENV ASPNETCORE_HTTP_PORTS=8080
 EXPOSE 8080
 USER $APP_UID
-ENTRYPOINT ["dotnet", "Chronicleaf.Api.dll"]
+ENTRYPOINT ["/app/chronicleaf-entrypoint.sh"]

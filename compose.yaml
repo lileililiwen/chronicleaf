@@ -1,0 +1,99 @@
+# Chronicleaf Community deployment: one application and one PostgreSQL database.
+#
+# Two services and nothing else: `app` (the published Api + React client, Hangfire in-process)
+# and `postgres`. No Redis, no queue service, no message broker - the queue lives in the same
+# database the product reads, which is the whole of the background-jobs contract.
+#
+# The PostgreSQL image is pinned by tag AND digest, and the backup/restore path in
+# scripts/verify-community.sh uses this same reference, so the tool that writes a backup is the
+# tool that reads it back. Refresh the digest deliberately (`docker pull postgres:17.6-alpine`
+# then `docker inspect`), never to a floating tag.
+#
+# Capture hardening (screenshot-capture design): the application service declares CAP_NET_ADMIN
+# so container initialization can install the capture-UID egress firewall the sandbox supervisor
+# probes for. That capability is Linux-only; on a host that cannot grant it the firewall step
+# reports the fact and capture jobs answer capture_sandbox_unavailable rather than navigating
+# with weaker isolation. See scripts/chronicleaf-entrypoint.sh and
+# docs/community-quickstart.md. No additional Compose service is introduced: the supervisor and
+# the egress proxy are internal to this one application service.
+#
+# Start it (operator-owned values live in .env, whose names are documented in .env.example):
+#   cp .env.example .env   # then fill in the four required values; the file is git-ignored
+#   docker compose up -d --build
+#   docker compose exec postgres pg_isready -U chronicleaf   # DB readiness healthcheck agrees
+#   curl http://127.0.0.1:5080/api/ready                      # application readiness agrees
+# Migrations are applied by the explicit operator command, never on HTTP startup:
+#   ConnectionStrings__Chronicleaf="Host=127.0.0.1;Port=5432;..." \
+#   Chronicleaf__AccessTokenHash="<sha256 hex>" \
+#     dotnet ef database update --project src/Chronicleaf.Infrastructure --startup-project src/Chronicleaf.Api
+# Back up before every upgrade; the application never overwrites existing data on restart.
+# See docs/community-quickstart.md for the full operator path including restore.
+
+name: chronicleaf
+
+services:
+  postgres:
+    image: postgres:17.6-alpine@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: chronicleaf
+      POSTGRES_USER: chronicleaf
+      POSTGRES_PASSWORD: ${CHRONICLEAF_DB_PASSWORD:?set CHRONICLEAF_DB_PASSWORD in .env}
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chronicleaf -d chronicleaf"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    networks:
+      - chronicleaf
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: chronicleaf:community
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Loopback by default: the application is served to this machine, and anything wider
+    # (a reverse proxy with TLS) is an explicit operator decision documented in
+    # docs/community-quickstart.md. The host port defaults to 5080 and is overridable for
+    # parallel verification runs sharing one Docker daemon.
+    ports:
+      - "127.0.0.1:${CHRONICLEAF_APP_PORT:-5080}:8080"
+    environment:
+      ConnectionStrings__Chronicleaf: Host=postgres;Database=chronicleaf;Username=chronicleaf;Password=${CHRONICLEAF_DB_PASSWORD:?set CHRONICLEAF_DB_PASSWORD in .env};Timeout=5;Command Timeout=10
+      Chronicleaf__AccessTokenHash: ${CHRONICLEAF_ACCESS_TOKEN_HASH:?set CHRONICLEAF_ACCESS_TOKEN_HASH in .env}
+      Chronicleaf__PublicOrigin: ${CHRONICLEAF_PUBLIC_ORIGIN:?set CHRONICLEAF_PUBLIC_ORIGIN in .env}
+      Chronicleaf__MediaRoot: /app/runtime/media
+      Chronicleaf__EncryptionKeyFile: /run/chronicleaf/encryption.key
+    volumes:
+      - media:/app/runtime/media
+      # The 32-byte AES-256 operator key, generated and kept outside the repository and
+      # outside any image, mounted read-only. A key baked into a layer is readable by
+      # anyone with the image, so there is no default and no fallback here.
+      - ${CHRONICLEAF_ENCRYPTION_KEY_FILE:?set CHRONICLEAF_ENCRYPTION_KEY_FILE in .env}:/run/chronicleaf/encryption.key:ro
+    # Linux-only hardened capture: lets container initialization install the capture-UID
+    # egress firewall the sandbox supervisor requires. Without it the application still
+    # serves everything else and capture jobs refuse visibly; see the entrypoint script.
+    cap_add:
+      - NET_ADMIN
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/health > /dev/null"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
+    networks:
+      - chronicleaf
+
+volumes:
+  database:
+  media:
+
+networks:
+  chronicleaf:

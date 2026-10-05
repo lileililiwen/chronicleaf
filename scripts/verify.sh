@@ -338,6 +338,18 @@ else
   # GitHub API was called, that a real repository was resolved, or that any specific GitHub response
   # shape is supported beyond what the transport's own pinned version documents.
   step "github evidence tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~GithubEvidenceTests"
+  # GITHUB-GRAPHQL-ENRICHMENT-001/002. That readable associated pull requests are appended with
+  # their ids, observed states and source URLs while the REST evidence stays intact; that errored
+  # GraphQL fields become unavailable items carrying the package's own reason vocabulary and never
+  # a sentence from a response body; that a repeated provider node across pages is appended once;
+  # that only the declared repository is ever queried with the one fixed named operation; that a
+  # missing permission ends the job as permission_denied with no fabricated fact; that a bundle
+  # that moves during the query - or between the request and the run - is superseded rather than
+  # overwritten; and that a 429 waits for the provider's own reset before the retry succeeds - are
+  # all proven against the same real disposable PostgreSQL and the real API host, with only the
+  # bytes on the wire scripted. No stage here may be read as evidence that GitHub works or that a
+  # real repository was resolved.
+  step "github graphql enrichment tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~GithubGraphqlEnrichmentTests"
   # LOCAL-GIT-EVIDENCE-001/002. That two selected commits are appended with their own immutable revisions and
   # bounded tracked differences, and that every later fact is read from two resolved SHAs rather than from
   # the directory; that an untracked file, a dirty edit and a committed secret-named file each reach no

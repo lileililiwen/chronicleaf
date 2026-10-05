@@ -150,6 +150,15 @@ public static class ChronicleafSchema
     /// </summary>
     public const string GitHubReleaseCandidatesMigrationId = "20261009090000_AddGitHubReleaseCandidates";
 
+    /// <summary>
+    /// The forward migration that adds the <c>github_enrichment_runs</c> table
+    /// (GITHUB-GRAPHQL-ENRICHMENT-001/002). A database that has never applied it has nowhere to
+    /// record which evidence revision an enrichment was asked against, so its enrichment routes
+    /// would fail against a missing table; readiness says so by name rather than answering 200 and
+    /// failing on the first request.
+    /// </summary>
+    public const string GitHubGraphqlEnrichmentMigrationId = "20261010090000_AddGitHubGraphqlEnrichment";
+
     /// <summary>Every migration a database must carry before this build calls itself ready.</summary>
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
@@ -169,6 +178,7 @@ public static class ChronicleafSchema
         MarkdownReviewExportMigrationId,
         LocalGitEvidenceMigrationId,
         GitHubReleaseCandidatesMigrationId,
+        GitHubGraphqlEnrichmentMigrationId,
     ];
 
     /// <summary>
@@ -176,7 +186,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = GitHubReleaseCandidatesMigrationId;
+    public const string ExpectedMigrationId = GitHubGraphqlEnrichmentMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

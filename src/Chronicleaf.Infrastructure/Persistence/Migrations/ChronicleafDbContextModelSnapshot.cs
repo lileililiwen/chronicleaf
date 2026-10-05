@@ -577,6 +577,58 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.ToTable("credentials", (string)null);
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.EnrichmentRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("ExpectedBundleRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expected_bundle_revision");
+
+                    b.Property<Guid>("MilestoneId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("milestone_id");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<string>("Owner")
+                        .IsRequired()
+                        .HasMaxLength(39)
+                        .HasColumnType("character varying(39)")
+                        .HasColumnName("owner");
+
+                    b.Property<string>("Repo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("repo");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MilestoneId");
+
+                    b.HasIndex("ScopeId", "OperationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_github_enrichment_runs_scope_id_operation_id");
+
+                    b.HasIndex("ScopeId", "MilestoneId", "CreatedAt")
+                        .HasDatabaseName("ix_github_enrichment_runs_scope_id_milestone_id_created_at");
+
+                    b.ToTable("github_enrichment_runs", (string)null);
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.EvidenceBundle", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2068,6 +2120,16 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_content_revisions_evidence_bundle_id");
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.EnrichmentRun", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Milestone", null)
+                        .WithMany()
+                        .HasForeignKey("MilestoneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_github_enrichment_runs_milestone_id");
                 });
 
             modelBuilder.Entity("Chronicleaf.Core.EvidenceBundle", b =>

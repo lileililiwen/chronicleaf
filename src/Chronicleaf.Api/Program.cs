@@ -15,6 +15,7 @@ using Chronicleaf.Api.Curation;
 using Chronicleaf.Api.Evidence;
 using Chronicleaf.Api.Git;
 using Chronicleaf.Api.GitHub;
+using Chronicleaf.Api.GitHubEnrichment;
 using Chronicleaf.Api.Candidates;
 using Chronicleaf.Api.Media;
 using Chronicleaf.Api.Operations;
@@ -35,6 +36,7 @@ using Chronicleaf.Infrastructure.Curation;
 using Chronicleaf.Infrastructure.Evidence;
 using Chronicleaf.Infrastructure.Git;
 using Chronicleaf.Infrastructure.GitHub;
+using Chronicleaf.Infrastructure.GitHubEnrichment;
 using Chronicleaf.Infrastructure.GitHubCandidates;
 using Chronicleaf.Infrastructure.Media;
 using Chronicleaf.Infrastructure.Operations;
@@ -196,6 +198,16 @@ builder.Services.AddGitHubEvidence();
 // /api/ready.
 builder.Services.AddGitHubCandidates();
 
+// GITHUB-GRAPHQL-ENRICHMENT-001/002. The optional relationship reader over the delivered GitHub
+// transport - no second HttpClient, so no second host, redirect policy or timeout to disagree
+// about - plus the run store, the service and the one job handler that appends attributed
+// issue/PR relationships to already-collected evidence. There is no key to configure here: a
+// token is the delivered vault's under the `github` provider and is only ever a lease for the
+// length of one read. Nothing is ever written to GitHub - the reader posts one fixed query and
+// nothing else - and nothing here confirms a candidate or publishes. A database without the
+// github-graphql-enrichment migration reports schema_mismatch at /api/ready.
+builder.Services.AddGitHubGraphqlEnrichment();
+
 // LOCAL-GIT-EVIDENCE-001/002. The read-only Git transport, which runs four Git verbs and refuses every
 // other, plus the two stores, the service and the one job handler that appends collected evidence to a
 // milestone. The registered roots are the operator's own configuration (`Chronicleaf:LocalRepositoryRoots`)
@@ -338,6 +350,13 @@ app.MapGitHubEvidenceEndpoints();
 // caller is GitHub, it has no session, and the HMAC signature over its own raw bytes is what
 // authenticates it. Nothing in this file confirms a candidate, and no route here returns a secret.
 app.MapGitHubCandidateEndpoints();
+
+// GITHUB-GRAPHQL-ENRICHMENT-001/002: the private enrichment request route. It is not marked
+// public, so the access package's default-deny boundary already covers it. No route here accepts
+// or returns a URL, a ref or a SHA: the SHAs an enrichment queries are the ones the milestone's
+// own bundle already carries, and the route carries only the evidence revision and the caller's
+// idempotency key.
+app.MapGitHubEnrichmentEndpoints();
 
 // LOCAL-GIT-EVIDENCE-001/002: the private root catalogue, registration and collection routes. None of
 // them is marked public, so the access package's default-deny boundary already covers every one of them.

@@ -73,6 +73,8 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     public DbSet<SyncSource> SyncSources => Set<SyncSource>();
 
+    public DbSet<EnrichmentRun> EnrichmentRuns => Set<EnrichmentRun>();
+
     public DbSet<LocalRepository> LocalRepositories => Set<LocalRepository>();
 
     public DbSet<LocalSyncSource> LocalSyncSources => Set<LocalSyncSource>();
@@ -946,6 +948,57 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .HasForeignKey(source => source.MilestoneId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_sync_sources_milestone_id");
+        });
+
+        // -----------------------------------------------------------------------------------------
+        // github-graphql-enrichment: one row per enrichment run, written when the owner asks and
+        // never changed afterwards. The evidence revision is here because a job payload carries an
+        // operation id and nothing else, so the revision the owner was looking at has to be durable
+        // somewhere the worker can read it from. What the run observed lives on the bundle it
+        // appended, not here: this row says what was asked, the bundle says what was read. There is
+        // no credential column, because this package only ever holds a vault reference for the
+        // length of one read.
+        // -----------------------------------------------------------------------------------------
+        modelBuilder.Entity<EnrichmentRun>(entity =>
+        {
+            entity.ToTable("github_enrichment_runs");
+            entity.HasKey(run => run.Id);
+            entity.Property(run => run.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(run => run.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(run => run.OperationId).HasColumnName("operation_id").IsRequired();
+            entity.Property(run => run.MilestoneId).HasColumnName("milestone_id").IsRequired();
+            entity.Property(run => run.ExpectedBundleRevision)
+                .HasColumnName("expected_bundle_revision")
+                .IsRequired();
+            entity.Property(run => run.Owner)
+                .HasColumnName("owner")
+                .HasMaxLength(GitHubOwnerMaxLength)
+                .IsRequired();
+            entity.Property(run => run.Repo)
+                .HasColumnName("repo")
+                .HasMaxLength(GitHubRepoMaxLength)
+                .IsRequired();
+            entity.Property(run => run.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            // One run per operation, and the worker's lookup: it is handed an operation id and
+            // nothing else, so this index is the only way it can find the request it is enriching.
+            entity.HasIndex(run => new { run.ScopeId, run.OperationId })
+                .IsUnique()
+                .HasDatabaseName("ux_github_enrichment_runs_scope_id_operation_id");
+
+            // A milestone's runs are read newest first, so the index leads with the milestone and
+            // the time the run was asked for.
+            entity.HasIndex(run => new { run.ScopeId, run.MilestoneId, run.CreatedAt })
+                .HasDatabaseName("ix_github_enrichment_runs_scope_id_milestone_id_created_at");
+
+            entity.HasOne<Milestone>()
+                .WithMany()
+                .HasForeignKey(run => run.MilestoneId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_github_enrichment_runs_milestone_id");
         });
 
         // -----------------------------------------------------------------------------------------

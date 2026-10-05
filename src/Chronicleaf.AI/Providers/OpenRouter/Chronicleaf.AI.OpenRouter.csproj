@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Chronicleaf.AI.OpenRouter</RootNamespace>
+    <AssemblyName>Chronicleaf.AI.OpenRouter</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      The contract, and nothing else in the repository. LLM-OPENROUTER-ADAPTER-001/002 own one thing:
+      how OpenRouter's chat completions API is spoken. Everything on the Chronicleaf side of a call - the
+      consent, the bounds, the evidence the owner authorized, the credential's revision, the
+      operation, the audit row - belongs to the packages that already shipped it, so this project
+      cannot reach any of it.
+
+      That is why the credential arrives through OpenRouterProviderSettings/IOpenRouterApiKeySource
+      rather than through Chronicleaf.Application.Secrets.ISecretVault: a project reference to the
+      vault would have been the one way for a transport to start deciding things that are not its
+      business, including which scope a credential belongs to. The vault-backed implementation of the
+      seam lives in the composition root instead, and it is the only place that knows both sides.
+    -->
+    <ProjectReference Include="../../../Chronicleaf.AI/Chronicleaf.AI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      The two abstractions a transport needs, and nothing that would make it a product feature:
+      dependency injection to be registered by a composition root, and logging so a refusal can say
+      which shape of provider answer it saw. There is no HTTP client package here on purpose - the
+      adapter takes an HttpMessageHandler and owns one HttpClient, so the call path is the BCL's and a
+      test can substitute the far end of the wire without substituting the wire itself.
+    -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.4" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.4" />
+  </ItemGroup>
+
+  <!--
+    What this project deliberately cannot reach is the point of it. There is no reference to the
+    credential vault, so an adapter that wanted a plaintext key would have to invent a way to get one.
+    There is no reference to the generation preview store, so it cannot re-read the evidence the owner
+    authorized, and no reference to the domain records, so it cannot see what a milestone is. What it
+    can do is serialise one request, send it to one fixed origin, and translate the answer.
+  -->
+
+</Project>

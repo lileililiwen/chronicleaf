@@ -250,6 +250,34 @@ else
   # published reference, which is a fact about a document rather than about a service, and the
   # credential-gated live smoke the design names is NOT performed and NOT claimed.
   step "llm anthropic adapter tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~LlmAnthropicAdapterTests"
+  # LLM-OPENROUTER-ADAPTER-001/002. That a valid nonstreaming chat completion maps text, finish
+  # state, the provider's own generation id and whatever usage the provider reported; that a refusal,
+  # a tool call in a text-only contract, a truncation - with or without a prefix - a finished answer
+  # with no text, a finish for a condition nobody set and three malformed bodies are each
+  # distinguishable and none of them is ever a draft; that absent or nonsensical token counts are
+  # reported unknown rather than fabricated; that the outbound request is exactly the consented payload
+  # at the fixed origin - model, ceiling, stream false, system instruction carrying the schema
+  # fallback, evidence as a labelled user message - with no member asking for tools and no schema
+  # member; that a 401 and a 403 are the same credential_rejected answer and neither the envelope nor
+  # the adapter's own log lines carry the key or the provider's error prose; that a 429 and a 5xx are
+  # two different codes; that a 302 is refused rather than followed; that a model outside the allowlist
+  # and an empty allowlist are both refused before a credential is leased and before a socket is
+  # opened; that a cancelled call throws and stores nothing; that a response over the 2 MiB cap is
+  # refused while its bytes are arriving; and that the adapter is registered in production and
+  # published verbatim - native schema off, so the schema rides in the prompt and the text is
+  # validated locally - and is unreachable when it is not registered - all proven against the same
+  # real disposable PostgreSQL, the real operator key file and the real API host, with the real
+  # OpenRouterProvider over a stub at the far end of its HttpClient.
+  #
+  # One substitution, and it is the package's own declared boundary: the message handler underneath the
+  # adapter's HttpClient. Everything above the socket is production's own code, including the adapter,
+  # the vault lease, the bearer header, the status mapping and the consent handshake - so a double
+  # implementing ILLMProvider (as the contract stage needs) could not have asserted any of this. No
+  # stage here may be read as evidence that OpenRouter works, that a named model exists or is available
+  # to any owner, or that a paid call is cheap: the response bodies are transcribed from the provider's
+  # published reference, which is a fact about a document rather than about a service, and the
+  # credential-gated live smoke the design names is NOT performed and NOT claimed.
+  step "llm openrouter adapter tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~LlmOpenrouterAdapterTests"
   # GITHUB-EVIDENCE-001/002. That a collection resolves the selected refs to immutable revisions and
   # appends bounded evidence naming each source; that a repository that is absent or not public fails
   # with repository_unavailable rather than with invented material; that a binary or excluded file is
@@ -327,7 +355,7 @@ else
   # real operation queue, with a real sealed credential behind a real consent.
   #
   # A simulation is refused as evidence here, and the refusal is specific rather than general. The one
-  # ILLMProvider in this file is a test double on the `anthropic` slot, a slot no production adapter
+  # ILLMProvider in this file is a test double on the `ollama` slot, a slot no production adapter
   # claims - the same discipline the delivered contract suite uses for the same reason, and
   # `the_slot_this_double_owns_is_claimed_by_no_production_adapter` fails the moment a future adapter
   # package claims it, because at that moment the double would be shadowed by the real adapter and every

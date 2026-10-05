@@ -73,17 +73,18 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
     /// The provider slot this suite's double serves.
     /// </summary>
     /// <remarks>
-    /// <b>OpenRouter, not openai, gemini or anthropic.</b> llm-openai-adapter, llm-gemini-adapter and
-    /// llm-anthropic-adapter each registered a real adapter for their slot in the production
-    /// composition root, and the resolver is built from whatever the composition root supplied. A
-    /// double claiming one of those slots would therefore be shadowed by the real adapter on any host
-    /// built from production, and a scenario expecting its scripted answer would get a real transport
-    /// instead - which is a test that silently stopped testing.
+    /// <b>Ollama, not openai, gemini, anthropic or openrouter.</b> llm-openai-adapter,
+    /// llm-gemini-adapter, llm-anthropic-adapter and llm-openrouter-adapter each registered a real
+    /// adapter for their slot in the production composition root, and the resolver is built from
+    /// whatever the composition root supplied. A double claiming one of those slots would therefore
+    /// be shadowed by the real adapter on any host built from production, and a scenario expecting
+    /// its scripted answer would get a real transport instead - which is a test that silently
+    /// stopped testing.
     ///
-    /// The two slots with no adapter yet are the ones this suite can serve a double on, because a double
+    /// The one slot with no adapter yet is the one this suite can serve a double on, because a double
     /// that is actually resolved is the only kind that can exercise the contract's behaviour at all.
     /// </remarks>
-    private const string ProviderId = GenerationProviderIds.OpenRouter;
+    private const string ProviderId = GenerationProviderIds.Ollama;
 
     /// <summary>A model the double declares it accepts. The contract has no model list of its own.</summary>
     private const string KnownModel = "test-model-r1";
@@ -657,10 +658,12 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
         Assert.DoesNotContain(keyFile.FilePath, host.Logs.Text, StringComparison.Ordinal);
         Assert.DoesNotContain(StoredSecret, host.Logs.Text, StringComparison.Ordinal);
 
-        // A 422 that does name a provider is a different path, and it names nothing else.
+        // A 422 that does name a provider is a different path, and it names nothing else. The
+        // double owns the ollama slot on this host and a credential is stored for it, so an unknown
+        // model is refused by name rather than by absence.
         using var refused = await owner.SendAsync(await owner.Post(
             "/api/settings/ai",
-            new { providerId = GenerationProviderIds.Ollama, model = KnownModel }));
+            new { providerId = ProviderId, model = "a-model-the-double-does-not-name" }));
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
         Assert.DoesNotContain(StoredSecret, await refused.Content.ReadAsStringAsync(), StringComparison.Ordinal);
@@ -1531,8 +1534,8 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
     }
 
     // ===========================================================================================
-    // The catalogue: configured and supported are separate answers, and a slot with no adapter is
-    // reported as having no adapter.
+    // The catalogue: configured and supported are separate answers, and every slot's capability is
+    // the one its own adapter published.
     // ===========================================================================================
 
     [Fact]
@@ -1583,14 +1586,15 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
 
             if (slotId == GenerationProviderIds.OpenAI
                 || slotId == GenerationProviderIds.Gemini
-                || slotId == GenerationProviderIds.Anthropic)
+                || slotId == GenerationProviderIds.Anthropic
+                || slotId == GenerationProviderIds.OpenRouter)
             {
-                // The three slots that are different on every host built from the production composition
-                // root, because llm-openai-adapter, llm-gemini-adapter and llm-anthropic-adapter each
-                // registered a real adapter for theirs. Each capability is therefore present here, copied
-                // verbatim from that adapter and not from this host's double - which is the delivered
-                // rule, and the reason this assertion is written as an exception rather than as a blanket
-                // "every other slot is empty".
+                // The four slots that are different on every host built from the production composition
+                // root, because llm-openai-adapter, llm-gemini-adapter, llm-anthropic-adapter and
+                // llm-openrouter-adapter each registered a real adapter for theirs. Each capability is
+                // therefore present here, copied verbatim from that adapter and not from this host's
+                // double - which is the delivered rule, and the reason this assertion is written as an
+                // exception rather than as a blanket "every other slot is empty".
                 Assert.True(slot.GetProperty("adapterInstalled").GetBoolean());
                 Assert.Equal(
                     slotId,
@@ -1598,13 +1602,13 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
                 continue;
             }
 
-            // The one slot no package has implemented yet. It is supported by the contract and not
-            // reachable, and it says which of the two reasons applies.
-            Assert.False(slot.GetProperty("adapterInstalled").GetBoolean());
-
-            // An absent descriptor is not a descriptor of all-false: the slot reports that nothing is
-            // known about its provider, which is a different fact from a provider that cannot.
-            Assert.Equal(JsonValueKind.Null, slot.GetProperty("capability").ValueKind);
+            // The one slot this suite's double serves. It is supported by the contract and reachable
+            // here, which is what makes the scenarios above evidence about the contract rather than
+            // about a missing adapter.
+            Assert.True(slot.GetProperty("adapterInstalled").GetBoolean());
+            Assert.Equal(
+                ProviderId,
+                slot.GetProperty("capability").GetProperty("id").GetString());
         }
     }
 
@@ -1615,9 +1619,10 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
         using var keyFile = OperatorKeyFile.Create();
 
         // The production composition root: every service this package registers, plus whatever adapters
-        // later packages added. OpenRouter is still a separate roadmap package, so this host has none for
-        // it - and the openai, gemini and anthropic slots are asserted below to have one each, which is
-        // what makes this a claim about one slot rather than about the registry being empty.
+        // later packages added. Ollama is still a separate roadmap package, so this host has none for
+        // it - and the openai, gemini, anthropic and openrouter slots are asserted below to have one
+        // each, which is what makes this a claim about one slot rather than about the registry being
+        // empty.
         await using var host = LlmProviderApiHost.StartProduction(database, new FixedTimeProvider(Clock), keyFile.FilePath);
         using var owner = await OwnerClient.CreateAsync(host);
 
@@ -1638,10 +1643,10 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
         Assert.Empty(catalogue.RootElement.GetProperty("usable").EnumerateArray());
 
         // The registry is no longer empty, and this is the assertion that says so. It is stated here
-        // rather than left implicit because a future reader who finds openai, gemini and anthropic
-        // installed must be able to tell whether that was intended: it was, by llm-openai-adapter,
-        // llm-gemini-adapter and llm-anthropic-adapter, and the two remaining slots are the ones still
-        // to come.
+        // rather than left implicit because a future reader who finds openai, gemini, anthropic and
+        // openrouter installed must be able to tell whether that was intended: it was, by
+        // llm-openai-adapter, llm-gemini-adapter, llm-anthropic-adapter and llm-openrouter-adapter, and
+        // the one remaining slot is the one still to come.
         var installed = catalogue.RootElement.GetProperty("supported")
             .EnumerateArray()
             .Where(entry => entry.GetProperty("adapterInstalled").GetBoolean())
@@ -1650,10 +1655,10 @@ public sealed class LlmProviderContractTests(ChronicleafPostgresFixture postgres
             .ToArray();
 
         Assert.Equal(
-            [GenerationProviderIds.Anthropic, GenerationProviderIds.Gemini, GenerationProviderIds.OpenAI],
+            [GenerationProviderIds.Anthropic, GenerationProviderIds.Gemini, GenerationProviderIds.OpenAI, GenerationProviderIds.OpenRouter],
             installed);
         Assert.Equal(
-            2,
+            1,
             catalogue.RootElement.GetProperty("supported")
                 .EnumerateArray()
                 .Count(entry => !entry.GetProperty("adapterInstalled").GetBoolean()));

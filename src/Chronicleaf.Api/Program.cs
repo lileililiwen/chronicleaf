@@ -261,6 +261,13 @@ builder.Services.AddMarkdownReviewExport();
 // schema_mismatch at /api/ready.
 builder.Services.AddNarrativeMemory();
 
+// CONTENT-ASSET-VARIANTS-001/002. The deterministic variant service: reusable formats rendered
+// from an approved story's accepted summary through fixed templates. It registers no provider, no
+// approval and no publisher: deriving reuses the drafts package's tables, approval stays the
+// review package's, and publication is a later package's. A database without the
+// grounded-markdown-drafts migration reports schema_mismatch at /api/ready.
+builder.Services.AddContentAssetVariants();
+
 // The rotation guard is applied once at start-up, so an access token that was changed since the
 // last run revokes every existing session before this process serves anything.
 builder.Services.AddHostedService<AccessTokenRotationStartup>();
@@ -399,6 +406,13 @@ app.MapContentDraftEndpoints();
 // human revision, an approval binds a revision and a body hash, and an export serves approved
 // bytes as an attachment the owner chose to download.
 app.MapContentReviewEndpoints();
+
+// CONTENT-ASSET-VARIANTS-001/002: the private derive and list routes. None of them is marked
+// public, so the access package's default-deny boundary already covers every one of them. There is
+// no generation here, no approval and no publication: deriving re-renders an approved story's
+// accepted summary through a deterministic template and stores the result as a draft with no
+// approval row.
+app.MapContentVariantEndpoints();
 
 // NARRATIVE-MEMORY-001/002: the private narrative read, create, edit and refresh routes. None of
 // them is marked public, so the access package's default-deny boundary already covers every one

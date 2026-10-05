@@ -81,6 +81,7 @@ timeline_base_url="${CHRONICLEAF_TIMELINE_BASE_URL:-http://127.0.0.1:5090}"
 review_base_url="${CHRONICLEAF_REVIEW_BASE_URL:-http://127.0.0.1:5091}"
 candidates_base_url="${CHRONICLEAF_CANDIDATES_BASE_URL:-http://127.0.0.1:5092}"
 narrative_base_url="${CHRONICLEAF_NARRATIVE_BASE_URL:-http://127.0.0.1:5093}"
+variants_base_url="${CHRONICLEAF_VARIANTS_BASE_URL:-http://127.0.0.1:5094}"
 log_file="$repo_root/$publish_dir/server.log"
 evidence_log_file="$repo_root/$publish_dir/server-evidence.log"
 credentials_log_file="$repo_root/$publish_dir/server-credentials.log"
@@ -94,6 +95,7 @@ timeline_log_file="$repo_root/$publish_dir/server-timeline.log"
 review_log_file="$repo_root/$publish_dir/server-review.log"
 candidates_log_file="$repo_root/$publish_dir/server-candidates.log"
 narrative_log_file="$repo_root/$publish_dir/server-narrative.log"
+variants_log_file="$repo_root/$publish_dir/server-variants.log"
 key_file=""
 
 # The operator key for this run: 32 random bytes in a temporary file outside the repository and
@@ -646,6 +648,224 @@ seed_review_milestone() {
 
 # The two content rows for one review milestone, inserted into the disposable database the review
 # suite is using.
+
+# ---------------------------------------------------------------------------------------------
+# Suite 14 seed: one project, one confirmed milestone, one evidence bundle and one approved
+# Markdown story. The story and its approval are inserted the way the review suite inserts its
+# rows - directly, with the rows read back and refused when they are not there - because a story
+# is produced by a provider and this host calls none.
+#
+# What the seed claims, and what it does not. The approval row binds the head revision, the body
+# hash and the evidence head, exactly as a press would record them; the voice snapshot declares
+# the English the body is written in, so neither finding list has anything to report and the
+# browser can actually derive and approve. So a pass is evidence that the panel derives a format
+# from an approved story, previews it as inert characters, approves it on its own revision, and
+# names the readme-update proposal as one - and is NOT evidence that a draft was generated on
+# this host. The .NET suite is where a real provider answer flows through generation into a
+# variant's source.
+# ---------------------------------------------------------------------------------------------
+seed_variants() {
+  local origin="$1"
+  local token="$2"
+  local cookie_jar
+  cookie_jar="$(mktemp -d)/cookies.txt"
+
+  local antiforgery
+  antiforgery="$(curl --silent --show-error --cookie-jar "$cookie_jar" --cookie "$cookie_jar" \
+    --data "{\"accessToken\":\"${token}\"}" \
+    -H 'Content-Type: application/json' \
+    "${origin}/api/session" >/dev/null && \
+    curl --silent --show-error --cookie-jar "$cookie_jar" --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/session/antiforgery" | jq -r '.token')"
+
+  if [ -z "$antiforgery" ] || [ "$antiforgery" = "null" ]; then
+    echo "the variants seed could not read an antiforgery value from ${origin}" >&2
+    return 1
+  fi
+
+  local project_id
+  project_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"name":"Formats","description":"Reusable content formats."}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/projects" | jq -r '.id')"
+
+  if [ -z "$project_id" ] || [ "$project_id" = "null" ]; then
+    echo "the variants seed could not create its project" >&2
+    return 1
+  fi
+
+  # The seeded body is English, so the voice a derivation is judged under must be too: the
+  # default profile declares Chinese and would report language findings on every field, which
+  # would leave the browser with nothing it can approve. The stored language is read back,
+  # because a PUT that did not take would leave the same un-approvable fixture behind.
+  local voice_language
+  voice_language="$(curl --silent --show-error --request PUT --cookie "$cookie_jar" \
+    --data '{"presetId":"technical-blog","overrides":{"language":"en"}}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 0' \
+    "${origin}/api/projects/${project_id}/voice-profile" | jq -r '.effectiveValues.language')"
+
+  if [ "$voice_language" != "en" ]; then
+    echo "the variants seed could not set the project's voice" >&2
+    return 1
+  fi
+
+  local milestone_id
+  milestone_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"title":"Variant source story","version":"0.1.0","occurredAt":"2026-10-01T09:00:00Z","type":"feature","notes":"Recorded by the e2e seed.","knownLimitations":[],"nextSteps":[]}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/projects/${project_id}/milestones" | jq -r '.id')"
+
+  if [ -z "$milestone_id" ] || [ "$milestone_id" = "null" ]; then
+    echo "the variants seed could not create its milestone" >&2
+    return 1
+  fi
+
+  curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"notes":"The pipeline now reproduces from a clean checkout.","expectedRevision":0}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 0' \
+    "${origin}/api/milestones/${milestone_id}/evidence/manual" >/dev/null
+
+  local bundle_id
+  bundle_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/milestones/${milestone_id}/evidence" \
+    | jq -r '.items[0].id')"
+
+  local evidence_item_id
+  evidence_item_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/milestones/${milestone_id}/evidence" \
+    | jq -r '.items[0].items[0].id')"
+
+  if [ -z "$evidence_item_id" ] || [ "$evidence_item_id" = "null" ]; then
+    echo "the variants seed could not read the evidence bundle the product created" >&2
+    return 1
+  fi
+
+  seed_variant_rows "$postgres_container" "chronicleaf_e2e_variants" \
+    "$project_id" "$milestone_id" "$bundle_id" "$evidence_item_id"
+}
+
+seed_variant_rows() {
+  local container="$1"
+  local database_name="$2"
+  local project_id="$3"
+  local milestone_id="$4"
+  local bundle_id="$5"
+  local evidence_item_id="$6"
+
+  local body summary voice_snapshot body_hash voice_hash media_hash fingerprint now
+  now="$(date -u +%Y-%m-%dT%H:%M:%S.000000Z)"
+
+  # The body, digit-free on purpose: the numeral rule refuses a figure that appears in no
+  # evidence item, and a fixture that violated it would be testing the wrong thing - the
+  # variant derivation re-checks the same rule before it stores anything.
+  body=$'# Variant source story\n\nThe pipeline now reproduces from a clean checkout.[^c1]\n\n## What changed\n\n- The pipeline runs from a clean checkout.[^c1]\n\n## Problems solved\n\n- A release could not be rebuilt from its source.[^c2]\n\n## Known limitations\n\nOnly Linux is covered.[^c3]\n\n## Next steps\n\nCover the other platform.[^c4]\n\n[^c1]: The pipeline runs from a clean checkout.\n[^c2]: A release could not be rebuilt from its source.\n[^c3]: Only Linux is covered.\n[^c4]: Cover the other platform.\n'
+
+  body_hash="$(printf '%s' "$body" | sha256sum | cut -d' ' -f1)"
+
+  # The delivered hasher's canonical form over the English values this body is judged under: the
+  # resolved values joined by U+001F, in the order VoiceSnapshotHasher writes them. The read
+  # route recomputes the fingerprint rather than trusting the stored one - so a default that ever
+  # changes makes this suite fail rather than make the panel show a voice it did not check.
+  fingerprint="$(printf 'en\037restrained\037true\03760\037high\037low\037true\037革命性\037震撼\037game-changing\037exciting news' \
+    | sha256sum | cut -d' ' -f1)"
+
+  voice_snapshot="{\"presetId\":\"technical-blog\",\"profileRevision\":0,\"capturedAt\":\"${now}\",\"language\":\"en\",\"tone\":\"restrained\",\"emoji\":true,\"titleMaxChars\":60,\"technicalDetail\":\"high\",\"marketing\":\"low\",\"firstPerson\":true,\"forbiddenTerms\":[\"革命性\",\"震撼\",\"game-changing\",\"exciting news\"],\"fingerprint\":\"${fingerprint}\"}"
+
+  voice_hash="$(printf '%s' "$voice_snapshot" | sha256sum | cut -d' ' -f1)"
+
+  # No picture is selected on this bundle, so the approval binds the empty selection: the hash
+  # of the empty string, which is a defined value rather than an absence.
+  media_hash="$(printf '' | sha256sum | cut -d' ' -f1)"
+
+  summary=$(jq -cn --arg e "$evidence_item_id" '{
+    milestoneTitle: "Variant source story",
+    summary: "The pipeline now reproduces from a clean checkout.",
+    changes: [
+      { text: "The pipeline runs from a clean checkout.", evidenceIds: [$e] }
+    ],
+    problemsSolved: [
+      { text: "A release could not be rebuilt from its source.", evidenceIds: [$e] }
+    ],
+    knownLimitations: [
+      { text: "Only Linux is covered.", evidenceIds: [$e] }
+    ],
+    nextSteps: [
+      { text: "Cover the other platform.", evidenceIds: [$e] }
+    ]
+  }')
+
+  local asset_id revision_id approval_id scope_id
+  asset_id="$(cat /proc/sys/kernel/random/uuid)"
+  revision_id="$(cat /proc/sys/kernel/random/uuid)"
+  approval_id="$(cat /proc/sys/kernel/random/uuid)"
+  scope_id="$(docker exec "$container" psql --username=chronicleaf --dbname="$database_name" --quiet --tuples-only --no-align \
+    --command 'SELECT id FROM installation LIMIT 1')"
+
+  # One statement per table, in dependency order: the story, its revision, then the live approval
+  # binding the head revision, the body hash and the evidence head - exactly what a press records.
+  # The triggers on content_revisions refuse UPDATE and DELETE, which is the append-only contract,
+  # and an INSERT is what a completed generation would do.
+  #
+  # `-i` is load-bearing: `docker exec` only forwards this heredoc to psql's stdin when it is asked to,
+  # and without it psql reads an empty script and exits 0 having inserted nothing. The rows are read
+  # back below and the seed refuses to continue if they are not there.
+  #
+  # The long values travel as psql variables and are interpolated with `:'name'`, which is psql's
+  # own quoting. A body interpolated into the SQL text by the shell would have to be escaped by the
+  # shell, and the two languages disagree about what a quote is.
+  docker exec -i "$container" psql --username=chronicleaf --dbname="$database_name" --quiet \
+    --set=ON_ERROR_STOP=1 --set=body="$body" --set=summary="$summary" --set=voice_snapshot="$voice_snapshot" \
+    <<SQL >/dev/null
+INSERT INTO content_assets
+  (id, scope_id, project_id, milestone_id, type, status, current_revision, created_at, updated_at)
+VALUES
+  ('${asset_id}', '${scope_id}', '${project_id}', '${milestone_id}', 'markdown-story', 'draft', 1, '${now}', '${now}');
+
+INSERT INTO content_revisions
+  (id, asset_id, scope_id, revision, evidence_bundle_id, evidence_revision, voice_revision,
+   voice_snapshot, summary, body_markdown, body_hash, provider_id, model, prompt_version, schema_version, created_at)
+VALUES
+  ('${revision_id}', '${asset_id}', '${scope_id}', 1, '${bundle_id}', 1, 0,
+   :'voice_snapshot'::jsonb, :'summary'::jsonb, :'body', '${body_hash}',
+   'openai', 'seeded-not-called', 'grounded-markdown/1', 'grounded-summary/1', '${now}');
+
+INSERT INTO content_approvals
+  (id, scope_id, asset_id, content_revision, actor_id, payload_kind, body_hash,
+   evidence_revision, voice_snapshot_hash, media_selection_hash, artifact_hash,
+   approved_at, invalidated_at, reason)
+VALUES
+  ('${approval_id}', '${scope_id}', '${asset_id}', 1, NULL, 'text', '${body_hash}',
+   1, '${voice_hash}', '${media_hash}', NULL, '${now}', NULL, NULL);
+SQL
+
+  # Read back what the database actually holds, and compare the stored digest with the one computed
+  # above. psql exiting zero is not evidence that a statement ran: the approval binds that hash,
+  # and a stored body whose hash is not its own would be a fixture proving nothing.
+  local stored
+  stored="$(docker exec "$container" psql --username=chronicleaf --dbname="$database_name" \
+    --quiet --tuples-only --no-align \
+    --command "SELECT count(*) || ' ' || coalesce(max(body_hash), '') FROM content_revisions WHERE asset_id = '${asset_id}'")"
+
+  if [ "$stored" != "1 ${body_hash}" ]; then
+    echo "the variants seed stored '${stored}', which is not the one revision hashed as ${body_hash}" >&2
+    return 1
+  fi
+
+  local live
+  live="$(docker exec "$container" psql --username=chronicleaf --dbname="$database_name" \
+    --quiet --tuples-only --no-align \
+    --command "SELECT count(*) FROM content_approvals WHERE asset_id = '${asset_id}' AND invalidated_at IS NULL")"
+
+  if [ "$live" != "1" ]; then
+    echo "the variants seed stored '${live}' live approvals, which is not the one the panel derives from" >&2
+    return 1
+  fi
+}
+
 seed_review_rows() {
   local container="$1"
   local database_name="$2"
@@ -1417,4 +1637,29 @@ start_suite narrative "$narrative_base_url" "$narrative_log_file" "$repo_root/$p
 echo "==> npm run test:e2e (real browser against $narrative_base_url)"
 run_suite "$narrative_base_url" "$narrative_log_file" "$repo_root/$publish_dir/access-token-narrative" \
   tests/narrative-memory.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 14: reusable content formats. It needs a milestone with an approved story the browser
+# can derive from, and neither a story nor an approval can be produced through the UI without a
+# provider - so its own installation, its own database and its own published instance, for the
+# same reason suites 10 to 13 each have one.
+#
+# Nothing the browser touches is seeded: every derivation and every variant approval below goes
+# through the shipped panel and the published server, and the variant rows and the variant
+# approval are records the product itself created. What a pass here establishes is that the panel
+# lists every derived format, derives one with its defined sections and attributed citations, and
+# approves it on its own revision - and that the readme-update format names its proposal as one.
+# It is NOT evidence that a draft was generated on this host: the approved story is seeded, and
+# the .NET suite is where a real provider answer flows through generation into a variant's source.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a fourteenth disposable PostgreSQL and published application at $variants_base_url"
+start_suite variants "$variants_base_url" "$variants_log_file" "$repo_root/$publish_dir/access-token-variants"
+
+echo "==> recording the project, evidence, approved story and approval the variant panel reads"
+seed_variants "$variants_base_url" "$(cat "$repo_root/$publish_dir/access-token-variants")"
+
+echo "==> npm run test:e2e (real browser against $variants_base_url)"
+run_suite "$variants_base_url" "$variants_log_file" "$repo_root/$publish_dir/access-token-variants" \
+  tests/content-asset-variants.spec.ts
 stop_suite

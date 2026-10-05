@@ -15,6 +15,7 @@ import { LocalGitSyncPanel } from '../local-git-evidence/LocalGitSyncPanel';
 import { LocalRepositoryPanel } from '../local-git-evidence/LocalRepositoryPanel';
 import { GroundedMarkdownDraftPanel } from '../grounded-markdown-drafts/GroundedMarkdownDraftPanel';
 import { MarkdownReviewPanel } from '../markdown-review-export/MarkdownReviewPanel';
+import { ContentVariantPanel } from '../content-asset-variants/ContentVariantPanel';
 import { NarrativeMemoryPanel } from '../narrative-memory/NarrativeMemoryPanel';
 import { MilestoneEvidencePanel } from '../milestone-evidence/MilestoneEvidencePanel';
 import { LlmProviderArea } from '../llm-provider-contract/LlmProviderArea';
@@ -467,6 +468,22 @@ function MilestoneRow({
       <MarkdownReviewPanel
         milestoneId={milestone.id}
         milestoneTitle={milestone.title}
+        archived={archived}
+        confirmed={milestone.status === 'confirmed'}
+      />
+
+      {/* CONTENT-ASSET-VARIANTS-001/002. Reusable formats derived from exactly that approved
+          story. It sits under the review panel because it consumes that panel's decision - the
+          live approval - and adds the one thing neither the draft nor the review panel has: the
+          same facts rendered in another shape. Deriving calls no provider, so there is no consent
+          to authorize and no job to watch; each derived asset is a draft with its own approve
+          control, because approving the story never approves the variant. The preview renders the
+          text as inert characters through the review package's own renderer, and the readme-update
+          format names its proposal notice rather than offering any control that could write a
+          repository. */}
+      <ContentVariantPanel
+        projectId={milestone.projectId}
+        milestoneId={milestone.id}
         archived={archived}
         confirmed={milestone.status === 'confirmed'}
       />

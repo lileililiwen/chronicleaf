@@ -490,6 +490,18 @@ else
   # operation queue, with the one declared substitution the package names (a throwing summary
   # builder for the failure scenario; the delivered builder reaches no provider).
   step "narrative memory tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~NarrativeMemoryTests"
+  # CONTENT-ASSET-VARIANTS-001/002. That all seven formats derive from an approved story with
+  # their defined sections and attributed footnote citations; that narrative entries arrive as
+  # attributed history without new facts; that sections with no source read unknown rather than
+  # invented; that an unknown format is refused before any row exists and an unapproved source
+  # is approval_required; that readme-update is a fenced proposal with no repository write; that
+  # a derivative starts as a draft with no approval row while the source approval stands; that a
+  # project voice override shortens the preset's title limit on the variant; that moved evidence
+  # refuses the derivation as stale; and that a variant's own approval binds and stales exactly
+  # like its source's - all proven against the same real disposable PostgreSQL through the real
+  # API host, with the approved story produced by a real generation job behind the delivered
+  # provider seam. Deriving itself calls no provider.
+  step "content asset variant tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~ContentAssetVariantsTests"
   # COMMUNITY-COMPOSE-RELEASE-001/002. That a clean install completes the
   # milestone-to-approved-Markdown flow with the timeline telling it back; that the compose
   # file describes exactly app plus postgres on the pinned digest with named volumes, a
@@ -543,7 +555,7 @@ if [ "${CHRONICLEAF_E2E:-0}" = "1" ]; then
   # migrations, and drives the shell, access, projects-and-milestones, background-jobs,
   # milestone-evidence, credential-vault, voice-profiles, llm-provider-contract, github-evidence,
   # screenshot-capture, grounded-markdown-drafts, screenshot-curation, milestone-timeline,
-  # markdown-review-export and narrative-memory fixtures in a real browser.
+  # markdown-review-export, narrative-memory and content-asset-variants fixtures in a real browser.
   # The suites after the shell are included by scripts/e2e.sh, which names each fixture file, so a
   # file that stops being matched shows up as a Playwright "no tests found" failure rather than as
   # a suite quietly passing with nothing in it; this stage

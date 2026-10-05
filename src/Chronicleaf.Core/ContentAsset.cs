@@ -9,17 +9,19 @@ namespace Chronicleaf.Core;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The set is closed and it has one member, deliberately. <see cref="MarkdownStory"/> is the whole
-/// outcome this package delivers, and a second member here would be a promise that some other
-/// package's storage is already designed for. The review package adds an <c>approved</c> status to
-/// the same row rather than a second table, so the vocabulary below is a statement about what a
-/// <em>draft</em> is and nothing about what it may later become.
+/// The set is closed and every member names a storage shape this repository has rules for.
+/// <see cref="MarkdownStory"/> is the generated outcome the drafts package delivers; the seven
+/// variant kinds are deterministic derivations of an approved story owned by
+/// <c>content-asset-variants</c>. A variant is a new asset, never a mutation of its source, and
+/// every variant row is a draft until the review package approves it separately: approval of the
+/// source never travels to a derivative.
 /// </para>
 /// <para>
-/// A type is never chosen by a request body. The route that creates a draft always writes
+/// A type is never chosen by the draft route. The route that creates a draft always writes
 /// <see cref="MarkdownStory"/>, so a caller cannot ask for a kind of content whose rules nobody has
 /// written down - the same reasoning the evidence package used to keep owner-writable kinds to a
-/// fixed list.
+/// fixed list. The variant kinds are chosen only by the variant derive route, which refuses an
+/// unknown type before any row exists.
 /// </para>
 /// </remarks>
 public static class ContentAssetTypes
@@ -30,8 +32,56 @@ public static class ContentAssetTypes
     /// </summary>
     public const string MarkdownStory = "markdown-story";
 
+    /// <summary>
+    /// A deterministic changelog derived from an approved story (CONTENT-ASSET-VARIANTS-001).
+    /// </summary>
+    public const string Changelog = "changelog";
+
+    /// <summary>
+    /// A deterministic technical blog derived from an approved story (CONTENT-ASSET-VARIANTS-001).
+    /// </summary>
+    public const string TechnicalBlog = "technical-blog";
+
+    /// <summary>
+    /// A deterministic concise progress note derived from an approved story
+    /// (CONTENT-ASSET-VARIANTS-001).
+    /// </summary>
+    public const string SocialShort = "social-short";
+
+    /// <summary>
+    /// A deterministic release note derived from an approved story (CONTENT-ASSET-VARIANTS-001).
+    /// </summary>
+    public const string GithubRelease = "github-release";
+
+    /// <summary>
+    /// A deterministic README proposal derived from an approved story (CONTENT-ASSET-VARIANTS-001).
+    /// A proposal block only: it never writes a repository.
+    /// </summary>
+    public const string ReadmeUpdate = "readme-update";
+
+    /// <summary>
+    /// A deterministic portfolio entry derived from an approved story (CONTENT-ASSET-VARIANTS-001).
+    /// </summary>
+    public const string Portfolio = "portfolio";
+
+    /// <summary>
+    /// A deterministic project-local weekly note derived from an approved story
+    /// (CONTENT-ASSET-VARIANTS-001). Client aggregation belongs to the agency report package.
+    /// </summary>
+    public const string WeeklyProgress = "weekly-progress";
+
     /// <summary>Every kind, in the order a surface would list them.</summary>
-    public static IReadOnlyList<string> All { get; } = [MarkdownStory];
+    public static IReadOnlyList<string> All { get; } =
+    [
+        MarkdownStory,
+        Changelog,
+        TechnicalBlog,
+        SocialShort,
+        GithubRelease,
+        ReadmeUpdate,
+        Portfolio,
+        WeeklyProgress,
+    ];
 
     /// <summary>Bounded to the width of the <c>content_assets.type</c> column.</summary>
     public const int MaxLength = 40;

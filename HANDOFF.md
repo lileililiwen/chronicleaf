@@ -1,10 +1,10 @@
-current_spec: markdown-review-export
+current_spec: community-compose-release
 
 # Chronicleaf handoff
 
 ## Current state — 2026-10-05
 
-Twenty-one changes implemented, verified and archived, each with exactly two commits (implementation/
+Twenty-two changes implemented, verified and archived, each with exactly two commits (implementation/
 tests/archive, then this HANDOFF-only pointer):
 
 | # | Change | Implementation commit | Canonical spec |
@@ -30,6 +30,7 @@ tests/archive, then this HANDOFF-only pointer):
 | 19 | `llm-anthropic-adapter` | `ab23ace` | `openspec/specs/llm-anthropic-adapter/spec.md` |
 | 20 | `llm-openrouter-adapter` | `c51dbd7` | `openspec/specs/llm-openrouter-adapter/spec.md` |
 | 21 | `llm-ollama-adapter` | `efed7af` | `openspec/specs/llm-ollama-adapter/spec.md` |
+| 22 | `markdown-review-export` | `64d6868` | `openspec/specs/markdown-review-export/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -367,10 +368,21 @@ owner's words; the e2e seed's candidate rows name the two real capture jobs the 
 PNG behind all three. Deployment stays `deployable: false`; there is no remote, no push and no
 publication.
 
-Next: implement `markdown-review-export` only. Its dependencies — `grounded-markdown-drafts`,
-`screenshot-curation` and `milestone-timeline` — are archived, so human editing, approval and
-export can now be built on the stored drafts. After it: `community-compose-release`, which
-is the first complete workflow.
+Next: implement `community-compose-release` only. It is the first complete workflow and
+depends on `markdown-review-export` plus all five BYOK adapters, which are all archived.
+`markdown-review-export` is archived (`64d6868`, canonical spec
+`openspec/specs/markdown-review-export/spec.md`): a human edit appends a revision carrying the
+owner's words and invalidates live approvals as `content_edited`; an approval binds the head
+revision, the body hash, the evidence head, the voice snapshot hash and the media selection
+hash, and is refused while any voice finding or any `claim_evidence_missing` grounding finding
+remains, with no acknowledgment flag that clears it; an export serves the approved revision's
+exact bytes as a Markdown attachment only while every binding still describes the stored state
+(never approved is `approval_required`, once approved is `approval_stale`); carried-forward
+evidence mints new item ids, so stale citations stay dangling and only a fresh grounded
+generation can be approved again. Read that package's own boundary before extending it, and
+note the two compositional updates it forced: the drafts suite's "no approve route" boundary
+now asserts zero rows in the review package's table rather than zero tables, and the provider
+contract browser spec now matches the panel's plural "adapters are installed for" sentence.
 `llm-ollama-adapter` is archived (`efed7af`, canonical spec
 `openspec/specs/llm-ollama-adapter/spec.md`): the fifth BYOK transport posts the consented payload
 to the operator-allowlisted origin's chat resource with an optional per-call bearer lease -

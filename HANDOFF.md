@@ -1,5 +1,7 @@
 # Chronicleaf handoff
 
+current_spec: github-graphql-enrichment
+
 ## Current state — 2026-10-05
 
 Twenty-four changes implemented, verified and archived, each with exactly two commits (implementation/
@@ -571,6 +573,42 @@ one obsolete `HasCheckConstraint` in the curation configuration) and 0 errors; t
 `--no-incremental` was used to make that claim a real one rather than a consequence of an incremental build
 reporting nothing. Name preflight exit 0; `openspec validate --all --strict --no-interactive` 54/54 before
 and after the archive, which used no `--skip-specs`.
+
+**Release evidence (`github-release-candidates`, commit `08651c4`, all run by the implementer
+rather than taken on report).** `bash scripts/verify.sh` exit 0 with the platform-feed stage and
+twenty-four filtered stages each asserted to select at least one test (15/15 shell, 24/24 persistence,
+23/23 access, 19/19 projects, 12/12 jobs, 9/9 media, 14/14 evidence, 32/32 vault, 22/22 voice, 26/26
+provider contract, 23/23 OpenAI, 24/24 Gemini, 24/24 Anthropic, 23/23 OpenRouter, 26/26 Ollama, 27/27
+GitHub evidence, 21/21 local Git, 52/52 capture, 18/18 curation, 30/30 drafts, 7/7 timeline, 11/11
+review-export, 10/10 compose-release, **40/40 release candidates** — 507 in total). `npm ci`, `tsc`
+and `vite build` green; `dotnet build --nologo --no-incremental` 0 errors with the same 2 pre-existing
+warnings at HEAD. `bash scripts/e2e.sh` green on the final code: 56/56 Playwright across twelve
+database-isolated browser suites (21/21 shell/access/projects/jobs, 3/3 evidence, 6/6 vault, 4/4 voice,
+4/4 providers, 3/3 GitHub, 3/3 capture, 4/4 drafts, 4/4 curation, 3/3 timeline, 2/2 review-export, **5/5
+candidates**). Name preflight exit 0; `openspec validate --all --strict --no-interactive` 54/54 before
+and after the archive, which used no `--skip-specs`. Canonical spec
+`openspec/specs/github-release-candidates/spec.md`.
+
+**Four defects the inherited work carried, none worked around in a test.** The transport registration
+used `TryAddSingleton`, which keys on the service type and silently installs nothing once claimed —
+now plain `AddSingleton`, per the standing rule. The new design-time factory hardcoded a placeholder
+connection string, so `dotnet ef database update` dialled the wrong server and `scripts/e2e.sh` died
+at suite 1 — it now honors `ConnectionStrings__Chronicleaf` for real migrations. The candidate seed
+connected a fictional repository the connect route honestly refuses with 422 — it connects the same
+real public `octocat/Hello-World` suite 6 uses. And the candidate list returned an empty page for a
+project with no connection, so the panel could never show its no-connection state — the list and
+count now refuse `github_candidate_connection_missing` 422 by name, with a new .NET scenario asserting
+it. Two browser-suite defects of the same unrun-suite class: the spec clicked a dashboard link where
+the product renders buttons, and its forbidden-words check matched honest prose ("published") instead
+of controls — both fixed in the spec, and the panel no longer renders both empty states at once.
+One environment flake recorded: a curation reorder poll failed once and passed on both adjacent runs
+(4/4 before, 4/4 after); untouched by this change.
+
+Next: `current_spec` advances to `github-graphql-enrichment`. `github-release-candidates` is archived
+(`08651c4`, canonical spec `openspec/specs/github-release-candidates/spec.md`): verified tag/release/
+merged-PR/closed-issue/star-threshold candidates as proposals only — no confirm verb, no evidence
+append, no publish — over HMAC-signed deliveries, bounded idempotent polls with supersede, and a
+vault-referenced webhook secret. Read that package's boundary before extending it.
 
 **About that 2-warning baseline, recorded because HANDOFF's own numbers were wrong.** This file has
 repeatedly claimed "0 warnings" for a build that never had them. The first full-gate run of

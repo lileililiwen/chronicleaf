@@ -4,6 +4,7 @@ using Chronicleaf.Application.AI;
 using Chronicleaf.Application.Capture;
 using Chronicleaf.Application.Common;
 using Chronicleaf.Application.Content;
+using Chronicleaf.Application.Evolution;
 using Chronicleaf.Application.Git;
 using Chronicleaf.Application.GitHub;
 using Chronicleaf.Application.GitHubCandidates;
@@ -514,6 +515,54 @@ public sealed class ApiErrorMiddleware(
                     Envelope.Create(
                         NarrativeError.ContextTooLarge,
                         contextTooLarge.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            // SCREENSHOT-EVOLUTION-IMAGES-001/002. Written here for the same reason as every
+            // other feature package's refusals: the evolution package raises them and this
+            // middleware is still the only place an envelope is written. The messages are
+            // authored in the evolution package and name no bytes and no scope: the 422s say
+            // the comparison as asked cannot be drawn, the 409 says the reviewed selection
+            // moved, the 413 says the canvas does not fit the ceiling, and the missing-bytes
+            // refusal reuses the HTML export's media_unavailable because the condition and the
+            // remedy - reselect the picture and render again - are the same.
+            case ComparisonViewportMismatchException viewportMismatch:
+                return (
+                    Envelope.Create(
+                        EvolutionError.ComparisonViewportMismatch,
+                        viewportMismatch.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            case InsufficientSelectedException insufficientSelected:
+                return (
+                    Envelope.Create(
+                        EvolutionError.InsufficientSelected,
+                        insufficientSelected.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            case SelectionSupersededException superseded:
+                return (
+                    Envelope.Create(
+                        EvolutionError.SelectionSuperseded,
+                        superseded.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            case EvolutionTooLargeException evolutionTooLarge:
+                return (
+                    Envelope.Create(
+                        EvolutionError.OutputTooLarge,
+                        evolutionTooLarge.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            case EvolutionMediaUnavailableException evolutionMediaGone:
+                return (
+                    Envelope.Create(
+                        EvolutionError.MediaUnavailable,
+                        evolutionMediaGone.Message,
                         traceId),
                     LogLevel.Information);
 

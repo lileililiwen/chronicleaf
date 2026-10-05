@@ -629,6 +629,121 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.ToTable("github_enrichment_runs", (string)null);
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.EvolutionImage", b =>
+                {
+                    b.Property<DateTimeOffset?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approved_at");
+
+                    b.Property<Guid?>("ApprovedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approved_by");
+
+                    b.Property<Guid>("ArtifactMediaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("artifact_media_id");
+
+                    b.Property<string>("ArtifactSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("artifact_sha256");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("Height")
+                        .HasColumnType("integer")
+                        .HasColumnName("height");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<string>("Layout")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("layout");
+
+                    b.Property<string>("ManifestJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("manifest_json");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<string>("SelectionHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("selection_hash");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<int>("Width")
+                        .HasColumnType("integer")
+                        .HasColumnName("width");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ArtifactMediaId");
+
+                    b.HasIndex("ProjectId")
+                        .HasDatabaseName("IX_evolution_images_project_id");
+
+                    b.HasIndex("ScopeId", "ProjectId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_evolution_images_scope_id_project_id_idempotency_key")
+                        .HasFilter("idempotency_key IS NOT NULL");
+
+                    b.ToTable("evolution_images", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_evolution_images_artifact_sha256_hex", "artifact_sha256 ~ '^[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("ck_evolution_images_dimensions_positive", "width > 0 AND height > 0");
+
+                            t.HasCheckConstraint("ck_evolution_images_layout", "layout IN ('before-after', 'horizontal-timeline', 'vertical-long', 'gallery')");
+
+                            t.HasCheckConstraint("ck_evolution_images_selection_hash_sha256_hex", "selection_hash ~ '^[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("ck_evolution_images_status", "status IN ('draft', 'approved')");
+                        });
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.EvolutionImage", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Media", null)
+                        .WithMany()
+                        .HasForeignKey("ArtifactMediaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_evolution_images_artifact_media_id");
+
+                    b.HasOne("Chronicleaf.Core.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_evolution_images_project_id");
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.EvidenceBundle", b =>
                 {
                     b.Property<Guid>("Id")

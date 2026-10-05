@@ -13,6 +13,7 @@ using Chronicleaf.Api.Common;
 using Chronicleaf.Api.Content;
 using Chronicleaf.Api.Curation;
 using Chronicleaf.Api.Evidence;
+using Chronicleaf.Api.Evolution;
 using Chronicleaf.Api.Git;
 using Chronicleaf.Api.GitHub;
 using Chronicleaf.Api.GitHubEnrichment;
@@ -35,6 +36,7 @@ using Chronicleaf.Infrastructure.Capture;
 using Chronicleaf.Infrastructure.Content;
 using Chronicleaf.Infrastructure.Curation;
 using Chronicleaf.Infrastructure.Evidence;
+using Chronicleaf.Infrastructure.Evolution;
 using Chronicleaf.Infrastructure.Git;
 using Chronicleaf.Infrastructure.GitHub;
 using Chronicleaf.Infrastructure.GitHubEnrichment;
@@ -268,6 +270,14 @@ builder.Services.AddNarrativeMemory();
 // grounded-markdown-drafts migration reports schema_mismatch at /api/ready.
 builder.Services.AddContentAssetVariants();
 
+// SCREENSHOT-EVOLUTION-IMAGES-001/002. The evolution store and service that render selected
+// screenshots into a derived comparison PNG with a re-derivable manifest, and approve the exact
+// selection and artifact hashes for export. It registers no provider, no browser and no
+// publisher: rendering composes stored bytes deterministically, selection stays the curation
+// package's and prose approval stays the review package's. A database without the
+// screenshot-evolution-images migration reports schema_mismatch at /api/ready.
+builder.Services.AddScreenshotEvolutionImages();
+
 // The rotation guard is applied once at start-up, so an access token that was changed since the
 // last run revokes every existing session before this process serves anything.
 builder.Services.AddHostedService<AccessTokenRotationStartup>();
@@ -419,6 +429,13 @@ app.MapContentVariantEndpoints();
 // of them. There is no approve route here and no field that could report one: a summary is a
 // generated document bound to its input hash, and approval stays the review package's.
 app.MapNarrativeEndpoints();
+
+// SCREENSHOT-EVOLUTION-IMAGES-001/002: the private render, read, approve, preview and download
+// routes. None of them is marked public, so the access package's default-deny boundary already
+// covers every one of them. There is no capture here and no promotion: a comparison depicts
+// selected screenshots, the preview is reviewable as a draft, and the download serves the exact
+// approved bytes only while the approval still describes the stored selection.
+app.MapEvolutionEndpoints();
 
 // SHELL-001/SHELL-002: every unmatched path is either an unknown API path, an unknown
 // static asset, or a client route. Only the last one falls back to the SPA entry point. This

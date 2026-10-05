@@ -502,6 +502,17 @@ else
   # API host, with the approved story produced by a real generation job behind the delivered
   # provider seam. Deriving itself calls no provider.
   step "content asset variant tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~ContentAssetVariantsTests"
+  # SCREENSHOT-EVOLUTION-IMAGES-001/002. That a same-viewport comparison preserves source
+  # pixels, order and provenance in a re-derivable manifest; that a milestone without a
+  # selected screenshot is an unavailable gap rather than a fabrication, and a candidate is
+  # never compared and never promoted; that mixed viewports outside the gallery are a 422
+  # while the gallery labels each viewport; that an approval binds the exact artifact hash
+  # for export while a draft exports nothing; that a caption edit supersedes the render and
+  # stales the approval; and that an oversized canvas is a 413 storing nothing usable - all
+  # proven against the same real disposable PostgreSQL through the real API host, with the
+  # selected pictures produced by real capture jobs behind the delivered browser seam and
+  # composed by this package's own BCL renderer.
+  step "screenshot evolution image tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~ScreenshotEvolutionImagesTests"
   # COMMUNITY-COMPOSE-RELEASE-001/002. That a clean install completes the
   # milestone-to-approved-Markdown flow with the timeline telling it back; that the compose
   # file describes exactly app plus postgres on the pinned digest with named volumes, a

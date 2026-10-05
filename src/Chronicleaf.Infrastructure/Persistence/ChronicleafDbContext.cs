@@ -105,6 +105,8 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     public DbSet<NarrativeRefreshRequestRow> NarrativeRefreshRequests => Set<NarrativeRefreshRequestRow>();
 
+    public DbSet<EvolutionImage> EvolutionImages => Set<EvolutionImage>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Installation>(entity =>
@@ -2124,6 +2126,93 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_narrative_refresh_requests_project_id");
         });
+
+        // SCREENSHOT-EVOLUTION-IMAGES-001/002: one rendered comparison per row. The manifest is
+        // the provenance - every depicted cell beside the media and caption revisions it was
+        // built from - so the artifact is re-derivable rather than a second store of truth.
+        // Selection stays the curation package's and approval stays a decision about this row's
+        // two hashes, which is why no trigger here refuses anything: staleness is recomputed on
+        // read rather than enforced on write.
+        modelBuilder.Entity<EvolutionImage>(entity =>
+        {
+            entity.ToTable(
+                "evolution_images",
+                table =>
+                {
+                    table.HasCheckConstraint(
+                        "ck_evolution_images_layout",
+                        "layout IN ('before-after', 'horizontal-timeline', 'vertical-long', 'gallery')");
+                    table.HasCheckConstraint("ck_evolution_images_status", "status IN ('draft', 'approved')");
+                    table.HasCheckConstraint(
+                        "ck_evolution_images_selection_hash_sha256_hex",
+                        "selection_hash ~ '^[0-9a-f]{64}$'");
+                    table.HasCheckConstraint(
+                        "ck_evolution_images_artifact_sha256_hex",
+                        "artifact_sha256 ~ '^[0-9a-f]{64}$'");
+                    table.HasCheckConstraint("ck_evolution_images_dimensions_positive", "width > 0 AND height > 0");
+                });
+            entity.HasKey(image => image.Id);
+            entity.Property(image => image.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(image => image.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(image => image.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(image => image.Layout)
+                .HasColumnName("layout")
+                .HasMaxLength(EvolutionLayoutMaxLength)
+                .IsRequired();
+            entity.Property(image => image.ManifestJson)
+                .HasColumnName("manifest_json")
+                .HasColumnType("jsonb")
+                .IsRequired();
+            entity.Property(image => image.SelectionHash)
+                .HasColumnName("selection_hash")
+                .HasMaxLength(Sha256HexMaxLength)
+                .IsRequired();
+            entity.Property(image => image.ArtifactMediaId).HasColumnName("artifact_media_id").IsRequired();
+            entity.Property(image => image.ArtifactSha256)
+                .HasColumnName("artifact_sha256")
+                .HasMaxLength(Sha256HexMaxLength)
+                .IsRequired();
+            entity.Property(image => image.Width).HasColumnName("width").IsRequired();
+            entity.Property(image => image.Height).HasColumnName("height").IsRequired();
+            entity.Property(image => image.Status)
+                .HasColumnName("status")
+                .HasMaxLength(EvolutionStatusMaxLength)
+                .IsRequired();
+            entity.Property(image => image.ApprovedBy).HasColumnName("approved_by");
+            entity.Property(image => image.ApprovedAt)
+                .HasColumnName("approved_at")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(image => image.IdempotencyKey)
+                .HasColumnName("idempotency_key")
+                .HasMaxLength(OperationIdempotencyKeyMaxLength);
+            entity.Property(image => image.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            entity.HasIndex(image => image.ProjectId)
+                .HasDatabaseName("IX_evolution_images_project_id");
+
+            // One selection per key: the same key with the same selection replays the row, and
+            // with another selection it is a conflict rather than a second row. Null keys are
+            // distinct by definition, so keyless renders never collide with each other.
+            entity.HasIndex(image => new { image.ScopeId, image.ProjectId, image.IdempotencyKey })
+                .IsUnique()
+                .HasDatabaseName("ux_evolution_images_scope_id_project_id_idempotency_key")
+                .HasFilter("idempotency_key IS NOT NULL");
+
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(image => image.ProjectId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_evolution_images_project_id");
+
+            entity.HasOne<MediaRecord>()
+                .WithMany()
+                .HasForeignKey(image => image.ArtifactMediaId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_evolution_images_artifact_media_id");
+        });
     }
 
     /// <summary>At most 40 characters for a content kind, matching the Core record's own bound.</summary>
@@ -2289,6 +2378,12 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     /// <summary>At most 10 characters; the longest narrative visibility is <c>exportable</c>.</summary>
     private const int NarrativeVisibilityMaxLength = 10;
+
+    /// <summary>At most 32 characters; the longest evolution layout is <c>horizontal-timeline</c>.</summary>
+    private const int EvolutionLayoutMaxLength = EvolutionLayouts.MaxLength;
+
+    /// <summary>At most 32 characters; the longest evolution status is <c>approved</c>.</summary>
+    private const int EvolutionStatusMaxLength = 32;
 
     /// <summary>
     /// Refuses a stored status this build does not know. A value that is not one of the six is not a

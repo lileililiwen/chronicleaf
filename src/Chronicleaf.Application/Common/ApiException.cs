@@ -172,6 +172,18 @@ public static class ApiErrorStatus
         // operation row, and no route answers a refresh that already failed.
         Narrative.NarrativeError.ContextTooLarge => 422,
 
+        // The screenshot-evolution-images package's codes. Additive in the same way, and the
+        // choices are this package's failure policy rather than defaults. 422 for depicted
+        // pictures that span more than one viewport outside the gallery, and for fewer than two
+        // milestones depicting a selected screenshot: both are facts the owner can change today
+        // with one selection, and both are refused before any bytes are stored. The 409s and the
+        // 413 deliberately reuse delivered codes - RevisionConflict for a selection that moved
+        // since the review, the review package's approval_required and approval_stale, the HTML
+        // export's media_unavailable and the delivered payload-too-large - because the condition
+        // and the remedy are the same and a second spelling would pretend otherwise.
+        Evolution.EvolutionError.ComparisonViewportMismatch => 422,
+        Evolution.EvolutionError.InsufficientSelected => 422,
+
         // The github-release-candidates package's codes. Additive in the same way, and the choices are
         // this package's failure policy rather than defaults. 401 for a delivery that did not
         // authenticate - and deliberately the same 401 for an unknown connection id, a connection with

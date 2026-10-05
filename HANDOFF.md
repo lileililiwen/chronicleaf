@@ -1,10 +1,10 @@
-current_spec: llm-anthropic-adapter
+current_spec: llm-openrouter-adapter
 
 # Chronicleaf handoff
 
 ## Current state — 2026-10-04
 
-Eighteen changes implemented, verified and archived, each with exactly two commits (implementation/
+Nineteen changes implemented, verified and archived, each with exactly two commits (implementation/
 tests/archive, then this HANDOFF-only pointer):
 
 | # | Change | Implementation commit | Canonical spec |
@@ -27,6 +27,7 @@ tests/archive, then this HANDOFF-only pointer):
 | 16 | `screenshot-curation` | `9c1ce4a` | `openspec/specs/screenshot-curation/spec.md` |
 | 17 | `milestone-timeline` | `4cfa8c3` | `openspec/specs/milestone-timeline/spec.md` |
 | 18 | `llm-gemini-adapter` | `b5f74ac` | `openspec/specs/llm-gemini-adapter/spec.md` |
+| 19 | `llm-anthropic-adapter` | `ab23ace` | `openspec/specs/llm-anthropic-adapter/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -364,11 +365,21 @@ owner's words; the e2e seed's candidate rows name the two real capture jobs the 
 PNG behind all three. Deployment stays `deployable: false`; there is no remote, no push and no
 publication.
 
-Next: implement `llm-anthropic-adapter` only. Its dependency — `llm-provider-contract` — is
-archived, so the Anthropic BYOK transport can now be built on the consented generation contract. After
-it: the remaining adapters (`llm-openrouter-adapter`, `llm-ollama-adapter`) stay independently
+Next: implement `llm-openrouter-adapter` only. Its dependency — `llm-provider-contract` — is
+archived, so the OpenRouter BYOK transport can now be built on the consented generation contract. After
+it: the remaining adapter (`llm-ollama-adapter`) stays independently
 deliverable, then `markdown-review-export` → `community-compose-release`, which
 is the first complete workflow.
+`llm-anthropic-adapter` is archived (`ab23ace`, canonical spec
+`openspec/specs/llm-anthropic-adapter/spec.md`): the third BYOK transport posts the consented payload
+to the fixed messages resource at the Anthropic origin with a per-call `x-api-key` lease beside the
+pinned version header, records the provider's own message id as the correlation handle, and reports
+no native schema support so the schema rides in the prompt and the text is validated locally. Read
+that package's own boundary before extending it, and note the two slot migrations it forced: a test
+double registered on a slot production has since claimed is shadowed by the real adapter, so
+`LlmProviderContractTests` moved its double from `anthropic` to `openrouter` and
+`GroundedMarkdownDrafts` moved its scripted double from `anthropic` to `ollama` - each asserted by
+that suite's own slot-ownership guard, and the next adapter package moves them again the same way.
 `llm-gemini-adapter` is archived (`b5f74ac`, canonical spec
 `openspec/specs/llm-gemini-adapter/spec.md`): the second BYOK transport posts the consented payload
 to the model's generateContent resource at the fixed Google origin with a per-call `x-goog-api-key`

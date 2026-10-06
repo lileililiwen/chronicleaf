@@ -187,6 +187,15 @@ public static class ChronicleafSchema
     /// </summary>
     public const string StaticBlogExportMigrationId = "20261013090000_AddStaticBlogExport";
 
+    /// <summary>
+    /// The forward migration that adds the <c>project_journeys</c> table
+    /// (PUBLIC-PROJECT-JOURNEY-001/002). A database that has never applied it has nowhere to
+    /// record an explicit publication decision, so its journey routes would fail against a
+    /// missing table; readiness says so by name rather than answering 200 and failing on the
+    /// first request.
+    /// </summary>
+    public const string PublicProjectJourneyMigrationId = "20261014090000_AddPublicProjectJourney";
+
     /// <summary>Every migration a database must carry before this build calls itself ready.</summary>
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
@@ -210,6 +219,7 @@ public static class ChronicleafSchema
         NarrativeMemoryMigrationId,
         ScreenshotEvolutionImagesMigrationId,
         StaticBlogExportMigrationId,
+        PublicProjectJourneyMigrationId,
     ];
 
     /// <summary>
@@ -217,7 +227,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = StaticBlogExportMigrationId;
+    public const string ExpectedMigrationId = PublicProjectJourneyMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

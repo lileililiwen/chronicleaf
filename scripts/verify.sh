@@ -524,6 +524,18 @@ else
   # behind the delivered provider seam and the pictures by real capture jobs behind the
   # delivered browser seam.
   step "static blog export tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~StaticBlogExportTests"
+  # PUBLIC-PROJECT-JOURNEY-001/002. That only an explicitly published, preview-hashed selection
+  # of approved entries reaches the anonymous projection with its local pictures, and private
+  # notes, candidate milestones, unselected pictures and credentials never do; that a
+  # never-enabled or revoked slug is 404 while the private preview stays 401 without a
+  # session; that a stale preview hash is 409 with the snapshot untouched; that a content
+  # edit suspends the public snapshot as 404 without deleting the journey row; and that a
+  # taken slug is 409, a moved revision is 409, a missing revision on update is 428 and a
+  # non-kebab slug is 422 - all proven against the same real disposable PostgreSQL through
+  # the real API host, with the approved stories produced by real generation jobs behind the
+  # delivered provider seam and the pictures by real capture jobs behind the delivered
+  # browser seam.
+  step "public project journey tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~PublicProjectJourneyTests"
   # COMMUNITY-COMPOSE-RELEASE-001/002. That a clean install completes the
   # milestone-to-approved-Markdown flow with the timeline telling it back; that the compose
   # file describes exactly app plus postgres on the pinned digest with named volumes, a

@@ -8,6 +8,7 @@ using Chronicleaf.Application.Evolution;
 using Chronicleaf.Application.Git;
 using Chronicleaf.Application.GitHub;
 using Chronicleaf.Application.GitHubCandidates;
+using Chronicleaf.Application.Journey;
 using Chronicleaf.Application.Media;
 using Chronicleaf.Application.Milestones;
 using Chronicleaf.Application.Narrative;
@@ -448,6 +449,22 @@ public sealed class ApiErrorMiddleware(
             case MediaUnavailableException mediaGone:
                 return (
                     Envelope.Create(HtmlExportError.MediaUnavailable, mediaGone.Message, traceId),
+                    LogLevel.Information);
+
+            // PUBLIC-PROJECT-JOURNEY-001/002. Written here for the same reason as every other
+            // feature package's refusals: the journey package raises them and this middleware is
+            // still the only place an envelope is written. The messages are authored in the
+            // journey package and name no prose, no slug history and no selection: the 409s say
+            // the address is taken or the preview moved, and both remedies are a fresh owner
+            // decision rather than a retry.
+            case JourneySlugConflictException slugTaken:
+                return (
+                    Envelope.Create(JourneyError.SlugConflict, slugTaken.Message, traceId),
+                    LogLevel.Information);
+
+            case JourneySelectionStaleException selectionStale:
+                return (
+                    Envelope.Create(JourneyError.SelectionStale, selectionStale.Message, traceId),
                     LogLevel.Information);
 
             // GITHUB-RELEASE-CANDIDATES-001/002. Written here for the same reason as every other feature

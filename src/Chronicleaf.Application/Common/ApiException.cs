@@ -164,6 +164,14 @@ public static class ApiErrorStatus
         // re-capture the picture and approve again, never a picture-less artifact.
         Content.HtmlExportError.MediaUnavailable => 409,
 
+        // The public-project-journey package's codes. Additive in the same way: 409 for a slug
+        // already taken by another project's journey, because the remedy is another slug rather
+        // than a corrected body - and 409 for a preview hash that no longer matches the stored
+        // selection, because nothing is wrong with the request and the remedy is a fresh preview
+        // rather than a retry of the publication.
+        Journey.JourneyError.SlugConflict => 409,
+        Journey.JourneyError.SelectionStale => 409,
+
         // The narrative-memory package's codes. Additive in the same way. 422 for a context that
         // does not fit the byte budget without losing a pinned fact, because the remedy is to
         // narrow the cutoff or shorten entries - the same shape as every other semantic refusal

@@ -109,6 +109,8 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     public DbSet<StaticBlogExportRequestRow> StaticBlogExportRequests => Set<StaticBlogExportRequestRow>();
 
+    public DbSet<ProjectJourneyRow> ProjectJourneys => Set<ProjectJourneyRow>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Installation>(entity =>
@@ -2267,6 +2269,80 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_static_blog_export_requests_project_id");
         });
+
+        // PUBLIC-PROJECT-JOURNEY-001/002: one explicit publication decision per project. The slug
+        // is the global public address, so its unique index is global too; the (scope, project)
+        // index is what makes one journey per project a database decision. The snapshot JSON is
+        // a frozen projection of approved text and picture references the public routes serve -
+        // never private notes, never candidates, never unselected pictures - and the two hashes
+        // are what the publication and the public read compare against.
+        modelBuilder.Entity<ProjectJourneyRow>(entity =>
+        {
+            entity.ToTable(
+                "project_journeys",
+                table =>
+                {
+                    table.HasCheckConstraint(
+                        "ck_project_journeys_slug_kebab_case",
+                        "slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'");
+                    table.HasCheckConstraint(
+                        "ck_project_journeys_selection_hash_sha256_hex",
+                        "selection_hash ~ '^[0-9a-f]{64}$'");
+                    table.HasCheckConstraint(
+                        "ck_project_journeys_snapshot_ref_sha256_hex",
+                        "snapshot_ref ~ '^[0-9a-f]{64}$'");
+                    table.HasCheckConstraint(
+                        "ck_project_journeys_revision_nonnegative",
+                        "revision >= 0");
+                });
+            entity.HasKey(journey => journey.Id);
+            entity.Property(journey => journey.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(journey => journey.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(journey => journey.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(journey => journey.Slug)
+                .HasColumnName("slug")
+                .HasMaxLength(JourneySlugMaxLength)
+                .IsRequired();
+            entity.Property(journey => journey.Enabled).HasColumnName("enabled").IsRequired();
+            entity.Property(journey => journey.Revision).HasColumnName("revision").IsRequired();
+            entity.Property(journey => journey.SelectionHash)
+                .HasColumnName("selection_hash")
+                .HasMaxLength(Sha256HexMaxLength)
+                .IsRequired();
+            entity.Property(journey => journey.SnapshotRef)
+                .HasColumnName("snapshot_ref")
+                .HasMaxLength(Sha256HexMaxLength)
+                .IsRequired();
+            entity.Property(journey => journey.SnapshotJson)
+                .HasColumnName("snapshot_json")
+                .HasColumnType("jsonb")
+                .IsRequired();
+            entity.Property(journey => journey.RevokedAt)
+                .HasColumnName("revoked_at")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(journey => journey.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(journey => journey.UpdatedAt)
+                .HasColumnName("updated_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            entity.HasIndex(journey => new { journey.ScopeId, journey.ProjectId })
+                .IsUnique()
+                .HasDatabaseName("ux_project_journeys_scope_id_project_id");
+
+            entity.HasIndex(journey => journey.Slug)
+                .IsUnique()
+                .HasDatabaseName("ux_project_journeys_slug");
+
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(journey => journey.ProjectId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_project_journeys_project_id");
+        });
     }
 
     /// <summary>At most 40 characters for a content kind, matching the Core record's own bound.</summary>
@@ -2441,6 +2517,9 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     /// <summary>At most 128 characters for a deployment base path, matching the builder's own bound.</summary>
     private const int StaticBlogExportBasePathMaxLength = 128;
+
+    /// <summary>At most 80 characters for a journey slug, matching the service's own bound.</summary>
+    private const int JourneySlugMaxLength = 80;
 
     /// <summary>
     /// Refuses a stored status this build does not know. A value that is not one of the six is not a

@@ -18,6 +18,7 @@ using Chronicleaf.Api.Git;
 using Chronicleaf.Api.GitHub;
 using Chronicleaf.Api.GitHubEnrichment;
 using Chronicleaf.Api.Candidates;
+using Chronicleaf.Api.Journey;
 using Chronicleaf.Api.Media;
 using Chronicleaf.Api.Narrative;
 using Chronicleaf.Api.Operations;
@@ -41,6 +42,7 @@ using Chronicleaf.Infrastructure.Git;
 using Chronicleaf.Infrastructure.GitHub;
 using Chronicleaf.Infrastructure.GitHubEnrichment;
 using Chronicleaf.Infrastructure.GitHubCandidates;
+using Chronicleaf.Infrastructure.Journey;
 using Chronicleaf.Infrastructure.Media;
 using Chronicleaf.Infrastructure.Narrative;
 using Chronicleaf.Infrastructure.Operations;
@@ -285,6 +287,14 @@ builder.Services.AddScreenshotEvolutionImages();
 // the static-blog-export migration reports schema_mismatch at /api/ready.
 builder.Services.AddStaticBlogExport();
 
+// PUBLIC-PROJECT-JOURNEY-001/002. The journey store and service that project explicitly
+// published selections as an anonymous read-only snapshot. It registers no provider, no
+// approval and no publisher: the projection re-resolves approved bytes through the delivered
+// stores, approval stays the review package's table, and the public surface is this
+// application's own anonymous routes. A database without the public-project-journey migration
+// reports schema_mismatch at /api/ready.
+builder.Services.AddProjectJourney();
+
 // The rotation guard is applied once at start-up, so an access token that was changed since the
 // last run revokes every existing session before this process serves anything.
 builder.Services.AddHostedService<AccessTokenRotationStartup>();
@@ -450,6 +460,15 @@ app.MapEvolutionEndpoints();
 // approved selection a job builds, the status route reports that job, and the download serves
 // the deterministic archive only while every frozen binding still describes the stored state.
 app.MapStaticBlogExportEndpoints();
+
+// PUBLIC-PROJECT-JOURNEY-001/002: the private preview, publication and read routes plus the two
+// anonymous public routes. The private three are not marked public, so the access package's
+// default-deny boundary already covers every one of them. The two public ones are marked public
+// deliberately in the endpoint module: their caller is an anonymous reader, and what authorizes
+// them is the frozen, explicitly published snapshot re-checked on every read. There is no
+// generation here, no approval and no export: a preview computes a hash, a publication freezes
+// a snapshot, and the public routes serve it only while every binding still holds.
+app.MapJourneyEndpoints();
 
 // SHELL-001/SHELL-002: every unmatched path is either an unknown API path, an unknown
 // static asset, or a client route. Only the last one falls back to the SPA entry point. This

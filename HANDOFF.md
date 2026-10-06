@@ -1,6 +1,6 @@
 # Chronicleaf handoff
 
-current_spec: publisher-devto-adapter
+current_spec: publisher-hashnode-adapter
 
 ## Current state — 2026-10-05
 
@@ -1463,3 +1463,51 @@ Pages build, or any live-site readiness. Deployment stays `deployable: false`; t
 no remote, no push and no publication.
 Next: `current_spec` is `publisher-devto-adapter`, the next package in drain order after
 `publisher-github-pages-adapter`.
+`publisher-devto-adapter` is archived
+(`b880186`, canonical spec `openspec/specs/publisher-devto-adapter/spec.md`): the second
+transport behind the publisher contract, creating one Forem article per confirmed publish -
+`published: false` for a draft, `true` only for an explicitly confirmed publish - through
+`POST https://dev.to/api/articles` with the leased key as the one `api-key` header (never a
+bearer scheme, never a query parameter) and `Accept: application/vnd.forem.api-v1+json`
+against the pinned host. A new `DevTo/` folder in the delivered `Chronicleaf.Publishers`
+leaf holds the `devto` adapter, its pinned-host transport, its explicit tag options (at most
+four lowercase-alphanumeric tags, validated until the provider reports support for more)
+and its five redacted failure codes; registration is demand-gated (absent
+`Chronicleaf:DevTo` section registers nothing and the slot answers
+`publisher_unknown_target`, present-but-invalid fails startup) and is the whole rollback
+lever. The preview is pure and binds the tag line into its warnings - which the contract
+hashes - so a post-preview tag change is refused as `publisher_preview_stale` before any
+job exists; pictures do not travel and are named in the warnings instead, so the confirmed
+preview consents to a text-only article. Every publish is a create: the transport exposes
+no PUT, because an update would overwrite remote text that may no longer be approved while
+a duplicate create is at worst a second draft. Only the create answers ambiguously: every
+answered status is the provider's verdict (`401/403` credential rejected, `422` invalid
+payload, `429` rate limited, `3xx` redirect refused without a second hop, anything else
+unavailable) with error bodies disposed unread, while a lost answer - and a `201` in JSON
+this client does not understand - becomes `unknown` with a `manual` hint that no reconcile
+can resolve (`SupportsReconcile: false`, the route answers
+`publisher_reconcile_unavailable` with no further upstream call). No per-target table was
+added so no migration was needed (schema unchanged). Read that package's own boundary
+before extending it, and note the three decisions implementation held before green: the
+options stay a flat comma string rather than a bound list, because the composition root's
+`Configure` cannot fill a list from the one key operators set (parsing and validation live
+in `Create`, re-run on every call); the transport owns its client as its own singleton
+rather than behind a bare `HttpMessageHandler`, because that registration is already taken
+by the GitHub Pages transport and a second one would make single-handler resolution
+order-dependent; and an unreadable `201` returns null so the adapter records `unknown`
+rather than `failed`, because the article may exist and `failed` would invite a second
+create of the same text. Evidence, all run by the implementer rather than taken on report:
+`bash scripts/verify.sh` exit 0 (`GATE_EXIT=0`, `set -o pipefail`, 48 stages) with the
+platform-feed stage and the new `publisher devto adapter tests` stage (11/11, filter
+asserted to select 11) alongside all existing stages - including 18/18 publisher contract
+and 12/12 GitHub Pages on isolated runs - `npm ci`, `tsc` + `vite build`, `dotnet build
+--nologo --no-incremental` 0 errors with the same 12 pre-existing warning grep lines at
+HEAD (zero added), name preflight exit 0, and `openspec validate --all --strict
+--no-interactive` 54/54 before and after the archive, which used no `--skip-specs`. No
+Web UI was shipped: no publisher UI exists to extend, the scenarios are API-observable,
+and no new browser suite was added. The opt-in real-Dev.to run was not performed: only
+the far end of the wire is scripted and no claim is made about any real article, any tag
+beyond the validated bound, or any rate-limit reset behavior. Deployment stays
+`deployable: false`; there is no remote, no push and no publication.
+Next: `current_spec` is `publisher-hashnode-adapter`, the next package in drain order after
+`publisher-devto-adapter`.

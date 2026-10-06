@@ -1,6 +1,6 @@
 # Chronicleaf handoff
 
-current_spec: public-project-journey
+current_spec: agency-client-projects
 
 ## Current state — 2026-10-05
 
@@ -39,6 +39,7 @@ next POST-MVP package in ROADMAP order after `html-content-export`.
 | 27 | `content-asset-variants` | `65309ac` | `openspec/specs/content-asset-variants/spec.md` |
 | 28 | `screenshot-evolution-images` | `f2916e1` | `openspec/specs/screenshot-evolution-images/spec.md` |
 | 29 | `static-blog-export` | `066e153` | `openspec/specs/static-blog-export/spec.md` |
+| 30 | `public-project-journey` | `6bc7e8e` | `openspec/specs/public-project-journey/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -393,8 +394,24 @@ owner's words; the e2e seed's candidate rows name the two real capture jobs the 
 PNG behind all three. Deployment stays `deployable: false`; there is no remote, no push and no
 publication.
 
-Next: `current_spec` is `public-project-journey`, the POST-MVP package ROADMAP orders
-immediately after `static-blog-export`. `static-blog-export` is archived
+Next: `current_spec` is `agency-client-projects`, the DEMAND-GATED package ROADMAP orders
+after `public-project-journey`. `public-project-journey` is archived
+(`6bc7e8e`, canonical spec `openspec/specs/public-project-journey/spec.md`): one
+`project_journeys` row per project carrying a global kebab-case slug, an enabled flag, an
+optimistic revision, the canonical selection hash and the frozen snapshot JSON; three private
+routes (preview computes the hash, PUT publishes/revokes under revision + hash checks, GET
+reads state) and two anonymous no-store routes (`GET /api/journey/{slug}`,
+`GET /api/journey/{slug}/media/{mediaId}`) that serve exactly the explicitly published
+confirmed milestones, approved bodies and approval-covered pictures. Unapproved is
+`approval_required`, moved is `approval_stale`, a stale preview hash is
+`journey_selection_stale` 409 with the snapshot untouched, a taken slug is
+`journey_slug_conflict` 409, a moved revision is `revision_conflict` 409, a missing revision
+on update is 428, and a revocation or lapsed approval suspends the public read as 404 without
+deleting the row. Private notes, candidates, unselected pictures and credentials never enter
+the snapshot and are asserted absent. Read that package's own boundary before extending it,
+and note the one defect its tests found: the service lowercased slugs instead of refusing
+them, so `UPPER` published as `upper` - slugs are now taken verbatim and anything but
+lowercase kebab case is 422. `static-blog-export` is archived
 (`066e153`, canonical spec `openspec/specs/static-blog-export/spec.md`): a job-built
 deterministic ZIP (`index.html` timeline oldest-first, `posts/{assetId}.html` rendered through
 the HTML export package's own sanitizing adapter, `assets/{mediaId}.png` deduplicated,
@@ -544,6 +561,45 @@ without `--skip-specs`, then make the implementation commit and the HANDOFF-only
 stop. Do not push.
 
 ## Package notes
+
+`public-project-journey` is archived (`6bc7e8e`, canonical spec
+`openspec/specs/public-project-journey/spec.md`). Read that package's own boundary before
+extending it, and note what it decided that a later reader would otherwise have to rediscover.
+
+**Release evidence (`public-project-journey`, commit `6bc7e8e`, all run by the implementer
+rather than taken on report).** `CHRONICLEAF_E2E=1 bash scripts/verify.sh` exit 0
+(`GATE_EXIT=0`) with the platform-feed stage and thirty-one filtered stages (the prior
+thirty plus `public project journey tests`) each asserted to select at least one
+test, including **14/14 public project journey** run directly against the same real
+disposable PostgreSQL and the real API host (enabled selection serves exactly its entries
+oldest-first with captions and media addresses, all no-store; approved picture bytes served
+anonymously as PNG while unselected and foreign pictures are 404; never-enabled slug 404
+with private preview 401 sessionless; private notes, candidate title, unselected media and
+credential value asserted absent; revoke disables app and media routes immediately; stale
+hash 409 with snapshot untouched; edit-triggered stale approval suspends as 404 with the
+row intact; slug conflict 409; stale revision 409 and missing revision 428; unapproved
+`approval_required`; foreign asset 404; six non-kebab slugs 422; dismissed milestone 422;
+absent journey 404 with revoke as disabled no-op). `npm ci`, `tsc` and `vite build` all
+green, and `bash scripts/e2e.sh` green across all fourteen database-isolated browser
+suites (67+ Playwright, no new suite: this package ships no UI).
+`dotnet build --nologo --no-incremental` 0 errors with the same 2 pre-existing warnings at
+HEAD. Name preflight exit 0; `openspec validate --all --strict --no-interactive` 54/54 before
+and after the archive, which used no `--skip-specs`.
+
+**A journey is a projection, not a source of truth.** The PUT carries the approved asset
+ids beside the preview hash it pins, because a hash alone cannot be recomputed into the
+selection it covers; the service re-resolves the same selection through the delivered
+asset, approval, evidence and media stores (reusing the review package's
+`approval_required`/`approval_stale` and the static-blog package's canonical selection
+hash) and freezes the snapshot only after every binding passes. The public read serves
+the frozen snapshot bytes only while a live re-resolution still agrees on every binding
+(content revision, body hash, evidence bundle/revision, media selection hash, title and
+date) - any drift suspends as the same 404 a missing slug answers, so a caller cannot
+probe for a journey that exists but is not public. The slug lookup is the one unscoped
+read in the package; media bytes are opened under the journey row's own scope with an
+empty actor and only for pictures the live snapshot depicts. No UI was shipped
+(route-only, the `static-blog-export` precedent). Deployment stays `deployable: false`;
+there is no remote, no push and no publication.
 
 `static-blog-export` is archived (`066e153`, canonical spec
 `openspec/specs/static-blog-export/spec.md`). Read that package's own boundary before

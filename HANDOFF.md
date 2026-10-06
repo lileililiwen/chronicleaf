@@ -1,6 +1,6 @@
 # Chronicleaf handoff
 
-current_spec: github-app-connection
+current_spec: linkedin-copy-package
 
 ## Current state — 2026-10-05
 
@@ -1272,3 +1272,41 @@ Hashnode transport endpoint/auth/draft mutation was resolved against official pr
 Validation: name preflight and strict OpenSpec passed53/53. Package graph is acyclic and dependency-ordered; required artifacts/four phase headings, 107 requirement IDs, 319 observable scenarios, 480 unchecked tasks, 58 local links and untracked-document whitespace checked separately. Provider-shaped fixtures and native commands in tasks are future implementation oracles, not executed runtime tests. No application source, implementation, archive, commits, push or deployment in this authoring step.
 
 Capture contract targets a hardened Linux container backend: dedicated browser UID/supervisor, destination-validating proxy and enforced egress firewall. Compose packaging must verify required capabilities and actual blocked network traffic; native environments without that sandbox report capture_sandbox_unavailable rather than navigate with reduced isolation. This is a future implementation contract, not proven sandbox/runtime evidence.
+
+`github-app-connection` is archived
+(`f5a93d4`, canonical spec `openspec/specs/github-app-connection/spec.md`): scoped GitHub App
+installation connections, with Community PAT behavior byte-identical. One
+`github_app_installations` row per bound installation carrying the scope, the installation id
+(globally unique: the first binding wins and a guessed id from another scope is
+`installation_mismatch` 403), the account login, the selection and a live/removed status, plus
+`auth_mode` (`pat` backfilled) and `installation_id` columns on `github_connections` under a
+`pat|installation` check constraint. Owner `GET .../github-app/setup` issues a 32-byte
+single-use state bound to the session with a 10-minute TTL; `POST .../github-app/connect
+{installationId, repositoryId, state}` consumes it (replayed/expired/foreign is
+`github_app_state_invalid` 400), reads the installation as the App itself through a BCL-only
+JWT (`Chronicleaf.GitHub/App`, RS256, no JWT package), mints a token naming exactly one
+`repository_ids` entry with no permission, and reads that repository through it before storing
+anything (unknown installation 404, unselected repository 404). `IGitHubInstallationTokenProvider`
+serves the token from a process-wide cache until 60s before GitHub expiry with a per-key gate,
+so a concurrent refresh mints once; no token reaches a row, a log, a payload or an exception.
+Collection through an installation reuses the delivered `milestone.github-sync` job and the
+evidence append contract (revoked installation ends `github_job_connection_missing` permanent,
+mint failure transient). The App PEM and webhook secret are delivered vault credentials under
+new `github-app`/`github-app-webhook` slots, resolved by reference with no owner-scope
+comparison; `POST /api/webhooks/github-app` verifies HMAC-SHA256 over the raw bytes (every
+auth failure one 401) and a `deleted` delivery marks the row removed and deletes every bound
+connection, so queued jobs fail without publishing. Read that package's own boundary before
+extending it, and note the one defect verification found: concurrent refreshes through one
+scope raced two reads on one DbContext (`NpgsqlOperationInProgressException`), so the binding
+recheck moved inside the per-key gate and the single-mint test now shares one scope on purpose.
+Evidence, all run by the implementer rather than taken on report: `bash scripts/verify.sh` exit
+0 (`GATE_EXIT=0`, `set -o pipefail`) with the platform-feed stage and the new `github app
+connection tests` stage (9/9 on three consecutive runs) alongside all existing stages (neighbors
+re-run in isolation: 27/27 evidence, 40/40 candidates, 32/32 vault, 18/18 curation), `npm ci`,
+`tsc` + `vite build`, `dotnet build --nologo --no-incremental` 0 errors with the same 2
+pre-existing warnings at HEAD, name preflight exit 0, and `openspec validate --all --strict
+--no-interactive` 54/54 before and after the archive, which used no `--skip-specs`. No Web UI
+was shipped: the design's React panel is satisfied API-observable (setup/connect/read/disconnect
+plus the delivery receipt), and no new browser suite was added. The opt-in real-GitHub run was
+not performed: only the wire bytes are scripted and no claim is made about any real installation
+or mint. Deployment stays `deployable: false`; there is no remote, no push and no publication.

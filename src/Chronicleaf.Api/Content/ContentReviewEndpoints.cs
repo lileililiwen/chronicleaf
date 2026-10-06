@@ -4,6 +4,7 @@ using Chronicleaf.Api.Access;
 using Chronicleaf.Application.Access;
 using Chronicleaf.Application.Common;
 using Chronicleaf.Application.Content;
+using Chronicleaf.Application.LinkedIn;
 using Chronicleaf.Application.Milestones;
 
 namespace Chronicleaf.Api.Content;
@@ -173,6 +174,7 @@ public static class ContentReviewEndpoints
         Guid assetId,
         HttpContext context,
         IContentReviewService reviews,
+        ILinkedInCopyService copies,
         IOwnerAccessService access,
         CancellationToken cancellationToken)
     {
@@ -187,6 +189,16 @@ public static class ContentReviewEndpoints
         if (string.Equals((format ?? "markdown").Trim(), "html", StringComparison.OrdinalIgnoreCase))
         {
             return await ExportHtmlAsync(assetId, context, reviews, access, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        // LINKEDIN-COPY-PACKAGE-002. The LinkedIn package is the same approval in a portable
+        // shape: copy.txt, the selected pictures and their manifest, served by its own use case
+        // under the same bindings the Markdown export re-checks. Preview and approval stay the
+        // review package's own routes; this branch only serves what they authorized.
+        if (string.Equals((format ?? "markdown").Trim(), "linkedin", StringComparison.OrdinalIgnoreCase))
+        {
+            return await ExportLinkedInAsync(assetId, revisionText, context, copies, access, cancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -251,6 +263,40 @@ public static class ContentReviewEndpoints
         // the owner chose to download: a single HTML file, or a ZIP holding the HTML, the
         // approval-covered pictures and their checksum manifest. Never a public page and never an
         // upstream call, under the same approval the Markdown export re-checks.
+        return Results.File(export.Bytes, export.ContentType, export.FileName);
+    }
+
+    private static async Task<IResult> ExportLinkedInAsync(
+        Guid assetId,
+        string? revisionText,
+        HttpContext context,
+        ILinkedInCopyService copies,
+        IOwnerAccessService access,
+        CancellationToken cancellationToken)
+    {
+        var owner = await OwnerScopeAsync(context, access, cancellationToken).ConfigureAwait(false);
+
+        long? revision = null;
+        if (revisionText is not null)
+        {
+            if (!long.TryParse(revisionText, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed) ||
+                parsed < 1)
+            {
+                throw new ValidationFailedException(
+                    "revision",
+                    "A revision is a stored version number, from 1.");
+            }
+
+            revision = parsed;
+        }
+
+        var export = await copies
+            .ExportAsync(owner, assetId, revision, cancellationToken)
+            .ConfigureAwait(false);
+
+        // The approved copy as a package the owner chose to download: copy.txt, the selected
+        // pictures and their manifest. Never a public page and never an upstream call, under
+        // the same approval the Markdown export re-checks.
         return Results.File(export.Bytes, export.ContentType, export.FileName);
     }
 

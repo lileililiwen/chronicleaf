@@ -515,6 +515,23 @@ else
   # API host, with the approved story produced by a real generation job behind the delivered
   # provider seam. Deriving itself calls no provider.
   step "content asset variant tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~ContentAssetVariantsTests"
+  # LINKEDIN-COPY-PACKAGE-001/002. That an approved story adapts into a LinkedIn copy draft
+  # carrying its citations, the owner's call to action, hashtags and per-picture accessibility
+  # words beside a voice value snapshot no later profile edit can reach; that an explicit
+  # project voice restriction wins over the preset and the derivative then approves; that a
+  # copy without a call to action stays informational with no invented growth promise; that an
+  # unapproved source, a foreign id, a moved evidence or voice head, an unknown picture, a
+  # digit the evidence never stated and every malformed hashtag, call to action, selection or
+  # source kind is refused with nothing stored; that an approved copy exports copy.txt, the
+  # selected pictures and their checksum manifest while a draft exports nothing and an edit
+  # ends the approval; that native publication is refused as publisher_unsupported with no
+  # operation, no audit row and no outbound request; and that the internal length ceiling
+  # refuses while the threshold warns - all proven against the same real disposable
+  # PostgreSQL through the real API host, with the approved story produced by a real
+  # generation job behind the delivered provider seam and the selected picture by a real
+  # capture job behind the delivered browser seam. Adapting itself calls no provider and
+  # nothing here reaches any LinkedIn endpoint.
+  step "linkedin copy package tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~LinkedinCopyPackageTests"
   # SCREENSHOT-EVOLUTION-IMAGES-001/002. That a same-viewport comparison preserves source
   # pixels, order and provenance in a re-derivable manifest; that a milestone without a
   # selected screenshot is an unavailable gap rather than a fabrication, and a candidate is

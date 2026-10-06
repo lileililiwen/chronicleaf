@@ -11,6 +11,7 @@ using Chronicleaf.Application.Git;
 using Chronicleaf.Application.GitHub;
 using Chronicleaf.Application.GitHubCandidates;
 using Chronicleaf.Application.Journey;
+using Chronicleaf.Application.LinkedIn;
 using Chronicleaf.Application.Media;
 using Chronicleaf.Application.Milestones;
 using Chronicleaf.Application.Narrative;
@@ -551,6 +552,22 @@ public sealed class ApiErrorMiddleware(
             case MediaUnavailableException mediaGone:
                 return (
                     Envelope.Create(HtmlExportError.MediaUnavailable, mediaGone.Message, traceId),
+                    LogLevel.Information);
+
+            // LINKEDIN-COPY-PACKAGE-001/002. Written here for the same reason as every other
+            // feature package's refusals: this package raises them and this middleware is still
+            // the only place an envelope is written. The messages are authored in the LinkedIn
+            // package and name no prose, no claim, no URL, no token and no host path: a native
+            // publish is refused because there is no transport behind it, and an over-long copy
+            // is refused against the package's own ceiling rather than any platform claim.
+            case PublisherUnsupportedException publishRefused:
+                return (
+                    Envelope.Create(LinkedInError.PublisherUnsupported, publishRefused.Message, traceId),
+                    LogLevel.Information);
+
+            case LinkedInCopyTooLongException copyTooLong:
+                return (
+                    Envelope.Create(LinkedInError.CopyTooLong, copyTooLong.Message, traceId),
                     LogLevel.Information);
 
             // PUBLIC-PROJECT-JOURNEY-001/002. Written here for the same reason as every other

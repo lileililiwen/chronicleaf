@@ -70,6 +70,17 @@ public static class ContentAssetTypes
     /// </summary>
     public const string WeeklyProgress = "weekly-progress";
 
+    /// <summary>
+    /// Copy-ready LinkedIn post text derived from an approved story (LINKEDIN-COPY-PACKAGE-001).
+    /// </summary>
+    /// <remarks>
+    /// A draft until the review package approves it separately, exactly like every other
+    /// derivative: approval of the source never travels here. The text cites only the footnote
+    /// ids the source summary's claim map assigned, and the pictures it may carry are named by
+    /// the LinkedIn package's own selection rows rather than by this type.
+    /// </remarks>
+    public const string LinkedinCopy = "linkedin-copy";
+
     /// <summary>Every kind, in the order a surface would list them.</summary>
     public static IReadOnlyList<string> All { get; } =
     [
@@ -81,6 +92,7 @@ public static class ContentAssetTypes
         ReadmeUpdate,
         Portfolio,
         WeeklyProgress,
+        LinkedinCopy,
     ];
 
     /// <summary>Bounded to the width of the <c>content_assets.type</c> column.</summary>

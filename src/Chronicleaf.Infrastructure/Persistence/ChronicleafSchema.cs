@@ -262,6 +262,13 @@ public static class ChronicleafSchema
     /// so by name rather than answering 200 and failing on the first request.
     /// </summary>
     public const string GitHubAppConnectionMigrationId = "20261017090000_AddGitHubAppConnection";
+    /// <summary>
+    /// The forward migration that adds the <c>linkedin_copy_media</c> table
+    /// (LINKEDIN-COPY-PACKAGE-001/002). A database that has never applied it has nowhere to bind
+    /// a copy's selected pictures, so its LinkedIn routes would fail against a missing table;
+    /// readiness says so by name rather than answering 200 and failing on the first request.
+    /// </summary>
+    public const string LinkedInCopyPackageMigrationId = "20261018090000_AddLinkedInCopyPackage";
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
         InitialMigrationId,
@@ -292,6 +299,7 @@ public static class ChronicleafSchema
         ScheduledProjectSyncMigrationId,
         HostedArchiveOperationsMigrationId,
         GitHubAppConnectionMigrationId,
+        LinkedInCopyPackageMigrationId,
     ];
 
     /// <summary>
@@ -299,7 +307,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = GitHubAppConnectionMigrationId;
+    public const string ExpectedMigrationId = LinkedInCopyPackageMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

@@ -164,6 +164,14 @@ public static class ApiErrorStatus
         // re-capture the picture and approve again, never a picture-less artifact.
         Content.HtmlExportError.MediaUnavailable => 409,
 
+        // The linkedin-copy-package's codes. Additive in the same way: 422 for a native publish
+        // request this product never performs, because the remedy is the copy-ready export the
+        // owner posts by hand rather than a corrected body - and 422 for a rendered copy over
+        // the package's own internal ceiling, because the remedy is less text rather than a
+        // retry of the same derivation.
+        LinkedIn.LinkedInError.PublisherUnsupported => 422,
+        LinkedIn.LinkedInError.CopyTooLong => 422,
+
         // The public-project-journey package's codes. Additive in the same way: 409 for a slug
         // already taken by another project's journey, because the remedy is another slug rather
         // than a corrected body - and 409 for a preview hash that no longer matches the stored

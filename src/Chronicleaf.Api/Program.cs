@@ -52,6 +52,7 @@ using Chronicleaf.Infrastructure.GitHub;
 using Chronicleaf.Infrastructure.GitHubEnrichment;
 using Chronicleaf.Infrastructure.GitHubCandidates;
 using Chronicleaf.Infrastructure.Journey;
+using Chronicleaf.Infrastructure.LinkedIn;
 using Chronicleaf.Infrastructure.Media;
 using Chronicleaf.Infrastructure.Media.S3;
 using Chronicleaf.Infrastructure.Narrative;
@@ -348,6 +349,14 @@ builder.Services.AddNarrativeMemory();
 // grounded-markdown-drafts migration reports schema_mismatch at /api/ready.
 builder.Services.AddContentAssetVariants();
 
+// LINKEDIN-COPY-PACKAGE-001/002. The LinkedIn copy service and its selection-row store: reviewed
+// copy-ready post text derived from an approved story, exported as copy.txt with the selected
+// pictures and refused unconditionally at the publish route. It registers no provider, no
+// credential and no transport: adaptation renders deterministically from stored rows, approval
+// stays the review package's table, and publication is a refusal rather than a call. A database
+// without the LinkedIn-copy migration reports schema_mismatch at /api/ready.
+builder.Services.AddLinkedInCopy();
+
 // SCREENSHOT-EVOLUTION-IMAGES-001/002. The evolution store and service that render selected
 // screenshots into a derived comparison PNG with a re-derivable manifest, and approve the exact
 // selection and artifact hashes for export. It registers no provider, no browser and no
@@ -557,6 +566,14 @@ app.MapContentReviewEndpoints();
 // accepted summary through a deterministic template and stores the result as a draft with no
 // approval row.
 app.MapContentVariantEndpoints();
+
+// LINKEDIN-COPY-PACKAGE-001/002: the private adapt and publish routes. None of them is marked
+// public, so the access package's default-deny boundary already covers every one of them. There
+// is no generation here, no approval and no transport: adapting renders an approved story's
+// accepted summary through a deterministic template and stores the result as a draft with no
+// approval row, and the publish route refuses with publisher_unsupported instead of calling
+// anything. Preview, edit, approval and the LinkedIn export shape stay the review package's.
+app.MapLinkedInCopyEndpoints();
 
 // NARRATIVE-MEMORY-001/002: the private narrative read, create, edit and refresh routes. None of
 // them is marked public, so the access package's default-deny boundary already covers every one

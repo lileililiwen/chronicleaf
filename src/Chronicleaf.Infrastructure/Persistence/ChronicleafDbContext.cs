@@ -113,6 +113,20 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     public DbSet<ProjectJourneyRow> ProjectJourneys => Set<ProjectJourneyRow>();
 
+    public DbSet<HostedUser> HostedUsers => Set<HostedUser>();
+
+    public DbSet<Tenant> Tenants => Set<Tenant>();
+
+    public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
+
+    public DbSet<TenantScope> TenantScopes => Set<TenantScope>();
+
+    public DbSet<HostedSession> HostedSessions => Set<HostedSession>();
+
+    public DbSet<HostedLoginRequest> HostedLoginRequests => Set<HostedLoginRequest>();
+
+    public DbSet<HostedImport> HostedImports => Set<HostedImport>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Installation>(entity =>
@@ -2390,6 +2404,222 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_project_journeys_project_id");
         });
+
+        // CLOUD-TENANT-BOUNDARY-001/002: the Hosted identity and tenant isolation tables. A user
+        // is one OIDC issuer plus one subject, a tenant owns one scope row with a fresh id, and a
+        // membership is the only thing that authorizes a session under a tenant. The Community
+        // installation scope is never referenced here, which is what keeps a tenant from
+        // addressing Community rows. Row-level security on the tenant tables (see the forward
+        // migration) additionally filters by the transaction's app.tenant_id, set per transaction
+        // by the tenancy service and dead with it on a pooled connection.
+        modelBuilder.Entity<HostedUser>(entity =>
+        {
+            entity.ToTable("hosted_users");
+            entity.HasKey(user => user.Id);
+            entity.Property(user => user.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(user => user.Issuer)
+                .HasColumnName("issuer")
+                .HasMaxLength(HostedIssuerMaxLength)
+                .IsRequired();
+            entity.Property(user => user.Subject)
+                .HasColumnName("subject")
+                .HasMaxLength(HostedSubjectMaxLength)
+                .IsRequired();
+            entity.Property(user => user.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            entity.HasIndex(user => new { user.Issuer, user.Subject })
+                .IsUnique()
+                .HasDatabaseName("ux_hosted_users_issuer_subject");
+        });
+
+        modelBuilder.Entity<Tenant>(entity =>
+        {
+            entity.ToTable(
+                "tenants",
+                table =>
+                {
+                    table.HasCheckConstraint(
+                        "ck_tenants_revision_nonnegative",
+                        "revision >= 0");
+                });
+            entity.HasKey(tenant => tenant.Id);
+            entity.Property(tenant => tenant.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(tenant => tenant.Name)
+                .HasColumnName("name")
+                .HasMaxLength(Tenant.NameMaxLength)
+                .IsRequired();
+            entity.Property(tenant => tenant.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(tenant => tenant.Revision).HasColumnName("revision").IsRequired();
+        });
+
+        modelBuilder.Entity<TenantMembership>(entity =>
+        {
+            entity.ToTable(
+                "tenant_memberships",
+                table =>
+                {
+                    table.HasCheckConstraint(
+                        "ck_tenant_memberships_role_known",
+                        "role IN ('owner', 'editor', 'viewer')");
+                });
+            entity.HasKey(membership => new { membership.TenantId, membership.UserId });
+            entity.Property(membership => membership.TenantId).HasColumnName("tenant_id").IsRequired();
+            entity.Property(membership => membership.UserId).HasColumnName("user_id").IsRequired();
+            entity.Property(membership => membership.Role)
+                .HasColumnName("role")
+                .HasMaxLength(TenantRoleMaxLength)
+                .IsRequired();
+            entity.Property(membership => membership.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(membership => membership.RevokedAt)
+                .HasColumnName("revoked_at")
+                .HasColumnType("timestamp with time zone");
+
+            entity.HasOne<Tenant>()
+                .WithMany()
+                .HasForeignKey(membership => membership.TenantId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_tenant_memberships_tenant_id");
+
+            entity.HasOne<HostedUser>()
+                .WithMany()
+                .HasForeignKey(membership => membership.UserId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_tenant_memberships_user_id");
+        });
+
+        modelBuilder.Entity<TenantScope>(entity =>
+        {
+            entity.ToTable("tenant_scopes");
+            entity.HasKey(scope => scope.Id);
+            entity.Property(scope => scope.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(scope => scope.TenantId).HasColumnName("tenant_id").IsRequired();
+            entity.Property(scope => scope.InstallationId).HasColumnName("installation_id").IsRequired();
+            entity.Property(scope => scope.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            entity.HasIndex(scope => scope.TenantId)
+                .IsUnique()
+                .HasDatabaseName("ux_tenant_scopes_tenant_id");
+
+            entity.HasOne<Tenant>()
+                .WithMany()
+                .HasForeignKey(scope => scope.TenantId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_tenant_scopes_tenant_id");
+        });
+
+        modelBuilder.Entity<HostedSession>(entity =>
+        {
+            entity.ToTable("hosted_sessions");
+            entity.HasKey(session => session.Id);
+            entity.Property(session => session.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(session => session.IdHash)
+                .HasColumnName("id_hash")
+                .HasMaxLength(HostedSession.IdHashLength)
+                .IsRequired();
+            entity.Property(session => session.UserId).HasColumnName("user_id").IsRequired();
+            entity.Property(session => session.ActiveTenantId).HasColumnName("active_tenant_id");
+            entity.Property(session => session.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(session => session.LastSeenAt)
+                .HasColumnName("last_seen_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(session => session.IdleExpiresAt)
+                .HasColumnName("idle_expires_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(session => session.ExpiresAt)
+                .HasColumnName("expires_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(session => session.AntiforgeryTokenHash)
+                .HasColumnName("antiforgery_token_hash")
+                .HasMaxLength(HostedSession.IdHashLength)
+                .IsRequired();
+            entity.Property(session => session.RevokedAt)
+                .HasColumnName("revoked_at")
+                .HasColumnType("timestamp with time zone");
+
+            entity.HasIndex(session => session.IdHash)
+                .IsUnique()
+                .HasDatabaseName("ux_hosted_sessions_id_hash");
+            entity.HasIndex(session => session.UserId).HasDatabaseName("ix_hosted_sessions_user_id");
+
+            entity.HasOne<HostedUser>()
+                .WithMany()
+                .HasForeignKey(session => session.UserId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_hosted_sessions_user_id");
+        });
+
+        modelBuilder.Entity<HostedLoginRequest>(entity =>
+        {
+            entity.ToTable("hosted_login_requests");
+            entity.HasKey(request => request.Id);
+            entity.Property(request => request.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(request => request.StateHash)
+                .HasColumnName("state_hash")
+                .HasMaxLength(HostedSession.IdHashLength)
+                .IsRequired();
+            entity.Property(request => request.NonceHash)
+                .HasColumnName("nonce_hash")
+                .HasMaxLength(HostedSession.IdHashLength)
+                .IsRequired();
+            entity.Property(request => request.CodeVerifier).HasColumnName("code_verifier");
+            entity.Property(request => request.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(request => request.ExpiresAt)
+                .HasColumnName("expires_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(request => request.ConsumedAt)
+                .HasColumnName("consumed_at")
+                .HasColumnType("timestamp with time zone");
+
+            entity.HasIndex(request => request.StateHash)
+                .IsUnique()
+                .HasDatabaseName("ux_hosted_login_requests_state_hash");
+        });
+
+        modelBuilder.Entity<HostedImport>(entity =>
+        {
+            entity.ToTable("hosted_imports");
+            entity.HasKey(import => import.Id);
+            entity.Property(import => import.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(import => import.InstallationId).HasColumnName("installation_id").IsRequired();
+            entity.Property(import => import.TenantId).HasColumnName("tenant_id").IsRequired();
+            entity.Property(import => import.UserId).HasColumnName("user_id").IsRequired();
+            entity.Property(import => import.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            entity.HasIndex(import => new { import.InstallationId, import.TenantId })
+                .IsUnique()
+                .HasDatabaseName("ux_hosted_imports_installation_id_tenant_id");
+
+            entity.HasOne<Tenant>()
+                .WithMany()
+                .HasForeignKey(import => import.TenantId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_hosted_imports_tenant_id");
+        });
     }
 
     /// <summary>At most 40 characters for a content kind, matching the Core record's own bound.</summary>
@@ -2567,6 +2797,15 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     /// <summary>At most 80 characters for a journey slug, matching the service's own bound.</summary>
     private const int JourneySlugMaxLength = 80;
+
+    /// <summary>At most 512 characters for a stored OIDC issuer URL.</summary>
+    private const int HostedIssuerMaxLength = 512;
+
+    /// <summary>At most 512 characters for a stored OIDC subject identifier.</summary>
+    private const int HostedSubjectMaxLength = 512;
+
+    /// <summary>At most 16 characters for a stored tenant role.</summary>
+    private const int TenantRoleMaxLength = 16;
 
     /// <summary>
     /// Refuses a stored status this build does not know. A value that is not one of the six is not a

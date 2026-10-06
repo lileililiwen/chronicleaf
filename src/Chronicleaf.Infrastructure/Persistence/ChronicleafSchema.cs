@@ -205,7 +205,17 @@ public static class ChronicleafSchema
     /// </summary>
     public const string AgencyClientProjectsMigrationId = "20261015090000_AddAgencyClientProjects";
 
-    /// <summary>Every migration a database must carry before this build calls itself ready.</summary>
+    /// <summary>
+    /// The forward migration that adds the <c>hosted_users</c>, <c>tenants</c>,
+    /// <c>tenant_memberships</c>, <c>tenant_scopes</c>, <c>hosted_sessions</c>,
+    /// <c>hosted_login_requests</c> and <c>hosted_imports</c> tables with the row-level
+    /// policies that filter the tenant tables by the transaction's tenant context
+    /// (CLOUD-TENANT-BOUNDARY-001/002). A database that has never applied it has nowhere to
+    /// record a Hosted identity or a tenant scope, so its tenancy routes would fail against
+    /// missing tables; readiness says so by name rather than answering 200 and failing on the
+    /// first login.
+    /// </summary>
+    public const string CloudTenantBoundaryMigrationId = "20261006013139_AddCloudTenantBoundary";
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
         InitialMigrationId,
@@ -230,6 +240,7 @@ public static class ChronicleafSchema
         StaticBlogExportMigrationId,
         PublicProjectJourneyMigrationId,
         AgencyClientProjectsMigrationId,
+        CloudTenantBoundaryMigrationId,
     ];
 
     /// <summary>
@@ -237,7 +248,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = AgencyClientProjectsMigrationId;
+    public const string ExpectedMigrationId = CloudTenantBoundaryMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

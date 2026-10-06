@@ -25,6 +25,7 @@ using Chronicleaf.Api.Narrative;
 using Chronicleaf.Api.Operations;
 using Chronicleaf.Api.Projects;
 using Chronicleaf.Api.Secrets;
+using Chronicleaf.Api.Tenancy;
 using Chronicleaf.Api.Timeline;
 using Chronicleaf.Api.Voice;
 using Chronicleaf.AI.Anthropic;
@@ -51,6 +52,7 @@ using Chronicleaf.Infrastructure.Operations;
 using Chronicleaf.Infrastructure.Persistence;
 using Chronicleaf.Infrastructure.Projects;
 using Chronicleaf.Infrastructure.Secrets;
+using Chronicleaf.Infrastructure.Tenancy;
 using Chronicleaf.Infrastructure.Voice;
 using Microsoft.Extensions.FileProviders;
 
@@ -72,6 +74,14 @@ builder.Services.AddChronicleafPersistence(builder.Configuration);
 // boundary that cannot verify a token must not pretend to exist. It registers the session
 // store, the durable login throttle and the start-up token-rotation guard.
 builder.Services.AddChronicleafAccess(builder.Configuration, builder.Environment.EnvironmentName);
+
+// CLOUD-TENANT-BOUNDARY-001/002. The Hosted end-user identity and tenant data isolation
+// over the same PostgreSQL, unit of work and audit trail the packages above delivered. In
+// Community mode every Hosted-only path refuses and the owner boundary behaves exactly as
+// before; in Hosted mode the operator token path is closed and only verified site-local
+// sessions with an explicit active tenant resolve a domain scope. A database without the
+// cloud-tenant-boundary migration reports schema_mismatch at /api/ready.
+builder.Services.AddCloudTenantBoundary(builder.Configuration);
 
 // PROJECTS-AND-MILESTONES-001/002. The owner's own Project and Milestone records, stored by the
 // same context, unit of work and audit trail the packages above delivered, with no store of its
@@ -346,6 +356,12 @@ app.MapGet("/api/ready", ReadinessEndpoint.CheckAsync).AllowPublicApi();
 // COMMUNITY-ACCESS-001: the owner session routes. POST /api/session is the one of them that
 // is public - it is the exchange itself - and the other two are private by default.
 app.MapAccessEndpoints();
+
+// CLOUD-TENANT-BOUNDARY-001/002: the two public login routes plus the private tenant routes.
+// The login two are marked public deliberately: their caller is an unauthenticated browser
+// starting a verified exchange, and the state/nonce challenge is what authenticates the
+// callback. Every other route here is private by the access package's default-deny boundary.
+app.MapTenancyEndpoints();
 
 // PROJECTS-AND-MILESTONES-001/002: the private project and milestone routes. None of them is
 // marked public, so the access package's default-deny boundary already covers every one of them

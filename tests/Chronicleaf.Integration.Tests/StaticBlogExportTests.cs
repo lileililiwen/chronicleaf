@@ -117,17 +117,20 @@ public sealed class StaticBlogExportTests(ChronicleafPostgresFixture postgres)
         using var archive = new ZipArchive(new MemoryStream(bytes), ZipArchiveMode.Read);
 
         // Exactly the generated entries: nothing from owner text can become a path, so nothing
-        // else can be here.
+        // else can be here. Both sides sort ordinally, because the asset ids are server-generated
+        // GUIDs with no alphabetical relation to the creation order: asserting the sorted actual
+        // against an unsorted expectation passes only when the first id happens to sort first.
         var names = archive.Entries.Select(entry => entry.FullName).Order(StringComparer.Ordinal).ToList();
         Assert.Equal(
-            [
+            new[]
+            {
                 ".nojekyll",
                 $"assets/{fixture.SelectedMediaIds[0]:N}.png",
                 "index.html",
                 "manifest.json",
                 $"posts/{fixture.Asset1Id:N}.html",
                 $"posts/{fixture.Asset2Id:N}.html",
-            ],
+            }.Order(StringComparer.Ordinal).ToList(),
             names);
 
         var index = Encoding.UTF8.GetString(await ReadEntryAsync(archive, "index.html"));

@@ -179,6 +179,18 @@ public static class ApiErrorStatus
         // delivered NotFound, so a caller cannot probe for another scope's clients.
         Agency.AgencyError.ClientArchived => 409,
 
+        // The cloud-tenant-boundary package's codes. Additive in the same way: 401 for an OIDC
+        // exchange this deployment does not accept, 403 for a tenant the caller holds no live
+        // membership in, 409 for a session with no selected tenant and for a Community volume
+        // with no explicit import, and 422 for an account past its tenant quota. The
+        // foreign-tenant refusal deliberately reuses the delivered NotFound above, so a caller
+        // cannot probe for another tenant by comparing codes.
+        Tenancy.TenancyError.OidcLoginFailed => 401,
+        Tenancy.TenancyError.TenantAccessDenied => 403,
+        Tenancy.TenancyError.TenantSelectionRequired => 409,
+        Tenancy.TenancyError.CommunityImportRequired => 409,
+        Tenancy.TenancyError.TenantLimitReached => 422,
+
         // The narrative-memory package's codes. Additive in the same way. 422 for a context that
         // does not fit the byte budget without losing a pinned fact, because the remedy is to
         // narrow the cutoff or shorten entries - the same shape as every other semantic refusal

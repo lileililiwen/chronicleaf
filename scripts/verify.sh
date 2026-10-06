@@ -7,7 +7,7 @@
 # LLM-OLLAMA-ADAPTER-001/002,
 # SCREENSHOT-CAPTURE-001/002, SCREENSHOT-CURATION-001/002, GROUNDED-MARKDOWN-DRAFTS-001/002,
 # MILESTONE-TIMELINE-001/002, MARKDOWN-REVIEW-EXPORT-001/002,
-# COMMUNITY-COMPOSE-RELEASE-001/002).
+# COMMUNITY-COMPOSE-RELEASE-001/002, CLOUD-TENANT-BOUNDARY-001/002).
 #
 # Required chain, in order:
 #   1. platform feed           - the committed packages/platform-feed is what the build resolves, from
@@ -547,6 +547,18 @@ else
   # forward migration readiness requires - all proven against the same real disposable PostgreSQL
   # through the real API host.
   step "agency client project tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~AgencyClientProjectsTests"
+  # CLOUD-TENANT-BOUNDARY-001/002. That a verified login creates and selects an owned tenant
+  # whose scope every private request then resolves; that a bad state, nonce, issuer, key,
+  # expiry or operator token issues no session; that a revoked membership denies subsequent
+  # access; that two tenants on one pooled connection each see only their own rows through the
+  # row-level policies; that a guessed foreign project, media, credential or operation id
+  # returns no foreign data; that a Community database opened in Hosted mode rejects silent
+  # reassignment until the explicit import is recorded; and that a Community deployment without
+  # tenants behaves exactly as before - all proven against the same real disposable PostgreSQL
+  # through the real API host, with the one declared substitution the package names (a handler
+  # answering the issuer's three resources, while the state lookup, the checks and the
+  # signature verification are the production code).
+  step "cloud tenant boundary tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~CloudTenantBoundaryTests"
   # COMMUNITY-COMPOSE-RELEASE-001/002. That a clean install completes the
   # milestone-to-approved-Markdown flow with the timeline telling it back; that the compose
   # file describes exactly app plus postgres on the pinned digest with named volumes, a

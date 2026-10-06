@@ -224,6 +224,49 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.ToTable("capture_requests", (string)null);
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.Client", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at");
+
+                    b.Property<long>("ContextRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("context_revision");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(20000)
+                        .HasColumnType("character varying(20000)")
+                        .HasColumnName("notes");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ScopeId", "Name")
+                        .HasDatabaseName("ix_clients_scope_id_name");
+
+                    b.ToTable("clients", (string)null);
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.ContentApproval", b =>
                 {
                     b.Property<Guid>("Id")
@@ -629,121 +672,6 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.ToTable("github_enrichment_runs", (string)null);
                 });
 
-            modelBuilder.Entity("Chronicleaf.Core.EvolutionImage", b =>
-                {
-                    b.Property<DateTimeOffset?>("ApprovedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("approved_at");
-
-                    b.Property<Guid?>("ApprovedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("approved_by");
-
-                    b.Property<Guid>("ArtifactMediaId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("artifact_media_id");
-
-                    b.Property<string>("ArtifactSha256")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("artifact_sha256");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<int>("Height")
-                        .HasColumnType("integer")
-                        .HasColumnName("height");
-
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("IdempotencyKey")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("idempotency_key");
-
-                    b.Property<string>("Layout")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("layout");
-
-                    b.Property<string>("ManifestJson")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("manifest_json");
-
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("project_id");
-
-                    b.Property<Guid>("ScopeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("scope_id");
-
-                    b.Property<string>("SelectionHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("selection_hash");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("status");
-
-                    b.Property<int>("Width")
-                        .HasColumnType("integer")
-                        .HasColumnName("width");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ArtifactMediaId");
-
-                    b.HasIndex("ProjectId")
-                        .HasDatabaseName("IX_evolution_images_project_id");
-
-                    b.HasIndex("ScopeId", "ProjectId", "IdempotencyKey")
-                        .IsUnique()
-                        .HasDatabaseName("ux_evolution_images_scope_id_project_id_idempotency_key")
-                        .HasFilter("idempotency_key IS NOT NULL");
-
-                    b.ToTable("evolution_images", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_evolution_images_artifact_sha256_hex", "artifact_sha256 ~ '^[0-9a-f]{64}$'");
-
-                            t.HasCheckConstraint("ck_evolution_images_dimensions_positive", "width > 0 AND height > 0");
-
-                            t.HasCheckConstraint("ck_evolution_images_layout", "layout IN ('before-after', 'horizontal-timeline', 'vertical-long', 'gallery')");
-
-                            t.HasCheckConstraint("ck_evolution_images_selection_hash_sha256_hex", "selection_hash ~ '^[0-9a-f]{64}$'");
-
-                            t.HasCheckConstraint("ck_evolution_images_status", "status IN ('draft', 'approved')");
-                        });
-                });
-
-            modelBuilder.Entity("Chronicleaf.Core.EvolutionImage", b =>
-                {
-                    b.HasOne("Chronicleaf.Core.Media", null)
-                        .WithMany()
-                        .HasForeignKey("ArtifactMediaId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_evolution_images_artifact_media_id");
-
-                    b.HasOne("Chronicleaf.Core.Project", null)
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_evolution_images_project_id");
-                });
-
             modelBuilder.Entity("Chronicleaf.Core.EvidenceBundle", b =>
                 {
                     b.Property<Guid>("Id")
@@ -853,6 +781,104 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_evidence_items_bundle_id_id");
 
                     b.ToTable("evidence_items", (string)null);
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.EvolutionImage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approved_at");
+
+                    b.Property<Guid?>("ApprovedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approved_by");
+
+                    b.Property<Guid>("ArtifactMediaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("artifact_media_id");
+
+                    b.Property<string>("ArtifactSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("artifact_sha256");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("Height")
+                        .HasColumnType("integer")
+                        .HasColumnName("height");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<string>("Layout")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("layout");
+
+                    b.Property<string>("ManifestJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("manifest_json");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<string>("SelectionHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("selection_hash");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<int>("Width")
+                        .HasColumnType("integer")
+                        .HasColumnName("width");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ArtifactMediaId");
+
+                    b.HasIndex("ProjectId")
+                        .HasDatabaseName("IX_evolution_images_project_id");
+
+                    b.HasIndex("ScopeId", "ProjectId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_evolution_images_scope_id_project_id_idempotency_key")
+                        .HasFilter("idempotency_key IS NOT NULL");
+
+                    b.ToTable("evolution_images", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_evolution_images_artifact_sha256_hex", "artifact_sha256 ~ '^[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("ck_evolution_images_dimensions_positive", "width > 0 AND height > 0");
+
+                            t.HasCheckConstraint("ck_evolution_images_layout", "layout IN ('before-after', 'horizontal-timeline', 'vertical-long', 'gallery')");
+
+                            t.HasCheckConstraint("ck_evolution_images_selection_hash_sha256_hex", "selection_hash ~ '^[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("ck_evolution_images_status", "status IN ('draft', 'approved')");
+                        });
                 });
 
             modelBuilder.Entity("Chronicleaf.Core.GenerationPreview", b =>
@@ -1273,6 +1299,171 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_github_webhook_subscriptions_scope_id_project_id");
 
                     b.ToTable("github_webhook_subscriptions", (string)null);
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.HostedImport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("InstallationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("installation_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("InstallationId", "TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_hosted_imports_installation_id_tenant_id");
+
+                    b.ToTable("hosted_imports", (string)null);
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.HostedLoginRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CodeVerifier")
+                        .HasColumnType("text")
+                        .HasColumnName("code_verifier");
+
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("consumed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("NonceHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("nonce_hash");
+
+                    b.Property<string>("StateHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("state_hash");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StateHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_hosted_login_requests_state_hash");
+
+                    b.ToTable("hosted_login_requests", (string)null);
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.HostedSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ActiveTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("active_tenant_id");
+
+                    b.Property<string>("AntiforgeryTokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("antiforgery_token_hash");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("IdHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("id_hash");
+
+                    b.Property<DateTimeOffset>("IdleExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("idle_expires_at");
+
+                    b.Property<DateTimeOffset>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_hosted_sessions_id_hash");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_hosted_sessions_user_id");
+
+                    b.ToTable("hosted_sessions", (string)null);
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.HostedUser", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Issuer")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("issuer");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("subject");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Issuer", "Subject")
+                        .IsUnique()
+                        .HasDatabaseName("ux_hosted_users_issuer_subject");
+
+                    b.ToTable("hosted_users", (string)null);
                 });
 
             modelBuilder.Entity("Chronicleaf.Core.Installation", b =>
@@ -1941,51 +2132,12 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.ToTable("projects", (string)null);
                 });
 
-            modelBuilder.Entity("Chronicleaf.Core.Client", b =>
+            modelBuilder.Entity("Chronicleaf.Core.ProjectJourneyRow", b =>
                 {
-                    b.Property<DateTimeOffset?>("ArchivedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("archived_at");
-
-                    b.Property<long>("ContextRevision")
-                        .HasColumnType("bigint")
-                        .HasColumnName("context_revision");
-
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)")
-                        .HasColumnName("name");
-
-                    b.Property<string>("Notes")
-                        .IsRequired()
-                        .HasMaxLength(20000)
-                        .HasColumnType("character varying(20000)")
-                        .HasColumnName("notes");
-
-                    b.Property<long>("Revision")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint")
-                        .HasColumnName("revision");
-
-                    b.Property<Guid>("ScopeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("scope_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ScopeId", "Name")
-                        .HasDatabaseName("ix_clients_scope_id_name");
-
-                    b.ToTable("clients", (string)null);
-                });
-
-                        modelBuilder.Entity("Chronicleaf.Core.ProjectJourneyRow", b =>
-                {
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -1994,21 +2146,17 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("enabled");
 
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uuid")
                         .HasColumnName("project_id");
 
-                    b.Property<DateTimeOffset?>("RevokedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("revoked_at");
-
                     b.Property<long>("Revision")
                         .HasColumnType("bigint")
                         .HasColumnName("revision");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
 
                     b.Property<Guid>("ScopeId")
                         .HasColumnType("uuid")
@@ -2045,13 +2193,13 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ProjectId");
 
-                    b.HasIndex("ScopeId", "ProjectId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_project_journeys_scope_id_project_id");
-
                     b.HasIndex("Slug")
                         .IsUnique()
                         .HasDatabaseName("ux_project_journeys_slug");
+
+                    b.HasIndex("ScopeId", "ProjectId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_project_journeys_scope_id_project_id");
 
                     b.ToTable("project_journeys", null, t =>
                         {
@@ -2065,7 +2213,7 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         });
                 });
 
-modelBuilder.Entity("Chronicleaf.Core.ProjectSummary", b =>
+            modelBuilder.Entity("Chronicleaf.Core.ProjectSummary", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -2226,6 +2374,10 @@ modelBuilder.Entity("Chronicleaf.Core.ProjectSummary", b =>
 
             modelBuilder.Entity("Chronicleaf.Core.StaticBlogExportRequestRow", b =>
                 {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
                     b.Property<string>("AssetIdsJson")
                         .IsRequired()
                         .HasColumnType("jsonb")
@@ -2245,10 +2397,6 @@ modelBuilder.Entity("Chronicleaf.Core.ProjectSummary", b =>
                         .IsRequired()
                         .HasColumnType("jsonb")
                         .HasColumnName("frozen_json");
-
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
 
                     b.Property<Guid>("OperationId")
                         .HasColumnType("uuid")
@@ -2403,6 +2551,95 @@ modelBuilder.Entity("Chronicleaf.Core.ProjectSummary", b =>
                         .HasDatabaseName("ix_sync_sources_scope_id_milestone_id_created_at");
 
                     b.ToTable("sync_sources", (string)null);
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.Tenant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("name");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("tenants", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenants_revision_nonnegative", "revision >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.TenantMembership", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("role");
+
+                    b.HasKey("TenantId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("tenant_memberships", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_memberships_role_known", "role IN ('owner', 'editor', 'viewer')");
+                        });
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.TenantScope", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("InstallationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("installation_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tenant_scopes_tenant_id");
+
+                    b.ToTable("tenant_scopes", (string)null);
                 });
 
             modelBuilder.Entity("Chronicleaf.Core.VoiceDraft", b =>
@@ -2625,6 +2862,23 @@ modelBuilder.Entity("Chronicleaf.Core.ProjectSummary", b =>
                         .HasConstraintName("fk_evidence_items_supersedes_id");
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.EvolutionImage", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Media", null)
+                        .WithMany()
+                        .HasForeignKey("ArtifactMediaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_evolution_images_artifact_media_id");
+
+                    b.HasOne("Chronicleaf.Core.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_evolution_images_project_id");
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.GenerationPreview", b =>
                 {
                     b.HasOne("Chronicleaf.Core.Milestone", null)
@@ -2698,6 +2952,26 @@ modelBuilder.Entity("Chronicleaf.Core.ProjectSummary", b =>
                         .HasConstraintName("fk_github_webhook_subscriptions_project_id");
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.HostedImport", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_hosted_imports_tenant_id");
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.HostedSession", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.HostedUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_hosted_sessions_user_id");
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.LocalRepository", b =>
                 {
                     b.HasOne("Chronicleaf.Core.Project", null)
@@ -2748,6 +3022,25 @@ modelBuilder.Entity("Chronicleaf.Core.ProjectSummary", b =>
                         .HasConstraintName("fk_narrative_refresh_requests_project_id");
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.Project", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Client", null)
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_projects_client_id");
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.ProjectJourneyRow", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_project_journeys_project_id");
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.ProjectSummary", b =>
                 {
                     b.HasOne("Chronicleaf.Core.Project", null)
@@ -2758,26 +3051,7 @@ modelBuilder.Entity("Chronicleaf.Core.ProjectSummary", b =>
                         .HasConstraintName("fk_project_summaries_project_id");
                 });
 
-            modelBuilder.Entity("Chronicleaf.Core.Project", b =>
-                {
-                    b.HasOne("Chronicleaf.Core.Client", null)
-                        .WithMany()
-                        .HasForeignKey("ClientId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_projects_client_id");
-                });
-
-                        modelBuilder.Entity("Chronicleaf.Core.ProjectJourneyRow", b =>
-                {
-                    b.HasOne("Chronicleaf.Core.Project", null)
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_project_journeys_project_id");
-                });
-
-modelBuilder.Entity("Chronicleaf.Core.ScreenshotCandidate", b =>
+            modelBuilder.Entity("Chronicleaf.Core.ScreenshotCandidate", b =>
                 {
                     b.HasOne("Chronicleaf.Core.Media", null)
                         .WithMany()
@@ -2812,6 +3086,33 @@ modelBuilder.Entity("Chronicleaf.Core.ScreenshotCandidate", b =>
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_sync_sources_milestone_id");
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.TenantMembership", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_memberships_tenant_id");
+
+                    b.HasOne("Chronicleaf.Core.HostedUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_memberships_user_id");
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.TenantScope", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_scopes_tenant_id");
                 });
 
             modelBuilder.Entity("Chronicleaf.Core.VoiceDraft", b =>

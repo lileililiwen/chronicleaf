@@ -15,6 +15,7 @@ using Chronicleaf.Application.Milestones;
 using Chronicleaf.Application.Narrative;
 using Chronicleaf.Application.Operations;
 using Chronicleaf.Application.Secrets;
+using Chronicleaf.Application.Tenancy;
 // `ApiError` also names the runtime shell's compact not_found/web_assets_unavailable record in
 // namespace Chronicleaf.Api, which wins the lookup from inside this namespace. The alias keeps the
 // envelope type unambiguous: the shell record is a different, shipped contract.
@@ -150,6 +151,31 @@ public sealed class ApiErrorMiddleware(
             // back to personal) rather than a retry.
             case ClientArchivedException clientArchived:
                 return (Envelope.Create(AgencyError.ClientArchived, clientArchived.Message, traceId), LogLevel.Information);
+
+            // CLOUD-TENANT-BOUNDARY-001/002. Written here for the same reason as the refusals
+            // above: the tenancy package raises them, and this middleware is still the only place
+            // an envelope is written. Each arm is explicit by type - the status-code mapping
+            // alone would still answer 500 - and every message is authored in the tenancy
+            // package: no token, no code, no issuer body and no tenant id a caller may not
+            // reach. The foreign-tenant refusal deliberately reuses the delivered NotFound, so
+            // a caller cannot probe for another tenant by comparing codes.
+            case OidcLoginFailedException loginFailed:
+                return (Envelope.Create(TenancyError.OidcLoginFailed, loginFailed.Message, traceId), LogLevel.Information);
+
+            case TenantNotFoundException tenantMissing:
+                return (Envelope.Create(TenancyError.NotFound, tenantMissing.Message, traceId), LogLevel.Information);
+
+            case TenantAccessDeniedException tenantDenied:
+                return (Envelope.Create(TenancyError.TenantAccessDenied, tenantDenied.Message, traceId), LogLevel.Information);
+
+            case TenantSelectionRequiredException tenantSelection:
+                return (Envelope.Create(TenancyError.TenantSelectionRequired, tenantSelection.Message, traceId), LogLevel.Information);
+
+            case CommunityImportRequiredException importRequired:
+                return (Envelope.Create(TenancyError.CommunityImportRequired, importRequired.Message, traceId), LogLevel.Information);
+
+            case TenantLimitReachedException tenantLimit:
+                return (Envelope.Create(TenancyError.TenantLimitReached, tenantLimit.Message, traceId), LogLevel.Information);
 
             // BACKGROUND-JOBS-001/002. Written here for the same reason as the refusals above: the
             // feature package raises them and this middleware is still the only place an envelope is

@@ -1,6 +1,6 @@
 # Chronicleaf handoff
 
-current_spec: agency-client-projects
+current_spec: cloud-tenant-boundary
 
 ## Current state — 2026-10-05
 
@@ -40,6 +40,7 @@ next POST-MVP package in ROADMAP order after `html-content-export`.
 | 28 | `screenshot-evolution-images` | `f2916e1` | `openspec/specs/screenshot-evolution-images/spec.md` |
 | 29 | `static-blog-export` | `066e153` | `openspec/specs/static-blog-export/spec.md` |
 | 30 | `public-project-journey` | `6bc7e8e` | `openspec/specs/public-project-journey/spec.md` |
+| 31 | `agency-client-projects` | `764eb0e` | `openspec/specs/agency-client-projects/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -394,8 +395,26 @@ owner's words; the e2e seed's candidate rows name the two real capture jobs the 
 PNG behind all three. Deployment stays `deployable: false`; there is no remote, no push and no
 publication.
 
-Next: `current_spec` is `agency-client-projects`, the DEMAND-GATED package ROADMAP orders
-after `public-project-journey`. `public-project-journey` is archived
+Next: `current_spec` is `cloud-tenant-boundary`, the next package in drain order after
+`agency-client-projects`. `agency-client-projects` is archived
+(`764eb0e`, canonical spec `openspec/specs/agency-client-projects/spec.md`): one
+`clients` row per agency client carrying a name (1..160), plain-text notes (20k), an
+optimistic revision, a membership context revision and a soft-archive stamp, plus one
+nullable `projects.client_id` foreign key (Restrict, null means personal); private routes
+for client CRUD, `GET /api/clients/{id}/projects` hierarchy, `GET
+/api/clients/{id}/context` report context built from explicit project ids, and `PATCH
+/api/projects/{id}/client` assignment under the project's own If-Match. A foreign-scope
+client is `not_found` 404 without exposure, an archived target is `client_archived` 409
+while moving away or clearing stays allowed, a duplicate association at the stored revision
+is a no-op with no write and no audit row, and every membership change advances both
+clients' context revisions while leaving client edit revisions alone. The project read now
+carries `clientId`. Read that package's own boundary before extending it, and note the two
+defects its tests found: a new envelope code needs an explicit middleware type-arm (the
+status-code mapping alone still answers 500), and a `JsonElement?` body property collapses
+an explicit JSON null into a missing key, so the assignment route binds the raw document to
+tell "clear back to personal" from "key absent" (absent is 422). No Web UI was shipped: the
+design names it optional, the scenarios are API-observable, and no new browser suite was
+added. `public-project-journey` is archived
 (`6bc7e8e`, canonical spec `openspec/specs/public-project-journey/spec.md`): one
 `project_journeys` row per project carrying a global kebab-case slug, an enabled flag, an
 optimistic revision, the canonical selection hash and the frozen snapshot JSON; three private
@@ -561,6 +580,36 @@ without `--skip-specs`, then make the implementation commit and the HANDOFF-only
 stop. Do not push.
 
 ## Package notes
+
+`agency-client-projects` is archived (`764eb0e`, canonical spec
+`openspec/specs/agency-client-projects/spec.md`). Read that package's own boundary before
+extending it, and note what it decided that a later reader would otherwise have to rediscover.
+
+**Release evidence (`agency-client-projects`, commit `764eb0e`, all run by the implementer
+rather than taken on report).** `CHRONICLEAF_E2E=1 bash scripts/verify.sh` exit 0
+(`GATE_EXIT=0`) with the platform-feed stage and thirty-two filtered stages (the prior
+thirty-one plus `agency client project tests`) each asserted to select at least one
+test, including **10/10 agency client projects** run directly against the same real
+disposable PostgreSQL and the real API host (two projects under Client A listed in name
+order with the personal project excluded and a project edit preserving the grouping;
+foreign-scope and invented client ids both 404 with the project untouched at revision 1;
+client lists paged by name with the scope-bound cursor; a move from A to B depicted under
+B's bumped context generation and absent from A's while neither client edit revision moved;
+archived client refusing new assignments as `client_archived` while keeping its historical
+tree and still letting a project move away or clear; report context depicting exactly the
+requested ids grouped under that client; duplicate association a no-op with no context
+bump; stale revisions 409 and missing ones 428 on both routes; empty/oversized names and
+notes, missing/malformed client ids and malformed context ids all 422 naming the field;
+sessionless list 401; migration columns, bounds, `fk_projects_client_id`,
+`IX_projects_client_id` and `ix_clients_scope_id_name` read back from the catalog).
+Neighbour suites re-run against the same build: 19/19 projects-and-milestones, 23/23
+access, 7/7 milestone-timeline. `npm ci`, `tsc` and `vite build` all green, and
+`bash scripts/e2e.sh` green across all fourteen database-isolated browser suites (no new
+suite: this package ships no UI). `dotnet build --nologo --no-incremental` 0 errors with
+the same 2 pre-existing warnings at HEAD. Name preflight exit 0;
+`openspec validate --all --strict --no-interactive` 54/54 before and after the archive,
+which used no `--skip-specs`. Deployment stays `deployable: false`; there is no remote,
+no push and no publication.
 
 `public-project-journey` is archived (`6bc7e8e`, canonical spec
 `openspec/specs/public-project-journey/spec.md`). Read that package's own boundary before

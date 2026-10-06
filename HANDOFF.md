@@ -1,7 +1,5 @@
 # Chronicleaf handoff
 
-current_spec: publisher-custom-blog-adapter
-
 ## Current state — 2026-10-05
 
 Twenty-six changes implemented, verified and archived, each with exactly two commits (implementation/
@@ -1658,3 +1656,58 @@ real-WordPress run was not performed: only the far end of the wire is scripted a
 claim is made about any real post, any real site, any taxonomy beyond the scripted ids,
 or any rate-limit behavior. Deployment stays `deployable: false`; there is no remote, no
 push and no publication.
+`publisher-custom-blog-adapter` is archived
+(`7350a78`, canonical spec `openspec/specs/publisher-custom-blog-adapter/spec.md`): the sixth
+and last transport behind the publisher contract, one `IPublisherAdapter` for the `custom-blog`
+slot speaking the Chronicleaf Publisher HTTP v1 contract under the operator's explicit fixed
+HTTPS origin (`Chronicleaf:CustomBlog`), sending the approved Markdown verbatim with one bearer
+credential per call from the scope's leased API key. Demand-gated like its siblings: an absent
+section registers nothing and the slot answers `publisher_unknown_target`; a present-but-invalid
+section fails startup. The formats allowlist defaults to `markdown`, is normalized to lowercase
+without duplicates, and must name `markdown` - the only format this adapter sends - so an
+allowlist that could never authorize a send is a startup refusal. Every publish first probes
+`GET /chronicleaf/v1/capabilities` under the same bearer credential and refuses an incompatible
+server with `customblog_incompatible_remote_contract` before any post bytes leave (schemaVersion
+1, idempotentWrites true, and a format on the allowlist required; a refused key, forbidden write
+or redirect on the probe reports `credential_rejected`, `publish_forbidden` or `redirect_refused`
+with the same precision as on the create). The create is then one
+`POST /chronicleaf/v1/posts` carrying `{schemaVersion:1, operationId, contentHash, title, markdown,
+mediaManifest:[], mode}` with `mode` draft or publish by the authorized mode and `Idempotency-Key`
+naming the operation the server reconciles by; pictures do not travel and are named in the preview
+warnings instead, so the confirmed preview consents to a Markdown-text-only post. The preview's
+target line binds origin, allowlist and exact Markdown byte count, so an origin or formats change
+after preview is refused as `publisher_preview_stale` before any job exists and before any key is
+paired. A refused key, rejected body, forbidden write, hash conflict (409), incompatible contract
+(412) and rate limit each map to a redacted `customblog_*` code with no secret and no moved
+approval; a redirect is refused without a second hop; error bodies are disposed unread. Only the
+create answers ambiguously: a lost create answer (timeout or reset after the bytes may have left)
+and an answered success in JSON this client does not understand each become `unknown` with a
+`manual` hint no reconcile can resolve (`SupportsReconcile: false`, the route answers
+`publisher_reconcile_unavailable` with no further upstream call - the server's operations endpoint
+is for a human reconciliation by hand, carrying the operation id the accept response already named,
+because the reconciler holds no credential); an identical resubmit returns the stored receipt with
+no second probe and no second post. A remote id longer than the attempt column or a non-https URL
+is not a receipt: the id is kept only when storable, the URL only when https within its column,
+otherwise the answer is unknown rather than a second create. The transport owns its own client
+with no base address and refuses redirects, so no bare-handler registration can rewire a sibling
+transport; no HTML export enters this registration because the sent body is the approved bytes
+verbatim. No per-target table was added so no migration was needed (schema unchanged). Read that
+package's own boundary before extending it. Evidence, all run by the implementer rather than taken
+on report: `bash scripts/verify.sh` exit 0 (`GATE_EXIT=0`, `set -o pipefail`) with the
+platform-feed stage and the new `publisher custom blog adapter tests` stage (15/15, filter
+asserted by the gate to select at least one test) alongside all existing stages, `npm ci`,
+`tsc` + `vite build`, `dotnet build --nologo --no-incremental` 0 errors with the same 12
+pre-existing warning grep lines at HEAD (zero added, baseline confirmed before changes), name
+preflight exit 0, and `openspec validate --all --strict --no-interactive` 54/54 before and after
+the archive, which used no `--skip-specs`. No Web UI was shipped: no publisher UI exists to
+extend, the scenarios are API-observable, and no new browser suite was added. The opt-in real
+server run was not performed: only the far end of the wire is scripted and no claim is made about
+any real server, any real post, any capability beyond the scripted documents, or any rate-limit
+behavior. Deployment stays `deployable: false`; there is no remote, no push and no publication.
+No `current_spec` remains: this was the last unblocked spec in the drain. Two changes stay ACTIVE
+in `openspec/changes` and are held, not named as current: `semantic-narrative-retrieval` is BLOCKED
+on owner decisions (demand, embedding model/provider/dimension and consent policy must be selected;
+owner Chronicleaf maintainer), and `hosted-managed-ai` is BLOCKED on owner decisions (Managed AI
+provider/model/quota/unit weights and financial settlement policy; owner Chronicleaf maintainer).
+Four further DEMAND-GATED changes (`agency-weekly-reports`, `evolution-gif-export`,
+`video-story-scripts`, `xiaohongshu-content-package`) await recorded demand before activation.

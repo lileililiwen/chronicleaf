@@ -1,6 +1,6 @@
 # Chronicleaf handoff
 
-current_spec: publisher-hashnode-adapter
+current_spec: publisher-ghost-adapter
 
 ## Current state — 2026-10-05
 
@@ -1511,3 +1511,48 @@ beyond the validated bound, or any rate-limit reset behavior. Deployment stays
 `deployable: false`; there is no remote, no push and no publication.
 Next: `current_spec` is `publisher-hashnode-adapter`, the next package in drain order after
 `publisher-devto-adapter`.
+`publisher-hashnode-adapter` is archived
+(`f1d990c`, canonical spec `openspec/specs/publisher-hashnode-adapter/spec.md`): the third
+transport behind the publisher contract, creating one draft per confirmed publish under the
+operator's explicit publication id through `POST https://gql-beta.hashnode.com/` - stopping
+after `createDraft` for a draft, continuing to `publishDraft` for the created draft only on
+an explicitly confirmed publish - with the leased personal access token as the one bearer
+header against the pinned host. A new `Hashnode/` folder in the delivered
+`Chronicleaf.Publishers` leaf holds the `hashnode` adapter, its pinned-host GraphQL
+transport (both documents are fixed literals with values in variables only; no pagination
+exists in either mutation so no page size is parameterized), its explicit publication-id
+options and its seven redacted failure codes (`401`/UNAUTHENTICATED credential rejected,
+`403`/non-plan FORBIDDEN publish forbidden because a contributor role never publishes,
+plan-caused FORBIDDEN capability unavailable, `422`/validation invalid payload, `429`
+rate limited, `3xx` redirect refused without a second hop, anything else unavailable, with a
+GraphQL errors array on an HTTP 200 classified as an answered refusal and error bodies
+disposed unread in every branch); registration is demand-gated (absent
+`Chronicleaf:Hashnode` section registers nothing and the slot answers
+`publisher_unknown_target`, present-but-invalid fails startup) and is the whole rollback
+lever. The preview is pure and binds the publication line into its warnings - which the
+contract hashes - so a post-preview publication change is refused as
+`publisher_preview_stale` before any job exists; pictures do not travel and are named in
+the warnings instead, so the confirmed preview consents to a text-only post, and the post
+URL is derived from `post.url`, never guessed from a slug. Only the create answers
+ambiguously without an id: a lost create answer becomes `unknown` with a `manual` hint no
+reconcile can resolve (`SupportsReconcile: false`, the route answers
+`publisher_reconcile_unavailable` with no further upstream call), while a publish-mode run
+whose create succeeded keeps its draft - a lost publish answer becomes `unknown` carrying
+the created draft id, and a refused publish mutation becomes `failed` carrying the refusal
+code beside the draft id as a recoverable remote draft receipt - with no new create call
+in either case, because the contract never reissues an attempt. No per-target table was
+added so no migration was needed (schema unchanged). Read that package's own boundary
+before extending it. Evidence, all run by the implementer rather than taken on report:
+`bash scripts/verify.sh` exit 0 (`GATE_EXIT=0`, `set -o pipefail`) with the platform-feed
+stage and the new `publisher hashnode adapter tests` stage (14/14, filter asserted to
+select 14) alongside all existing stages, `npm ci`, `tsc` + `vite build`, `dotnet build
+--nologo --no-incremental` 0 errors with the same 12 pre-existing warning grep lines at
+HEAD (zero added), name preflight exit 0, and `openspec validate --all --strict
+--no-interactive` 54/54 before and after the archive, which used no `--skip-specs`. No
+Web UI was shipped: no publisher UI exists to extend, the scenarios are API-observable,
+and no new browser suite was added. The opt-in real-Hashnode run was not performed: only
+the far end of the wire is scripted and no claim is made about any real draft, any real
+post, any publication capability, or any rate-limit behavior. Deployment stays
+`deployable: false`; there is no remote, no push and no publication.
+Next: `current_spec` is `publisher-ghost-adapter`, the next package in drain order after
+`publisher-hashnode-adapter`.

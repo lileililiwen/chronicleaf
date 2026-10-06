@@ -27,6 +27,7 @@ using Chronicleaf.Api.Projects;
 using Chronicleaf.Api.Secrets;
 using Chronicleaf.Api.Tenancy;
 using Chronicleaf.Api.Timeline;
+using Chronicleaf.Api.Teams;
 using Chronicleaf.Api.Voice;
 using Chronicleaf.AI.Anthropic;
 using Chronicleaf.AI.Gemini;
@@ -53,6 +54,7 @@ using Chronicleaf.Infrastructure.Persistence;
 using Chronicleaf.Infrastructure.Projects;
 using Chronicleaf.Infrastructure.Secrets;
 using Chronicleaf.Infrastructure.Tenancy;
+using Chronicleaf.Infrastructure.Teams;
 using Chronicleaf.Infrastructure.Voice;
 using Microsoft.Extensions.FileProviders;
 
@@ -82,6 +84,15 @@ builder.Services.AddChronicleafAccess(builder.Configuration, builder.Environment
 // sessions with an explicit active tenant resolve a domain scope. A database without the
 // cloud-tenant-boundary migration reports schema_mismatch at /api/ready.
 builder.Services.AddCloudTenantBoundary(builder.Configuration);
+
+// TEAM-PROJECT-PERMISSIONS-001/002. Hosted team invitations and per-project roles over the
+// same PostgreSQL, unit of work and audit trail the packages above delivered. In Community
+// mode every method refuses exactly like the tenancy boundary, so the single-user owner path
+// is untouched; in Hosted mode invitations are explicit bearer grants and project actions are
+// authorized at the service layer against the stored membership and grants, never from a
+// request claim. A database without the team-project-permissions migration reports
+// schema_mismatch at /api/ready.
+builder.Services.AddTeamProjectPermissions();
 
 // PROJECTS-AND-MILESTONES-001/002. The owner's own Project and Milestone records, stored by the
 // same context, unit of work and audit trail the packages above delivered, with no store of its
@@ -362,6 +373,13 @@ app.MapAccessEndpoints();
 // starting a verified exchange, and the state/nonce challenge is what authenticates the
 // callback. Every other route here is private by the access package's default-deny boundary.
 app.MapTenancyEndpoints();
+
+// TEAM-PROJECT-PERMISSIONS-001/002: the private invitation, membership and project-grant
+// routes. None of them is marked public, so the access package's default-deny boundary
+// already covers every one of them and the public allow-list stays exactly as the access
+// package fixed it - an invitation token is the only bearer a non-member ever holds, and it
+// is accepted exactly once.
+app.MapTeamsEndpoints();
 
 // PROJECTS-AND-MILESTONES-001/002: the private project and milestone routes. None of them is
 // marked public, so the access package's default-deny boundary already covers every one of them

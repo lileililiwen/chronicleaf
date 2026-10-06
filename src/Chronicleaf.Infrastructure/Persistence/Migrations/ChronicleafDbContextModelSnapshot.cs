@@ -2213,6 +2213,45 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.ProjectMembership", b =>
+                {
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Permission")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("permission");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.HasKey("ProjectId", "UserId", "Permission");
+
+                    b.HasIndex("ProjectId")
+                        .HasDatabaseName("ix_project_memberships_project_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_project_memberships_user_id");
+
+                    b.ToTable("project_memberships", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_project_memberships_permission_known", "permission IN ('reader', 'editor', 'approver', 'publisher')");
+
+                            t.HasCheckConstraint("ck_project_memberships_revision_nonnegative", "revision >= 0");
+                        });
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.ProjectSummary", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2581,6 +2620,73 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.TenantInvitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("AcceptedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("accepted_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("email");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("role");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("token_hash");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tenant_invitations_token_hash");
+
+                    b.HasIndex("TenantId", "Email")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tenant_invitations_tenant_id_email")
+                        .HasFilter("accepted_at IS NULL AND revoked_at IS NULL");
+
+                    b.ToTable("tenant_invitations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_invitations_role_known", "role IN ('owner', 'editor', 'viewer')");
+                        });
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.TenantMembership", b =>
                 {
                     b.Property<Guid>("TenantId")
@@ -2594,6 +2700,10 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
 
                     b.Property<DateTimeOffset?>("RevokedAt")
                         .HasColumnType("timestamp with time zone")
@@ -2611,6 +2721,8 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
 
                     b.ToTable("tenant_memberships", null, t =>
                         {
+                            t.HasCheckConstraint("ck_tenant_memberships_revision_nonnegative", "revision >= 0");
+
                             t.HasCheckConstraint("ck_tenant_memberships_role_known", "role IN ('owner', 'editor', 'viewer')");
                         });
                 });
@@ -3041,6 +3153,23 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_project_journeys_project_id");
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.ProjectMembership", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_project_memberships_project_id");
+
+                    b.HasOne("Chronicleaf.Core.HostedUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_project_memberships_user_id");
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.ProjectSummary", b =>
                 {
                     b.HasOne("Chronicleaf.Core.Project", null)
@@ -3086,6 +3215,23 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_sync_sources_milestone_id");
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.TenantInvitation", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.HostedUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_invitations_created_by");
+
+                    b.HasOne("Chronicleaf.Core.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_invitations_tenant_id");
                 });
 
             modelBuilder.Entity("Chronicleaf.Core.TenantMembership", b =>

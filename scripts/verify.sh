@@ -559,6 +559,19 @@ else
   # answering the issuer's three resources, while the state lookup, the checks and the
   # signature verification are the production code).
   step "cloud tenant boundary tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~CloudTenantBoundaryTests"
+  # TEAM-PROJECT-PERMISSIONS-001/002. That an editor edits an assigned project while approval
+  # stays refused until the approver grant is separately held; that a publisher cannot publish
+  # an unapproved head; that a reader of one project sees nothing of another, through the real
+  # domain read path as well as the probe; that one live invitation creates exactly one
+  # membership with the token stored as a hash and disclosed exactly once; that an expired
+  # token is 410 and a replayed, revoked or unknown token creates nothing; that the last owner
+  # can be neither demoted nor removed and a revoked member's sessions die while their grants
+  # stay as history; that duplicate grants write nothing; that the database itself refuses a
+  # role or permission outside the vocabularies; and that Community behavior is unchanged -
+  # all proven against the same real disposable PostgreSQL through the real API host, with the
+  # one declared substitution the tenant boundary names (a handler answering the issuer's
+  # three resources, while the checks and the signature verification are production code).
+  step "team project permission tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~TeamProjectPermissionsTests"
   # COMMUNITY-COMPOSE-RELEASE-001/002. That a clean install completes the
   # milestone-to-approved-Markdown flow with the timeline telling it back; that the compose
   # file describes exactly app plus postgres on the pinned digest with named volumes, a

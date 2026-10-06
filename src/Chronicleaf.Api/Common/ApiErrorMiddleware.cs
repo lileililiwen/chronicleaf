@@ -15,6 +15,7 @@ using Chronicleaf.Application.Milestones;
 using Chronicleaf.Application.Narrative;
 using Chronicleaf.Application.Operations;
 using Chronicleaf.Application.Secrets;
+using Chronicleaf.Application.Teams;
 using Chronicleaf.Application.Tenancy;
 // `ApiError` also names the runtime shell's compact not_found/web_assets_unavailable record in
 // namespace Chronicleaf.Api, which wins the lookup from inside this namespace. The alias keeps the
@@ -176,6 +177,29 @@ public sealed class ApiErrorMiddleware(
 
             case TenantLimitReachedException tenantLimit:
                 return (Envelope.Create(TenancyError.TenantLimitReached, tenantLimit.Message, traceId), LogLevel.Information);
+
+            // TEAM-PROJECT-PERMISSIONS-001/002. Written here for the same reason as the
+            // refusals above: the teams package raises them, and this middleware is still the
+            // only place an envelope is written. Each arm is explicit by type - the status-code
+            // mapping alone would still answer 500 - and every message is authored in the teams
+            // package: no token, no email and no user id a caller may not reach. The expired
+            // invitation is 410 because the remedy is a fresh invitation rather than a retry,
+            // while a used one and a duplicate pending one are 409 conflicts with the
+            // invitation's own single-use state.
+            case InvitationExpiredException invitationExpired:
+                return (Envelope.Create(TeamPermissionError.InvitationExpired, invitationExpired.Message, traceId), LogLevel.Information);
+
+            case InvitationReusedException invitationReused:
+                return (Envelope.Create(TeamPermissionError.InvitationReused, invitationReused.Message, traceId), LogLevel.Information);
+
+            case InvitationExistsException invitationExists:
+                return (Envelope.Create(TeamPermissionError.InvitationExists, invitationExists.Message, traceId), LogLevel.Information);
+
+            case LastOwnerConflictException lastOwner:
+                return (Envelope.Create(TeamPermissionError.LastOwner, lastOwner.Message, traceId), LogLevel.Information);
+
+            case TeamAccessDeniedException teamDenied:
+                return (Envelope.Create(TeamPermissionError.AccessDenied, teamDenied.Message, traceId), LogLevel.Information);
 
             // BACKGROUND-JOBS-001/002. Written here for the same reason as the refusals above: the
             // feature package raises them and this middleware is still the only place an envelope is

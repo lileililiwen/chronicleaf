@@ -127,6 +127,10 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     public DbSet<HostedImport> HostedImports => Set<HostedImport>();
 
+    public DbSet<TenantInvitation> TenantInvitations => Set<TenantInvitation>();
+
+    public DbSet<ProjectMembership> ProjectMemberships => Set<ProjectMembership>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Installation>(entity =>
@@ -2467,6 +2471,9 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                     table.HasCheckConstraint(
                         "ck_tenant_memberships_role_known",
                         "role IN ('owner', 'editor', 'viewer')");
+                    table.HasCheckConstraint(
+                        "ck_tenant_memberships_revision_nonnegative",
+                        "revision >= 0");
                 });
             entity.HasKey(membership => new { membership.TenantId, membership.UserId });
             entity.Property(membership => membership.TenantId).HasColumnName("tenant_id").IsRequired();
@@ -2482,6 +2489,7 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
             entity.Property(membership => membership.RevokedAt)
                 .HasColumnName("revoked_at")
                 .HasColumnType("timestamp with time zone");
+            entity.Property(membership => membership.Revision).HasColumnName("revision").IsRequired();
 
             entity.HasOne<Tenant>()
                 .WithMany()
@@ -2619,6 +2627,114 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .HasForeignKey(import => import.TenantId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_hosted_imports_tenant_id");
+        });
+
+        // TEAM-PROJECT-PERMISSIONS-001/002: explicit bearer invitations and per-project grants.
+        // An invitation is one live token per email per tenant; a grant is one explicit permission
+        // per user per project. The role and permission vocabularies are closed by the database
+        // itself, so no writer can invent a grant the policy never defined.
+        modelBuilder.Entity<TenantInvitation>(entity =>
+        {
+            entity.ToTable(
+                "tenant_invitations",
+                table =>
+                {
+                    table.HasCheckConstraint(
+                        "ck_tenant_invitations_role_known",
+                        "role IN ('owner', 'editor', 'viewer')");
+                });
+            entity.HasKey(invitation => invitation.Id);
+            entity.Property(invitation => invitation.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(invitation => invitation.TenantId).HasColumnName("tenant_id").IsRequired();
+            entity.Property(invitation => invitation.Email)
+                .HasColumnName("email")
+                .HasMaxLength(TenantInvitation.EmailMaxLength)
+                .IsRequired();
+            entity.Property(invitation => invitation.Role)
+                .HasColumnName("role")
+                .HasMaxLength(TenantRoleMaxLength)
+                .IsRequired();
+            entity.Property(invitation => invitation.TokenHash)
+                .HasColumnName("token_hash")
+                .HasMaxLength(HostedSession.IdHashLength)
+                .IsRequired();
+            entity.Property(invitation => invitation.CreatedBy).HasColumnName("created_by").IsRequired();
+            entity.Property(invitation => invitation.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(invitation => invitation.ExpiresAt)
+                .HasColumnName("expires_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(invitation => invitation.AcceptedAt)
+                .HasColumnName("accepted_at")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(invitation => invitation.RevokedAt)
+                .HasColumnName("revoked_at")
+                .HasColumnType("timestamp with time zone");
+
+            entity.HasIndex(invitation => invitation.TokenHash)
+                .IsUnique()
+                .HasDatabaseName("ux_tenant_invitations_token_hash");
+            entity.HasIndex(invitation => new { invitation.TenantId, invitation.Email })
+                .IsUnique()
+                .HasDatabaseName("ux_tenant_invitations_tenant_id_email")
+                .HasFilter("accepted_at IS NULL AND revoked_at IS NULL");
+
+            entity.HasOne<Tenant>()
+                .WithMany()
+                .HasForeignKey(invitation => invitation.TenantId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_tenant_invitations_tenant_id");
+
+            entity.HasOne<HostedUser>()
+                .WithMany()
+                .HasForeignKey(invitation => invitation.CreatedBy)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_tenant_invitations_created_by");
+        });
+
+        modelBuilder.Entity<ProjectMembership>(entity =>
+        {
+            entity.ToTable(
+                "project_memberships",
+                table =>
+                {
+                    table.HasCheckConstraint(
+                        "ck_project_memberships_permission_known",
+                        "permission IN ('reader', 'editor', 'approver', 'publisher')");
+                    table.HasCheckConstraint(
+                        "ck_project_memberships_revision_nonnegative",
+                        "revision >= 0");
+                });
+            entity.HasKey(grant => new { grant.ProjectId, grant.UserId, grant.Permission });
+            entity.Property(grant => grant.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(grant => grant.UserId).HasColumnName("user_id").IsRequired();
+            entity.Property(grant => grant.Permission)
+                .HasColumnName("permission")
+                .HasMaxLength(ProjectPermissionMaxLength)
+                .IsRequired();
+            entity.Property(grant => grant.Revision).HasColumnName("revision").IsRequired();
+            entity.Property(grant => grant.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            entity.HasIndex(grant => grant.ProjectId).HasDatabaseName("ix_project_memberships_project_id");
+            entity.HasIndex(grant => grant.UserId).HasDatabaseName("ix_project_memberships_user_id");
+
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(grant => grant.ProjectId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_project_memberships_project_id");
+
+            entity.HasOne<HostedUser>()
+                .WithMany()
+                .HasForeignKey(grant => grant.UserId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_project_memberships_user_id");
         });
     }
 
@@ -2806,6 +2922,9 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     /// <summary>At most 16 characters for a stored tenant role.</summary>
     private const int TenantRoleMaxLength = 16;
+
+    /// <summary>At most 16 characters for a stored project permission; the longest is 'publisher'.</summary>
+    private const int ProjectPermissionMaxLength = 16;
 
     /// <summary>
     /// Refuses a stored status this build does not know. A value that is not one of the six is not a

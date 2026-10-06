@@ -1,6 +1,8 @@
 using Chronicleaf.Api.Access;
 using Chronicleaf.Application.Access;
 using Chronicleaf.Application.Milestones;
+using Chronicleaf.Application.Teams;
+using Chronicleaf.Application.Tenancy;
 using Chronicleaf.Core;
 
 namespace Chronicleaf.Api.Projects;
@@ -87,9 +89,27 @@ public static class ProjectMilestoneEndpoints
         HttpContext context,
         IProjectMilestoneService projects,
         IOwnerAccessService access,
+        ITeamPermissionService teams,
+        TenancySettings tenancy,
         CancellationToken cancellationToken)
     {
+        var session = AccessEndpoints.OwnerSession(context);
         var owner = await OwnerScopeAsync(context, access, cancellationToken).ConfigureAwait(false);
+
+        // TEAM-PROJECT-PERMISSIONS-001: in Hosted mode a project read is a granted read, not a
+        // membership read. The check lives in the teams service against the stored membership
+        // and grants, so a route cannot serve what the service refuses; tenant owners hold
+        // every permission implicitly. The Community path takes no branch on team state.
+        if (tenancy.IsHosted)
+        {
+            await teams.RequireProjectPermissionAsync(
+                session,
+                projectId,
+                "read",
+                false,
+                cancellationToken).ConfigureAwait(false);
+        }
+
         var project = await projects.GetProjectAsync(owner, projectId, cancellationToken).ConfigureAwait(false);
 
         ProjectMilestoneMapping.PublishRevision(context, project.Revision);
@@ -103,9 +123,25 @@ public static class ProjectMilestoneEndpoints
         UpdateProjectRequest? request,
         IProjectMilestoneService projects,
         IOwnerAccessService access,
+        ITeamPermissionService teams,
+        TenancySettings tenancy,
         CancellationToken cancellationToken)
     {
+        var session = AccessEndpoints.OwnerSession(context);
         var owner = await OwnerScopeAsync(context, access, cancellationToken).ConfigureAwait(false);
+
+        // TEAM-PROJECT-PERMISSIONS-001: in Hosted mode a project edit is a granted edit. A
+        // reader with no edit grant is refused here at the service layer, before the
+        // compare-and-set runs; the Community path takes no branch on team state.
+        if (tenancy.IsHosted)
+        {
+            await teams.RequireProjectPermissionAsync(
+                session,
+                projectId,
+                "edit",
+                false,
+                cancellationToken).ConfigureAwait(false);
+        }
 
         var project = await projects.UpdateProjectAsync(
             owner,

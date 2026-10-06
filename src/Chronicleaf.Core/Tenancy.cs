@@ -120,13 +120,15 @@ public sealed class TenantMembership
         Guid userId,
         string role,
         DateTimeOffset createdAt,
-        DateTimeOffset? revokedAt = null)
+        DateTimeOffset? revokedAt = null,
+        long revision = 1)
     {
         TenantId = tenantId;
         UserId = userId;
         Role = role;
         CreatedAt = createdAt;
         RevokedAt = revokedAt;
+        Revision = revision;
     }
 
     public Guid TenantId { get; }
@@ -140,6 +142,12 @@ public sealed class TenantMembership
 
     /// <summary>When the membership was revoked, or <c>null</c> while it is live.</summary>
     public DateTimeOffset? RevokedAt { get; }
+
+    /// <summary>
+    /// The optimistic revision for role changes (TEAM-PROJECT-PERMISSIONS-002); the first
+    /// committed version is 1. Rows written before this package carry 1 by backfill.
+    /// </summary>
+    public long Revision { get; }
 
     /// <summary>True while the membership authorizes access under the tenant.</summary>
     public bool IsLive => RevokedAt is null;

@@ -216,6 +216,16 @@ public static class ChronicleafSchema
     /// first login.
     /// </summary>
     public const string CloudTenantBoundaryMigrationId = "20261006013139_AddCloudTenantBoundary";
+
+    /// <summary>
+    /// The forward migration that adds the <c>tenant_invitations</c> and
+    /// <c>project_memberships</c> tables and the <c>tenant_memberships.revision</c> column
+    /// (TEAM-PROJECT-PERMISSIONS-001/002). A database that has never applied it has nowhere to
+    /// record an invitation or a project grant, so its team routes would fail against missing
+    /// tables; readiness says so by name rather than answering 200 and failing on the first
+    /// request.
+    /// </summary>
+    public const string TeamProjectPermissionsMigrationId = "20261006024003_AddTeamProjectPermissions";
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
         InitialMigrationId,
@@ -241,6 +251,7 @@ public static class ChronicleafSchema
         PublicProjectJourneyMigrationId,
         AgencyClientProjectsMigrationId,
         CloudTenantBoundaryMigrationId,
+        TeamProjectPermissionsMigrationId,
     ];
 
     /// <summary>
@@ -248,7 +259,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = CloudTenantBoundaryMigrationId;
+    public const string ExpectedMigrationId = TeamProjectPermissionsMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

@@ -191,6 +191,18 @@ public static class ApiErrorStatus
         Tenancy.TenancyError.CommunityImportRequired => 409,
         Tenancy.TenancyError.TenantLimitReached => 422,
 
+        // The team-project-permissions package's codes. Additive in the same way: 403 for a
+        // project action the caller holds no grant for, 410 for an invitation whose 7-day life
+        // ran out before it was accepted, and 409 for a token that is already used, a duplicate
+        // pending invitation and a removal or demotion that would leave no live owner. The
+        // unknown-token and foreign-project refusals deliberately reuse the delivered NotFound
+        // above, so a caller cannot probe for another tenant's invitations or projects.
+        Teams.TeamPermissionError.AccessDenied => 403,
+        Teams.TeamPermissionError.InvitationExpired => 410,
+        Teams.TeamPermissionError.InvitationReused => 409,
+        Teams.TeamPermissionError.InvitationExists => 409,
+        Teams.TeamPermissionError.LastOwner => 409,
+
         // The narrative-memory package's codes. Additive in the same way. 422 for a context that
         // does not fit the byte budget without losing a pinned fact, because the remedy is to
         // narrow the cutoff or shorten entries - the same shape as every other semantic refusal

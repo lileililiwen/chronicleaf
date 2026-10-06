@@ -1,6 +1,6 @@
 # Chronicleaf handoff
 
-current_spec: medium-import-package
+current_spec: publisher-contract
 
 ## Current state — 2026-10-05
 
@@ -1344,3 +1344,36 @@ was shipped: the design names it optional, the scenarios are API-observable, and
 suite was added. No LinkedIn network exists to test against (structural: no transport), and the
 opt-in real-provider/browser runs were not performed. Deployment stays `deployable: false`;
 there is no remote, no push and no publication.
+`medium-import-package` is archived
+(`780b6fd`, canonical spec `openspec/specs/medium-import-package/spec.md`): manual Medium
+article import material as an export-only package, with Community behavior the only behavior
+(no Hosted surface). No new table and no migration: the package stores nothing, so the schema
+is byte-identical and rollback is unregistering the one service. `GET export?format=medium`
+re-serves the approved revision's exact bytes through the review package's own Markdown and
+HTML exports - so never-approved is `approval_required`, an edited-then-unapproved head is
+`approval_stale`, and missing picture bytes are `media_unavailable`, all re-checked rather
+than redefined - then packs a deterministic ZIP (`article.html`, `article.md`, the
+approval-covered `images/*` entries verbatim, `manifest.json` with per-file digests, and
+`MEDIUM-IMPORT.txt` hand-carry instructions naming the asset, revision and body hash with
+the official restriction that Medium accepts no new API integrations). The manifest
+attributes an origin, never a destination: no URL, post id or publication status in any
+entry, and the same revision packs byte-identically twice. Native publish
+(`POST .../adaptations/medium/publish`) is an unconditional 422 `publisher_unsupported`
+with no credential lease, no job, no audit row and no socket (there is no HttpClient
+anywhere in the package); a foreign id stays the delivered 404. Behaviorally
+supportsPublish=false/supportsDraft=false with exportFormats html|markdown, awaiting the
+future publisher registry in `publisher-contract`, which this package does not anticipate in
+code. Read that package's own boundary before extending it. Evidence, all run by the
+implementer rather than taken on report: `bash scripts/verify.sh` exit 0 (`GATE_EXIT=0`,
+`set -o pipefail`) with the platform-feed stage and the new `medium import package tests`
+stage (7/7) alongside all existing stages, `npm ci`, `tsc` + `vite build`, `dotnet build
+--nologo --no-incremental` 0 errors with only the 6 pre-existing warning lines in untouched
+files (2 src CS0649/CS0618 + 4 xUnit1030 in GithubAppConnectionTests.cs, doubled per
+target), name preflight exit 0, and `openspec validate --all --strict --no-interactive`
+54/54 before and after the archive, which used no `--skip-specs`. No Web UI was shipped:
+the design's UI is optional, the scenarios are API-observable, and no new browser suite was
+added. No Medium network exists to test against (structural: no transport, no scraping, no
+browser posting). Deployment stays `deployable: false`; there is no remote, no push and no
+publication.
+Next: `current_spec` is `publisher-contract`, the next package in drain order after
+`medium-import-package`.

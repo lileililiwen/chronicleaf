@@ -269,6 +269,13 @@ public static class ChronicleafSchema
     /// readiness says so by name rather than answering 200 and failing on the first request.
     /// </summary>
     public const string LinkedInCopyPackageMigrationId = "20261018090000_AddLinkedInCopyPackage";
+    /// <summary>
+    /// The forward migration that adds the <c>publication_attempts</c> table
+    /// (PUBLISHER-CONTRACT-001/002). A database that has never applied it has nowhere to
+    /// record a reviewed send, so its publisher routes would fail against a missing table;
+    /// readiness says so by name rather than answering 200 and failing on the first request.
+    /// </summary>
+    public const string PublisherContractMigrationId = "20261019090000_AddPublisherContract";
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
         InitialMigrationId,
@@ -300,6 +307,7 @@ public static class ChronicleafSchema
         HostedArchiveOperationsMigrationId,
         GitHubAppConnectionMigrationId,
         LinkedInCopyPackageMigrationId,
+        PublisherContractMigrationId,
     ];
 
     /// <summary>
@@ -307,7 +315,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = LinkedInCopyPackageMigrationId;
+    public const string ExpectedMigrationId = PublisherContractMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

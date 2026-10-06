@@ -547,7 +547,21 @@ else
   # capture job behind the delivered browser seam. Packaging itself calls no provider and
   # nothing here reaches any Medium endpoint.
   step "medium import package tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~MediumImportPackageTests"
-  # SCREENSHOT-EVOLUTION-IMAGES-001/002. That a same-viewport comparison preserves source
+  # PUBLISHER-CONTRACT-001/002. That a confirmed current preview and approval records one
+  # target-specific dispatch with the scope's publisher credential leased for the call; that a
+  # draft, a tampered preview, an edited head and a revoked approval are each refused before
+  # any send while approval alone dispatches nothing; that an unconfirmed publish and a
+  # missing credential are refused before a job exists; that Medium and LinkedIn are refused
+  # as export-only with the contract's own code rather than the export packages'
+  # publisher_unsupported; that an identical key returns the original receipt with no second
+  # dispatch; that an ambiguous timeout and a crash after the commit each become unknown
+  # with exactly one dispatch and no retry; that the same key over different work is a 409;
+  # and that an unknown receipt reconciles where the target permits and stays manual where
+  # it does not - all proven against the same real disposable PostgreSQL and the real API
+  # host, with the real vault sealing and leasing the publisher credential and only the far
+  # end of the wire (a test-local fake on a target id production never takes) scripted. No
+  # stage here reaches any remote side: this contract ships no transport.
+  step "publisher contract tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~PublisherContractTests"  # SCREENSHOT-EVOLUTION-IMAGES-001/002. That a same-viewport comparison preserves source
   # pixels, order and provenance in a re-derivable manifest; that a milestone without a
   # selected screenshot is an unavailable gap rather than a fabrication, and a candidate is
   # never compared and never promoted; that mixed viewports outside the gallery are a 422

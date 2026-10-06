@@ -2658,6 +2658,130 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.PublicationAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ApprovalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approval_id");
+
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("asset_id");
+
+                    b.Property<string>("BodyHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("body_hash");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<long>("ContentRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("content_revision");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DispatchedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dispatched_at");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("error_code");
+
+                    b.Property<long>("EvidenceRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("evidence_revision");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("mode");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<string>("PreviewHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("preview_hash");
+
+                    b.Property<string>("RemoteId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("remote_id");
+
+                    b.Property<string>("RemoteUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("remote_url");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("state");
+
+                    b.Property<string>("TargetId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("target_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssetId");
+
+                    b.HasIndex("OperationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_publication_attempts_operation_id");
+
+                    b.HasIndex("ScopeId", "AssetId")
+                        .HasDatabaseName("ix_publication_attempts_scope_id_asset_id");
+
+                    b.HasIndex("ScopeId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_publication_attempts_scope_id_idempotency_key");
+
+                    b.ToTable("publication_attempts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_publication_attempts_evidence_revision_positive", "evidence_revision >= 1");
+
+                            t.HasCheckConstraint("ck_publication_attempts_mode_known", "mode IN ('draft', 'publish')");
+
+                            t.HasCheckConstraint("ck_publication_attempts_revision_positive", "content_revision >= 1");
+
+                            t.HasCheckConstraint("ck_publication_attempts_state_known", "state IN ('prepared', 'sending', 'published', 'remote-draft', 'unknown', 'failed')");
+                        });
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.ScreenshotCandidate", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3552,6 +3676,16 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_project_sync_schedules_project_id");
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.PublicationAttempt", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.ContentAsset", null)
+                        .WithMany()
+                        .HasForeignKey("AssetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_publication_attempts_asset_id");
                 });
 
             modelBuilder.Entity("Chronicleaf.Core.ScreenshotCandidate", b =>

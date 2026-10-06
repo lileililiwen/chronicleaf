@@ -293,6 +293,27 @@ public static class ApiErrorStatus
         GitHub.GitHubAppError.NotConfigured => 503,
         GitHub.GitHubAppError.Unreachable => 503,
 
+        // The publisher-contract package's codes. Additive in the same way, and the choices are
+        // this package's failure policy rather than defaults. 422 for a target no package
+        // classified, an export-only target asked to publish, a mode the target does not serve,
+        // a publish without the separate explicit confirmation, a scope with no publisher
+        // credential, and an ambiguous receipt the target cannot reconcile: the remedy in every
+        // case is a different request, never a retry of this one. 409 for a confirmed preview
+        // that no longer describes the stored state, because the remedy is a fresh preview and
+        // a new confirmation rather than a resend of the stale one - the same shape as the
+        // review package's stale approval. The export-only refusal deliberately does not reuse
+        // the Medium and LinkedIn packages' publisher_unsupported: that string is their own
+        // unconditional refusal, and reusing it here would merge two different decisions into
+        // one code. The publication_unknown job code deliberately has no arm: it is written to
+        // the attempt row and the operation row, and no route answers a run that already ended.
+        Publishing.PublisherError.UnknownTarget => 422,
+        Publishing.PublisherError.TargetExportOnly => 422,
+        Publishing.PublisherError.ModeUnsupported => 422,
+        Publishing.PublisherError.ConfirmationRequired => 422,
+        Publishing.PublisherError.CredentialMissing => 422,
+        Publishing.PublisherError.ReconcileUnavailable => 422,
+        Publishing.PublisherError.PreviewStale => 409,
+
         _ => 500,
     };
 }

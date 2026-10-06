@@ -95,6 +95,8 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     public DbSet<ContentApproval> ContentApprovals => Set<ContentApproval>();
 
+    public DbSet<PublicationAttempt> PublicationAttempts => Set<PublicationAttempt>();
+
     public DbSet<GitHubWebhookSubscription> GitHubWebhookSubscriptions => Set<GitHubWebhookSubscription>();
 
     public DbSet<GitHubWebhookDelivery> GitHubWebhookDeliveries => Set<GitHubWebhookDelivery>();
@@ -1840,6 +1842,127 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .HasConstraintName("fk_content_approvals_asset_id");
         });
 
+        // PUBLISHER-CONTRACT-001/002: one reviewed publication decision and its outcome. The row is
+        // never deleted and never rewritten: the state moves forward by compare-and-set from
+        // prepared through sending to one terminal state, and the unique index on (scope,
+        // idempotency key) is what makes a repeated key return the stored receipt rather than a
+        // second send. The second unique index on the operation id is what makes one operation
+        // run exactly one attempt, and the check constraints close the state, mode and digest
+        // vocabularies at the database rather than in application code.
+        modelBuilder.Entity<PublicationAttempt>(entity =>
+        {
+            entity.ToTable("publication_attempts");
+            entity.HasKey(attempt => attempt.Id);
+            entity.Property(attempt => attempt.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(attempt => attempt.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(attempt => attempt.OperationId).HasColumnName("operation_id").IsRequired();
+            entity.Property(attempt => attempt.TargetId)
+                .HasColumnName("target_id")
+                .HasMaxLength(PublisherTargetMaxLength)
+                .IsRequired();
+            entity.Property(attempt => attempt.AssetId).HasColumnName("asset_id").IsRequired();
+            entity.Property(attempt => attempt.ContentRevision)
+                .HasColumnName("content_revision")
+                .IsRequired();
+            entity.Property(attempt => attempt.BodyHash)
+                .HasColumnName("body_hash")
+                .HasMaxLength(Sha256HexMaxLength)
+                .IsRequired();
+            entity.Property(attempt => attempt.EvidenceRevision)
+                .HasColumnName("evidence_revision")
+                .IsRequired();
+            entity.Property(attempt => attempt.PreviewHash)
+                .HasColumnName("preview_hash")
+                .HasMaxLength(Sha256HexMaxLength)
+                .IsRequired();
+            entity.Property(attempt => attempt.Mode)
+                .HasColumnName("mode")
+                .HasMaxLength(PublishModeMaxLength)
+                .IsRequired();
+            entity.Property(attempt => attempt.ApprovalId).HasColumnName("approval_id").IsRequired();
+            entity.Property(attempt => attempt.IdempotencyKey)
+                .HasColumnName("idempotency_key")
+                .HasMaxLength(PublisherIdempotencyKeyMaxLength)
+                .IsRequired();
+            entity.Property(attempt => attempt.State)
+                .HasColumnName("state")
+                .HasMaxLength(PublishStateMaxLength)
+                .IsRequired();
+            entity.Property(attempt => attempt.RemoteId)
+                .HasColumnName("remote_id")
+                .HasMaxLength(PublisherRemoteIdMaxLength);
+            entity.Property(attempt => attempt.RemoteUrl)
+                .HasColumnName("remote_url")
+                .HasMaxLength(PublisherRemoteUrlMaxLength);
+            entity.Property(attempt => attempt.ErrorCode)
+                .HasColumnName("error_code")
+                .HasMaxLength(PublisherErrorCodeMaxLength);
+            entity.Property(attempt => attempt.DispatchedAt)
+                .HasColumnName("dispatched_at")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(attempt => attempt.CompletedAt)
+                .HasColumnName("completed_at")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(attempt => attempt.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(attempt => attempt.UpdatedAt)
+                .HasColumnName("updated_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            entity.ToTable(
+                table =>
+                {
+                    // The state, mode and revision vocabularies as database constraints rather than
+                    // conventions. A state no reader recognises would otherwise be reported as
+                    // whatever the panel guessed it meant, and a revision that is not positive is
+                    // not a revision anyone approved.
+                    table.HasCheckConstraint(
+                        "ck_publication_attempts_revision_positive",
+                        "content_revision >= 1");
+                    table.HasCheckConstraint(
+                        "ck_publication_attempts_evidence_revision_positive",
+                        "evidence_revision >= 1");
+                    table.HasCheckConstraint(
+                        "ck_publication_attempts_state_known",
+                        "state IN ('prepared', 'sending', 'published', 'remote-draft', 'unknown', 'failed')");
+                    table.HasCheckConstraint(
+                        "ck_publication_attempts_mode_known",
+                        "mode IN ('draft', 'publish')");
+                });
+
+            // One attempt per idempotency key per scope: a repeated key returns the stored
+            // receipt rather than a second send.
+            entity.HasIndex(attempt => new
+                {
+                    attempt.ScopeId,
+                    attempt.IdempotencyKey,
+                })
+                .IsUnique()
+                .HasDatabaseName("ux_publication_attempts_scope_id_idempotency_key");
+
+            // One attempt per operation: the queue may deliver the same operation twice, but
+            // only one receipt is ever committed for it.
+            entity.HasIndex(attempt => attempt.OperationId)
+                .IsUnique()
+                .HasDatabaseName("ux_publication_attempts_operation_id");
+
+            entity.HasIndex(attempt => new
+                {
+                    attempt.ScopeId,
+                    attempt.AssetId,
+                })
+                .HasDatabaseName("ix_publication_attempts_scope_id_asset_id");
+
+            entity.HasOne<ContentAsset>()
+                .WithMany()
+                .HasForeignKey(attempt => attempt.AssetId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_publication_attempts_asset_id");
+        });
+
         // -----------------------------------------------------------------------------------------
         // github-release-candidates. Four tables, and the two unique indexes are the package.
         //
@@ -3086,6 +3209,27 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     /// <summary>At most 32 characters for an approval payload kind, matching the Core record's own bound.</summary>
     private const int ContentPayloadKindMaxLength = ContentPayloadKinds.MaxLength;
+
+    /// <summary>At most 64 characters for a publisher target id, matching the Core record's own bound.</summary>
+    private const int PublisherTargetMaxLength = PublisherTargetIds.MaxLength;
+
+    /// <summary>At most 16 characters for a publish mode, matching the Core record's own bound.</summary>
+    private const int PublishModeMaxLength = PublishModes.MaxLength;
+
+    /// <summary>At most 16 characters for a publication attempt state, matching the Core record's own bound.</summary>
+    private const int PublishStateMaxLength = PublishStates.MaxLength;
+
+    /// <summary>At most 200 characters for a caller idempotency key, matching the Core record's own bound.</summary>
+    private const int PublisherIdempotencyKeyMaxLength = PublicationAttempt.Limits.MaxIdempotencyKeyLength;
+
+    /// <summary>At most 200 characters for a remote side's identifier, matching the Core record's own bound.</summary>
+    private const int PublisherRemoteIdMaxLength = PublicationAttempt.Limits.MaxRemoteIdLength;
+
+    /// <summary>At most 2000 characters for a remote side's address, matching the Core record's own bound.</summary>
+    private const int PublisherRemoteUrlMaxLength = PublicationAttempt.Limits.MaxRemoteUrlLength;
+
+    /// <summary>At most 64 characters for a redacted publication failure code, matching the Core record's own bound.</summary>
+    private const int PublisherErrorCodeMaxLength = PublicationAttempt.Limits.MaxErrorCodeLength;
 
     /// <summary>At most 512 characters for a wait selector, matching the application-side bound.</summary>
     private const int CaptureSelectorMaxLength = 512;

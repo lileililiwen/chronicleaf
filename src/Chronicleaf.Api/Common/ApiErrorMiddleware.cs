@@ -17,6 +17,7 @@ using Chronicleaf.Application.Medium;
 using Chronicleaf.Application.Milestones;
 using Chronicleaf.Application.Narrative;
 using Chronicleaf.Application.Operations;
+using Chronicleaf.Application.Publishing;
 using Chronicleaf.Application.Secrets;
 using Chronicleaf.Application.Schedules;
 using Chronicleaf.Application.Teams;
@@ -25,6 +26,11 @@ using Chronicleaf.Application.Tenancy;
 // namespace Chronicleaf.Api, which wins the lookup from inside this namespace. The alias keeps the
 // envelope type unambiguous: the shell record is a different, shipped contract.
 using Envelope = Chronicleaf.Application.Common.ApiError;
+
+// The publisher contract's failure vocabulary lives in Chronicleaf.Application.Publishing, but
+// this file's own namespace makes a bare `Publishing` resolve to the Api endpoint module. The
+// alias keeps the envelope codes unambiguous: the endpoint module carries routes, never codes.
+using PublisherError = Chronicleaf.Application.Publishing.PublisherError;
 
 // The candidate package's failure types are addressed through an alias because this file already
 // carries a `GitHub` prefix for the delivered evidence package, and two feature packages both
@@ -783,6 +789,70 @@ public sealed class ApiErrorMiddleware(
                     Envelope.Create(
                         ArchiveError.RestoreExpired,
                         restoreExpired.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            // PUBLISHER-CONTRACT-001/002. Written here for the same reason as every other
+            // feature package's refusals: the publishing package raises them and this middleware
+            // is still the only place an envelope is written. Each arm is explicit by type - the
+            // status-code mapping alone would still answer 500 - and every message is authored in
+            // the publishing package: no prose, no claim, no URL, no token and no host path. The
+            // export-only refusal deliberately does not reuse the Medium and LinkedIn packages'
+            // publisher_unsupported: that string is their own unconditional refusal, and this
+            // contract classifies those targets as export-only with its own code instead.
+            case PublisherUnknownTargetException unknownTarget:
+                return (
+                    Envelope.Create(
+                        PublisherError.UnknownTarget,
+                        unknownTarget.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            case PublisherTargetExportOnlyException exportOnly:
+                return (
+                    Envelope.Create(
+                        PublisherError.TargetExportOnly,
+                        exportOnly.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            case PublisherModeUnsupportedException modeUnsupported:
+                return (
+                    Envelope.Create(
+                        PublisherError.ModeUnsupported,
+                        modeUnsupported.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            case PublisherPreviewStaleException previewStale:
+                return (
+                    Envelope.Create(
+                        PublisherError.PreviewStale,
+                        previewStale.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            case PublisherConfirmationRequiredException confirmationRequired:
+                return (
+                    Envelope.Create(
+                        PublisherError.ConfirmationRequired,
+                        confirmationRequired.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            case PublisherCredentialMissingException credentialMissing:
+                return (
+                    Envelope.Create(
+                        PublisherError.CredentialMissing,
+                        credentialMissing.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            case PublisherReconcileUnavailableException reconcileUnavailable:
+                return (
+                    Envelope.Create(
+                        PublisherError.ReconcileUnavailable,
+                        reconcileUnavailable.Message,
                         traceId),
                     LogLevel.Information);
 

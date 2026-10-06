@@ -25,6 +25,7 @@ using Chronicleaf.Api.Media;
 using Chronicleaf.Api.Narrative;
 using Chronicleaf.Api.Operations;
 using Chronicleaf.Api.Projects;
+using Chronicleaf.Api.Publishing;
 using Chronicleaf.Api.S3;
 using Chronicleaf.Api.Schedules;
 using Chronicleaf.Api.Secrets;
@@ -60,6 +61,7 @@ using Chronicleaf.Infrastructure.Narrative;
 using Chronicleaf.Infrastructure.Operations;
 using Chronicleaf.Infrastructure.Persistence;
 using Chronicleaf.Infrastructure.Projects;
+using Chronicleaf.Infrastructure.Publishing;
 using Chronicleaf.Infrastructure.Secrets;
 using Chronicleaf.Infrastructure.Schedules;
 using Chronicleaf.Infrastructure.Tenancy;
@@ -390,6 +392,17 @@ builder.Services.AddStaticBlogExport();
 // reports schema_mismatch at /api/ready.
 builder.Services.AddProjectJourney();
 
+// PUBLISHER-CONTRACT-001/002. The adapter registry, the attempt store, the reviewed
+// publication service and its durable job handler, plus the vault-backed credential source
+// that leases the scope's publisher credential for one call. It registers no provider, no
+// transport and no publish-capable adapter: the registry classifies Medium and LinkedIn as
+// export-only, and the six transport adapters arrive in their own packages. A database
+// without the publisher-contract migration reports schema_mismatch at /api/ready.
+builder.Services.AddPublisherContract();
+builder.Services.AddSingleton<
+    Chronicleaf.Application.Publishing.IPublisherCredentialSource,
+    VaultPublisherCredentialSource>();
+
 // The rotation guard is applied once at start-up, so an access token that was changed since the
 // last run revokes every existing session before this process serves anything.
 builder.Services.AddHostedService<AccessTokenRotationStartup>();
@@ -620,6 +633,14 @@ app.MapStaticBlogExportEndpoints();
 // generation here, no approval and no export: a preview computes a hash, a publication freezes
 // a snapshot, and the public routes serve it only while every binding still holds.
 app.MapJourneyEndpoints();
+
+// PUBLISHER-CONTRACT-001/002: the private publish-preview, publish, receipt and reconcile
+// routes. None of them is marked public, so the access package's default-deny boundary already
+// covers every one of them. There is no generation here, no approval and no export: a preview
+// computes a hash, a publish freezes the approved bindings a job sends, and the receipt routes
+// report what the run recorded. In Hosted mode the reads are granted reads and publishing is a
+// granted publish over an approved head.
+app.MapPublisherContractEndpoints();
 
 // SHELL-001/SHELL-002: every unmatched path is either an unknown API path, an unknown
 // static asset, or a client route. Only the last one falls back to the SPA entry point. This

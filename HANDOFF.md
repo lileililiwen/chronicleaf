@@ -1,6 +1,6 @@
 # Chronicleaf handoff
 
-current_spec: cloud-object-storage
+current_spec: scheduled-project-sync
 
 ## Current state — 2026-10-05
 
@@ -43,6 +43,7 @@ next POST-MVP package in ROADMAP order after `html-content-export`.
 | 31 | `agency-client-projects` | `764eb0e` | `openspec/specs/agency-client-projects/spec.md` |
 | 32 | `cloud-tenant-boundary` | `0a6a935` | `openspec/specs/cloud-tenant-boundary/spec.md` |
 | 33 | `team-project-permissions` | `0f47fca` | `openspec/specs/team-project-permissions/spec.md` |
+| 34 | `cloud-object-storage` | `bdfcec9` | `openspec/specs/cloud-object-storage/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -397,8 +398,37 @@ owner's words; the e2e seed's candidate rows name the two real capture jobs the 
 PNG behind all three. Deployment stays `deployable: false`; there is no remote, no push and no
 publication.
 
-Next: `current_spec` is `cloud-object-storage`, the next package in drain order after
-`team-project-permissions`. `team-project-permissions` is archived
+Next: `current_spec` is `scheduled-project-sync`, the next package in drain order after
+`cloud-object-storage`. `cloud-object-storage` is archived
+(`bdfcec9`, canonical spec `openspec/specs/cloud-object-storage/spec.md`): Hosted
+S3-compatible scoped media adapter, with Community behavior byte-identical. An S3-backed
+`IMediaStore` sibling to the Local store with the same stage/verify/promote/register sequence
+(rows land with `provider_id=s3`), tenant-scoped `scopes/{scope}/` prefixes checked on stored
+keys as well as generated ones, scoped GET presigns bounded to five minutes through
+`POST /api/media/{id}/presign`, and `media_in_use` honored through the same checker on either
+backend; credentials travel as a vault reference to a sealed `s3` JSON document (never in rows,
+messages or logs); the installation's `Chronicleaf:StorageMode` selects the backend for new
+writes while each row's own provider decides its reads, and the migration copies, re-verifies
+and compare-and-set flips one scope's rows with the source never deleted, recording
+checksum/source key/target key/state per object in `media_migration_copies` for restart. Read
+that package's own boundary before extending it, and note the three defects verification found:
+the composition root's always-registered vault bridge needs its options in every mode (Local
+hosts failed to build without them); the adopted adapter mints presigned URLs in https even
+against a plain-http endpoint, so the factory restores the endpoint's own scheme on an exact
+authority match (SigV4 signs host and query, never scheme); and a test baseline that ignored
+the promotion re-read counted the upload's own download as a leak. Evidence, all run by the
+implementer rather than taken on report: `bash scripts/verify.sh` exit 0 (`GATE_EXIT=0`) with
+the platform-feed stage and the new `cloud object storage tests` stage (11/11) alongside all
+existing stages, `npm ci`, `tsc` + `vite build`, `dotnet build --nologo --no-incremental` 0
+errors with the same 2 pre-existing warnings at HEAD, name preflight exit 0, and
+`openspec validate --all --strict --no-interactive` 54/54 before and after the archive,
+which used no `--skip-specs`. No Web UI was shipped: the design names it optional, the
+scenarios are API-observable, and no new browser suite was added. The opt-in real-cloud run
+was not performed: MinIO (`minio/minio:RELEASE.2024-10-13T13-34-11Z`) over the real SDK and
+the real platform adapter is the S3 conformance, and no claim is made about AWS/R2 beyond
+compatibility through the same adapter. Deployment stays `deployable: false`; there is no
+remote, no push and no publication.
+`team-project-permissions` is archived
 (`0f47fca`, canonical spec `openspec/specs/team-project-permissions/spec.md`): Hosted team
 invitations plus per-project roles, with Community behavior byte-identical. One
 `tenant_invitations` row per invite carrying a normalized email label, a tenant role, a
@@ -1066,6 +1096,50 @@ trailing blank line on the generated canonical spec, which is the tool's archive
 twenty-four; and eleven of the twenty-four canonical specs carry openspec's own `TBD - created by archiving`
 purpose line, including the three before this one, so leaving it is the repository's existing behaviour
 rather than a gap.
+
+`cloud-object-storage` is archived (`bdfcec9`, canonical spec
+`openspec/specs/cloud-object-storage/spec.md`). Read that package's own boundary before
+extending it, and note what it decided that a later reader would otherwise have to rediscover.
+
+**Release evidence (`cloud-object-storage`, commit `bdfcec9`, all run by the implementer
+rather than taken on report).** `bash scripts/verify.sh` exit 0 (`GATE_EXIT=0`) with the
+platform-feed stage and the new `cloud object storage tests` stage alongside all existing
+stages, each filtered stage asserted to select at least one test, including **11/11 cloud
+object storage** run directly against the same real disposable PostgreSQL and the real API
+host (S3-mode upload storing the decoded type and hash under the server-generated scoped key
+with the row naming `s3` and the bytes asserted in MinIO under the same key; foreign-scope
+read and presign both 404 with zero backend calls past the upload's own; 360s/zero/garbage
+lifetimes 422 with zero presigns minted and a lawful mint carrying its expiry; 1s MinIO URL
+fetchable now and 403 after the second passes; limit-1 migration flipping one row to `s3`
+with the ledger's digest/key/state and the source bytes intact while each backend serves its
+own rows, then finishing and idling; refused-write and corrupted-copy runs keeping `local`
+with `failed` ledger entries and resuming to verified after the fault clears; Community host
+with no S3 settings storing/serving/retiring locally, no `IS3BackendFactory` registered, and
+presign 503; sealed `s3` document absent unaligned from ciphertext/nonce and from every text
+column and message while the production bridge builds a working backend from it; github-slot
+reference and missing reference both 503 with no secret in the message; referenced S3 image
+409 `media_in_use` then retired with the object gone; interrupted S3 upload reconciled
+idempotently through the recorded pending row). Neighbour suites re-run against the same
+build: 9/9 local media storage, 32/32 credential vault, 9/9 cloud tenant boundary, 12/12
+team project permissions. `npm ci`, `tsc` and `vite build` all green (no Web changes).
+`dotnet build --nologo --no-incremental` 0 errors with the same 2 pre-existing warnings at
+HEAD. Name preflight exit 0; `openspec validate --all --strict --no-interactive` 54/54 before
+and after the archive, which used no `--skip-specs`. No new browser suite: the scenarios are
+API-observable and the design names UI optional. Deployment stays `deployable: false`; there
+is no remote, no push and no publication.
+
+**What the S3 package owns, and what it deliberately does not.** The adopted
+`Platform.Storage.S3` adapter is reached through a backend the factory builds per call over
+a leased vault document, and the lease is returned before the first request - a backend
+built once at start-up would hold keys for the life of the process. Tenants share one
+bucket by key prefix, never by credential: the credential is the operator's single vault
+reference, and isolation is the `scopes/{scope}/` prefix checked on every stored key, not a
+second bucket per tenant. The ledger can resume work but can never declare bytes good: a
+`verified` entry still re-verifies the target before the row flips. Rollback is
+registration-only (S3 mode off serves everything from disk; rows, ledger and evidence stay),
+and there is no migration route or schedule - the service is operator tooling behind the
+same seam the orphan reconciler keeps. The `media.provider_id` column defaults `local`, so
+every pre-existing row and every old INSERT reads exactly what it always read.
 
 # Bootstrap handoff
 

@@ -1,6 +1,6 @@
 # Chronicleaf handoff
 
-current_spec: hosted-archive-operations
+current_spec: github-app-connection
 
 ## Current state — 2026-10-05
 
@@ -399,8 +399,45 @@ owner's words; the e2e seed's candidate rows name the two real capture jobs the 
 PNG behind all three. Deployment stays `deployable: false`; there is no remote, no push and no
 publication.
 
-Next: `current_spec` is `hosted-archive-operations`, the next package in drain order after
-`scheduled-project-sync`. `scheduled-project-sync` is archived
+Next: `current_spec` is `github-app-connection`, the next package in drain order after
+`hosted-archive-operations`. `hosted-archive-operations` is archived
+(`2db6039`, canonical spec `openspec/specs/hosted-archive-operations/spec.md`): operator-run
+backup manifests plus owner-run recoverable deletion over tenant-scoped stores, with Community
+behavior byte-identical. One `archive_backup_manifests` row per operator-measured backup
+carrying the schema/key versions, the media inventory hash and the content digest beside an
+opaque inventory token (no route serves manifests, so no location or key history reaches an
+owner response); `MeasureAsync`/`RecordAsync`/`RehearseAsync` recompute both hashes from the
+live scope and compare byte for byte, so an unknown schema, an unknown key version or a
+drifted inventory/digest each fail loudly with the old stamp kept. One `archive_tombstones`
+row per confirmed deletion carrying the 30-day window, the erase request, an operator hold
+and the restore/purge stamps under a partial unique index (one live tombstone per project);
+`DELETE /api/projects/{id}/archive-data` confirms the project's own name at its own revision
+(422/409/428), revokes a live journey and disables an enabled schedule through the delivered
+contracts before inserting the tombstone, while scope credentials, evidence, milestones,
+assets and media are untouched; `POST .../restore` lifts a live deletion inside the window
+at the tombstone's revision (past it is `archive_restore_expired` 410); the operator
+`PurgeExpiredAsync` pass skips an open window, a hold, a live approval or a live projection
+with its reason and otherwise retires only unreferenced project media through the delivered
+store (referenced media 409-kept) with a receipt itemizing retained bundles/assets. Hosted
+reads/edits gate through `RequireProjectPermissionAsync` (read/edit) with the Community path
+branch-free; foreign projects and manifests answer the delivered 404 with no foreign data.
+Read that package's own boundary before extending it, and note the four defects verification
+found: minimal-API DELETE forbids inferred bodies (`[FromBody]` explicit); nested units of
+work are rejected, so the delete suspends first and inserts last and the purge retires
+before stamping (each step idempotent and retry-safe); an owner session lapses across the
+31-day clock move, so post-move reads sign in again; and `projects` carries no timestamps,
+so foreign-scope seeds insert without them. Evidence, all run by the implementer rather than
+taken on report: `bash scripts/verify.sh` exit 0 (`GATE_EXIT=0`, `set -o pipefail`) with
+the platform-feed stage and the new `hosted archive operations tests` stage (17/17) alongside
+all existing stages, `npm ci`, `tsc` + `vite build`, `dotnet build --nologo --no-incremental`
+0 errors with the same 2 pre-existing warnings at HEAD, name preflight exit 0, and `openspec
+validate --all --strict --no-interactive` 54/54 before and after the archive, which used no
+`--skip-specs`. No Web UI was shipped: the design's optional panel is satisfied API-observable
+(manifests are operator rows by design, never owner responses), and no new browser suite was
+added. The opt-in real-backup rehearsal against a real snapshot inventory was not performed:
+only live-row digests are compared and no claim is made about any external snapshot store.
+Deployment stays `deployable: false`; there is no remote, no push and no publication.
+`scheduled-project-sync` is archived
 (`bfa302a`, canonical spec `openspec/specs/scheduled-project-sync/spec.md`): opt-in
 recurring repository synchronization, with Community behavior byte-identical. One
 `project_sync_schedules` row per project carrying an enabled flag, a 15..10080-minute cadence,
@@ -1144,6 +1181,55 @@ registration-only (S3 mode off serves everything from disk; rows, ledger and evi
 and there is no migration route or schedule - the service is operator tooling behind the
 same seam the orphan reconciler keeps. The `media.provider_id` column defaults `local`, so
 every pre-existing row and every old INSERT reads exactly what it always read.
+
+`hosted-archive-operations` is archived (`2db6039`, canonical spec
+`openspec/specs/hosted-archive-operations/spec.md`). Read that package's own boundary before
+extending it, and note what it decided that a later reader would otherwise have to rediscover.
+
+**Release evidence (`hosted-archive-operations`, commit `2db6039`, all run by the implementer
+rather than taken on report).** `bash scripts/verify.sh` exit 0 (`GATE_EXIT=0`,
+`set -o pipefail`) with the platform-feed stage and the new `hosted archive operations tests`
+stage alongside all existing stages, each filtered stage asserted to select at least one test,
+including **17/17 hosted archive operations** run directly against the same real disposable
+PostgreSQL and the real API host (measured/recorded/rehearsed backup proving the live scope
+still hashes to both recorded digests with the stamp reread from the row; unknown key 999,
+unknown schema and media/content drift each refused without promotion; recording alone reading
+unverified; foreign-scope rows moving neither digest with a foreign manifest id answering null
+to this scope; confirmed delete suspending a live journey and an enabled schedule while
+evidence, media bytes, the sealed credential and the project revision all still read back;
+wrong-name 422, stale-revision 409, missing-If-Match 428, second-delete
+`archive_already_deleted` 409, anonymous 401, never-deleted 404; restore inside the window
+lifting the deletion with the erase request withdrawn and a second restore 404; restore past
+the window `archive_restore_expired` 410 with the tombstone still live; foreign restore and
+read the delivered 404 with no foreign id or name in the body and the foreign row untouched;
+purge after the window retiring only the unreferenced media with the referenced picture still
+serving, bundles/items/approvals retained and the receipt itemizing them; purge inside the
+window, under a live approval and under a hold each skipping with their reason, the approval
+then withdrawn and the hold then cleared both purging on the next pass). Neighbour suites
+re-run against the same build by the full gate (all prior filtered stages green, unchanged).
+`npm ci`, `tsc` and `vite build` all green (no Web changes). `dotnet build
+--nologo --no-incremental` 0 errors with the same 2 pre-existing warnings at HEAD. Name
+preflight exit 0; `openspec validate --all --strict --no-interactive` 54/54 before and after
+the archive, which used no `--skip-specs`. No new browser suite: the scenarios are
+API-observable and manifests are operator rows with no route by design. Deployment stays
+`deployable: false`; there is no remote, no push and no publication.
+
+**What the archive package owns, and what it deliberately does not.** Recovery is
+byte-identical or it fails loudly: the rehearsal recomputes the media and content digests
+from the live scope and compares all four values (schema, key, media, content), and any
+drift keeps the old stamp rather than merging a new one. Deletion suspends rather than
+erases: the tombstone, the revoked journey and the disabled schedule are the whole delete,
+and units of work never nest — each suspension owns its own commit through its delivered
+service, sequenced suspend-first/tombstone-last so a retry finishes rather than half-writes.
+The purge keeps what it cannot prove is eligible: an open window, a hold, a live approval
+or a live projection each skip with a receipted reason, and only unreferenced media retires
+through the delivered store that refuses referenced bytes with `media_in_use`. Scope
+credentials are never retired by a project deletion — they belong to the scope, and the
+suite asserts one still resolves afterwards. Rollback is registration removal (no hosted
+loop, no transport, no schedule); the operator's backup runner and purge pass are methods,
+not loops. Five envelope codes (`archive_key_mismatch`, `archive_media_mismatch`,
+`archive_schema_mismatch`, `archive_already_deleted`, `archive_restore_expired`) with
+explicit middleware arms; the foreign refusal reuses the delivered 404.
 
 # Bootstrap handoff
 

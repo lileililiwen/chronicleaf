@@ -602,6 +602,20 @@ else
   # PostgreSQL and the real API host, with only the far end of the wire scripted. No stage here
   # reaches real Hashnode.
   step "publisher hashnode adapter tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~PublisherHashnodeAdapterTests"
+  # PUBLISHER-GHOST-ADAPTER-001/002. That a confirmed draft preview creates one Admin post as
+  # draft and a confirmed publish creates one published post - the approved title verbatim, the
+  # shared HTML export's sanitized article body, the operator's tags, status by the authorized
+  # mode, one short-lived Ghost-scheme token signed from the leased id:secret key with the
+  # configured Accept-Version, and the receipt carrying the remote post id, the URL derived
+  # from the post's url, and the exact body hash; that a refused key, a rejected body and a
+  # conflict each fail with a redacted code, no secret and no moved approval while an
+  # unsupported API major is refused as incompatible_target before any byte leaves and a
+  # post-preview origin change stales the confirmation before any call; that a redirect is
+  # refused without a second hop; that a lost create answer becomes unknown with a manual hint
+  # the target cannot reconcile; and that an identical resubmit returns the receipt with no
+  # second create - all proven against the same real disposable PostgreSQL and the real API
+  # host, with only the far end of the wire scripted. No stage here reaches real Ghost.
+  step "publisher ghost adapter tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~PublisherGhostAdapterTests"
   # SCREENSHOT-EVOLUTION-IMAGES-001/002. That a same-viewport comparison preserves source
   # pixels, order and provenance in a re-derivable manifest; that a milestone without a
   # selected screenshot is an unavailable gap rather than a fabrication, and a candidate is

@@ -8,7 +8,8 @@
 # SCREENSHOT-CAPTURE-001/002, SCREENSHOT-CURATION-001/002, GROUNDED-MARKDOWN-DRAFTS-001/002,
 # MILESTONE-TIMELINE-001/002, MARKDOWN-REVIEW-EXPORT-001/002,
 # COMMUNITY-COMPOSE-RELEASE-001/002, CLOUD-TENANT-BOUNDARY-001/002,
-# TEAM-PROJECT-PERMISSIONS-001/002, CLOUD-OBJECT-STORAGE-001/002).
+# TEAM-PROJECT-PERMISSIONS-001/002, CLOUD-OBJECT-STORAGE-001/002,
+# SCHEDULED-PROJECT-SYNC-001/002).
 #
 # Required chain, in order:
 #   1. platform feed           - the committed packages/platform-feed is what the build resolves, from
@@ -634,6 +635,19 @@ else
   # secret GitHub holds matches one an owner stored: what these scenarios establish is Chronicleaf's own
   # handling of what GitHub answers.
   step "github release candidates tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~GithubReleaseCandidatesTests"
+  # SCHEDULED-PROJECT-SYNC-001/002. That a due enabled schedule creates exactly one operation and
+  # one candidate run and advances the next run by one interval; that a disabled or disconnected
+  # schedule dispatches nothing and a disconnected or archived one is turned off; that repeated
+  # ticks and a three-hour outage collapse to one poll with no catch-up burst; that a scheduled
+  # poll records attributed candidates and nothing else - no milestone, evidence, draft or media;
+  # that the eleventh enabled schedule is refused as schedule_quota; that a failed provider run
+  # stays visible with its redacted code and the next bounded attempt; that a stale revision is a
+  # 409 and a missing If-Match a 428; that a restart keeps the next due instant with no duplicate;
+  # that an archived project supersedes the in-flight sync; and that disabling cancels a poll that
+  # never started - all proven against the same real disposable PostgreSQL and the real API host,
+  # with only the bytes on the wire scripted. No stage here may be read as evidence that GitHub
+  # works or that any real repository was polled.
+  step "scheduled project sync tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~ScheduledProjectSyncTests"
 fi
 
 step "frontend install" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm ci'

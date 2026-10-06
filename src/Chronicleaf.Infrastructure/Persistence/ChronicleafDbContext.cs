@@ -133,6 +133,8 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     public DbSet<MediaMigrationCopy> MediaMigrationCopies => Set<MediaMigrationCopy>();
 
+    public DbSet<ProjectSyncSchedule> ProjectSyncSchedules => Set<ProjectSyncSchedule>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Installation>(entity =>
@@ -2108,6 +2110,70 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .HasForeignKey(run => run.ProjectId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_github_candidate_runs_project_id");
+        });
+
+        // SCHEDULED-PROJECT-SYNC-001: one project's opt-in recurring poll. Off until an owner turns
+        // it on: a project without a row has no schedule, and the tick only reads rows that say
+        // enabled. The revision is the compare-and-set token a stale writer - an owner editing while
+        // a tick fires, or two ticks at once - loses with.
+        modelBuilder.Entity<ProjectSyncSchedule>(entity =>
+        {
+            entity.ToTable("project_sync_schedules");
+            entity.HasKey(schedule => schedule.Id);
+            entity.Property(schedule => schedule.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(schedule => schedule.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(schedule => schedule.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(schedule => schedule.Enabled).HasColumnName("enabled").IsRequired();
+            entity.Property(schedule => schedule.IntervalMinutes)
+                .HasColumnName("interval_minutes")
+                .IsRequired();
+            entity.Property(schedule => schedule.NextRunAt)
+                .HasColumnName("next_run_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(schedule => schedule.LastOperationId).HasColumnName("last_operation_id");
+            entity.Property(schedule => schedule.Revision).HasColumnName("revision").IsRequired();
+            entity.Property(schedule => schedule.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(schedule => schedule.UpdatedAt)
+                .HasColumnName("updated_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            entity.Property(schedule => schedule.Revision).IsConcurrencyToken();
+
+            // One schedule per project: the insert takes this index in the same statement, so two
+            // concurrent PUTs cannot both create.
+            entity.HasIndex(schedule => new { schedule.ScopeId, schedule.ProjectId })
+                .IsUnique()
+                .HasDatabaseName("ux_project_sync_schedules_scope_id_project_id");
+
+            // The tick's read: due enabled rows, oldest due first.
+            entity.HasIndex(schedule => new { schedule.Enabled, schedule.NextRunAt })
+                .HasDatabaseName("ix_project_sync_schedules_enabled_next_run_at");
+
+            // A cadence is quarter-hourly at most and weekly at most, and a revision is one or
+            // greater: checked on the pair of bounds so a row outside the cadence cannot be stored
+            // at all.
+            entity.ToTable(
+                table =>
+                {
+                    table.HasCheckConstraint(
+                        "ck_project_sync_schedules_interval",
+                        $"interval_minutes >= {ProjectSyncSchedule.MinIntervalMinutes} "
+                        + $"AND interval_minutes <= {ProjectSyncSchedule.MaxIntervalMinutes}");
+                    table.HasCheckConstraint(
+                        "ck_project_sync_schedules_revision",
+                        "revision >= 1");
+                });
+
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(schedule => schedule.ProjectId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_project_sync_schedules_project_id");
         });
 
         // NARRATIVE-MEMORY-001: one explicit, owner-written line of project history, attributed to

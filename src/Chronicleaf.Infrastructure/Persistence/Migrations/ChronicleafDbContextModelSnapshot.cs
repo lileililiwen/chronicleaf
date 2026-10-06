@@ -2378,6 +2378,68 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.ProjectSyncSchedule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<int>("IntervalMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("interval_minutes");
+
+                    b.Property<Guid?>("LastOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("last_operation_id");
+
+                    b.Property<DateTimeOffset>("NextRunAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_run_at");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("Enabled", "NextRunAt")
+                        .HasDatabaseName("ix_project_sync_schedules_enabled_next_run_at");
+
+                    b.HasIndex("ScopeId", "ProjectId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_project_sync_schedules_scope_id_project_id");
+
+                    b.ToTable("project_sync_schedules", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_project_sync_schedules_interval", "interval_minutes >= 15 AND interval_minutes <= 10080");
+
+                            t.HasCheckConstraint("ck_project_sync_schedules_revision", "revision >= 1");
+                        });
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.ScreenshotCandidate", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3252,6 +3314,16 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_project_summaries_project_id");
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.ProjectSyncSchedule", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_project_sync_schedules_project_id");
                 });
 
             modelBuilder.Entity("Chronicleaf.Core.ScreenshotCandidate", b =>

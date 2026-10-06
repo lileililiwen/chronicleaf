@@ -237,6 +237,14 @@ public static class ChronicleafSchema
     /// stops here still serves everything it served before.
     /// </summary>
     public const string CloudObjectStorageMigrationId = "20261006032737_AddCloudObjectStorage";
+
+    /// <summary>
+    /// The forward migration that adds the <c>project_sync_schedules</c> table
+    /// (SCHEDULED-PROJECT-SYNC-001/002). A database that has never applied it has nowhere to
+    /// record an opt-in sync schedule, so its schedule routes would fail against a missing table;
+    /// readiness says so by name rather than answering 200 and failing on the first request.
+    /// </summary>
+    public const string ScheduledProjectSyncMigrationId = "20261016090000_AddScheduledProjectSync";
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
         InitialMigrationId,
@@ -264,6 +272,7 @@ public static class ChronicleafSchema
         CloudTenantBoundaryMigrationId,
         TeamProjectPermissionsMigrationId,
         CloudObjectStorageMigrationId,
+        ScheduledProjectSyncMigrationId,
     ];
 
     /// <summary>
@@ -271,7 +280,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = CloudObjectStorageMigrationId;
+    public const string ExpectedMigrationId = ScheduledProjectSyncMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

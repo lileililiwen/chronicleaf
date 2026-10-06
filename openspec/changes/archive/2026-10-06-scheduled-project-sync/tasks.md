@@ -1,0 +1,25 @@
+## 1. BFS — Baseline and impact coverage
+- [x] 1.1 Map every requirement and Success/Failure/Boundary scenario to src/Chronicleaf.Application/Schedules/, owned state/contracts, API/UI callers and ScheduledProjectSyncTests fixtures; confirm proposal/design/spec agree and record baseline.
+- [x] 1.2 Confirm completed dependencies (github-release-candidates, background-jobs, cloud-tenant-boundary), C# .NET10 / React TypeScript boundary, shared-package adoption and every activation/blocker decision; do not start a blocked handoff or duplicate sibling code.
+
+## 2. DFS — Requirement-by-requirement implementation
+- [x] 2.1 Implement SCHEDULED-PROJECT-SYNC-001 Opt-in durable sync schedule through its declared contracts, state/IO and applicable API/UI; add tests asserting its specified success, failure and boundary results before marking complete.
+- [x] 2.2 Implement SCHEDULED-PROJECT-SYNC-002 Read-only scheduled outcomes through its declared contracts, state/IO and applicable API/UI; add tests asserting its specified success, failure and boundary results before marking complete.
+
+## 3. BFS — Cross-surface regression and completeness
+- [x] 3.1 Run ScheduledProjectSyncTests with the exact fixtures in design.md; verify scope, privacy, revision/concurrency, retry/cancel and output invariants across every changed caller, and audit the original impact map for omissions.
+- [x] 3.2 Exercise dependency compatibility and retained preexisting history; test documented rollback/partial failure and verify no current-change placeholders, unauthorized side effects or unrelated sibling changes.
+
+## 4. Verification
+- [x] 4.1 Run native build and scoped real scenario tests from design.md; execute applicable UI/browser, PostgreSQL or provider-contract checks and local Gate. Record exact commands/results and unavailable prerequisites; no mock-only runtime claims.
+- [x] 4.2 Run `node scripts/check-openspec-change-names.mjs`, `openspec validate --all --strict --no-interactive`, `git diff --check`, and review untracked/staged content and the mapped impact surface before archive.
+- [x] 4.3 Only after implementation authorization and all scoped acceptance: archive without --skip-specs, create implementation/tests/archive commit, then HANDOFF.md-only pointer/evidence commit; exactly two commits, no conversational confirmation, stop and do not push.
+
+Evidence:
+- 1.1: SCHEDULED-PROJECT-SYNC-001 → ProjectSyncSchedule (Core) + PUT/GET /api/projects/{id}/sync-schedule + ProjectSyncTicker/TickAsync + ProjectSyncJobHandler(kind project.scheduled-sync) + 20261016090000 migration; 001 Success/Failure/Boundary → tests Sync_001_Success / Sync_001_Failure(disabled, archived-or-disconnected) / Sync_001_Boundary(collapse). 002 → delivered GitHubCandidateService.PollAsync reuse (no second poll/transport/store) + quota schedule_quota 429 + lastOperation redacted outcome; tests Sync_002_Success(poll, 5/5) / Sync_002_Failure(quota) / Sync_002_Boundary(404 failed visible). No Web UI: API-observable like team-permissions/cloud-object-storage; no browser suite.
+- 1.2: github-release-candidates, background-jobs, cloud-tenant-boundary all archived with canonical specs under openspec/specs/; Platform.Jobs via delivered IJobDispatcher/IOperationService (no new queue); no sibling edits (dotnet-platform-libs untouched); CLOUD phase, no demand gate.
+- 2.1: Tick enqueues kind project.scheduled-sync (TargetId=project, InputRevision=project revision, key scheduleId:dueUnix) + GitHubCandidateRun(since null); one active sync/project across both sync kinds; miss collapses to now+interval; archive/disconnect disables + cancels queued; revision-guarded PUT (0 creates, stale 409, missing 428, interval 422, no-connection 409, quota 429).
+- 2.2: Handler delegates to delivered candidates.PollAsync; supersede via delivered OperationTargets head 'project' (proven: archived mid-flight → superseded, null resultRef); quota MaxEnabledPerScope=10; last outcome joined from operations row (status/errorCode/completedAt); Hosted reads gated read/edit via RequireProjectPermissionAsync, Community branch-free.
+- 3.1: ScheduledProjectSyncTests 12/12 vs real Testcontainers PostgreSQL + real Api host (FakeGitHubHandler only on wire); seed scope A/B equivalent via InstallationId scope + foreign-project 404 probes; deterministic FixedTimeProvider clock.
+- 3.2: Neighbors re-run green: BackgroundJobsTests 12/12, GithubReleaseCandidatesTests 40/40, CommunityPersistenceTests 24/24, ProjectsAndMilestonesTests 19/19. Rollback = deregistration only (migration additive, no Down on startup); no placeholders (grep TODO/ScheduledProjectSync outside tests yields only docs); envelope arms added in both ApiException status map and ApiErrorMiddleware type switch (verified by 429/409 tests answering non-500).
+- 4.1: `dotnet build --nologo --no-incremental` 0 errors, same 2 pre-existing warnings; full `bash scripts/verify.sh` foreground with GATE_EXIT (see commit message); no Web changes → no npm beyond gate's own ci/build; no E2E (CHRONICLEAF_E2E unset, no UI).

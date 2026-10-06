@@ -25,6 +25,7 @@ using Chronicleaf.Api.Narrative;
 using Chronicleaf.Api.Operations;
 using Chronicleaf.Api.Projects;
 using Chronicleaf.Api.S3;
+using Chronicleaf.Api.Schedules;
 using Chronicleaf.Api.Secrets;
 using Chronicleaf.Api.Tenancy;
 using Chronicleaf.Api.Timeline;
@@ -56,6 +57,7 @@ using Chronicleaf.Infrastructure.Operations;
 using Chronicleaf.Infrastructure.Persistence;
 using Chronicleaf.Infrastructure.Projects;
 using Chronicleaf.Infrastructure.Secrets;
+using Chronicleaf.Infrastructure.Schedules;
 using Chronicleaf.Infrastructure.Tenancy;
 using Chronicleaf.Infrastructure.Teams;
 using Chronicleaf.Infrastructure.Voice;
@@ -249,6 +251,14 @@ builder.Services.AddGitHubEvidence();
 // publishes. A database without the github-release-candidates migration reports schema_mismatch at
 // /api/ready.
 builder.Services.AddGitHubCandidates();
+
+// SCHEDULED-PROJECT-SYNC-001/002. The opt-in recurring poll over the delivered candidate
+// contracts: one schedule row per project, one minute tick that turns due rows into queued polls,
+// and the one job handler that runs the delivered poll. Nothing here confirms a candidate,
+// appends evidence, writes a draft or publishes: the job the tick creates is the delivered poll,
+// whose own contract already refuses to confirm anything. A database without the
+// scheduled-project-sync migration reports schema_mismatch at /api/ready.
+builder.Services.AddProjectSyncSchedules(builder.Configuration);
 
 // GITHUB-GRAPHQL-ENRICHMENT-001/002. The optional relationship reader over the delivered GitHub
 // transport - no second HttpClient, so no second host, redirect policy or timeout to disagree
@@ -459,6 +469,12 @@ app.MapGitHubEvidenceEndpoints();
 // caller is GitHub, it has no session, and the HMAC signature over its own raw bytes is what
 // authenticates it. Nothing in this file confirms a candidate, and no route here returns a secret.
 app.MapGitHubCandidateEndpoints();
+
+// SCHEDULED-PROJECT-SYNC-001/002: the private schedule read and write. Neither is marked public,
+// so the access package's default-deny boundary already covers both of them. No route here accepts
+// or returns a URL, a ref or a SHA: the repository is the delivered connection's two names, and the
+// route carries only the switch, the cadence and the schedule's own revision.
+app.MapProjectSyncScheduleEndpoints();
 
 // GITHUB-GRAPHQL-ENRICHMENT-001/002: the private enrichment request route. It is not marked
 // public, so the access package's default-deny boundary already covers it. No route here accepts

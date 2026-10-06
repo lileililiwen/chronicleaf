@@ -240,6 +240,15 @@ public static class ApiErrorStatus
         GitHubCandidates.GitHubCandidateError.Unreachable => 503,
         GitHubCandidates.GitHubCandidateError.DeliveryTooLarge => 413,
 
+        // The scheduled-project-sync package's codes. Additive in the same way, and the choices are
+        // this package's failure policy rather than defaults. 429 for an activation past the
+        // scope's enabled-schedule quota, because the remedy is to disable another schedule rather
+        // than to retry or correct this one. 409 for a project with no readable repository
+        // connection, because nothing is wrong with the request and the remedy is to connect a
+        // repository rather than to resend the schedule.
+        Schedules.ScheduleError.QuotaExceeded => 429,
+        Schedules.ScheduleError.NoConnection => 409,
+
         _ => 500,
     };
 }

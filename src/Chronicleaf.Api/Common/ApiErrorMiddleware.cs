@@ -15,6 +15,7 @@ using Chronicleaf.Application.Milestones;
 using Chronicleaf.Application.Narrative;
 using Chronicleaf.Application.Operations;
 using Chronicleaf.Application.Secrets;
+using Chronicleaf.Application.Schedules;
 using Chronicleaf.Application.Teams;
 using Chronicleaf.Application.Tenancy;
 // `ApiError` also names the runtime shell's compact not_found/web_assets_unavailable record in
@@ -570,6 +571,29 @@ public sealed class ApiErrorMiddleware(
                     Envelope.Create(
                         CandidateError.DeliveryTooLarge,
                         deliveryTooLarge.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            // SCHEDULED-PROJECT-SYNC-001/002. Written here for the same reason as every other
+            // feature package's refusals: this package raises them and this middleware is still the
+            // only place an envelope is written. Each arm is explicit by type - the status-code
+            // mapping alone would still answer 500 - and every message is authored in the schedules
+            // package: no repository name, no interval history and no other scope's count. The 429
+            // says the remedy is to disable another schedule rather than to retry this one, and the
+            // 409 says the remedy is to connect a repository rather than to resend the schedule.
+            case ScheduleQuotaExceededException scheduleQuota:
+                return (
+                    Envelope.Create(
+                        ScheduleError.QuotaExceeded,
+                        scheduleQuota.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            case ScheduleConnectionMissingException scheduleNoConnection:
+                return (
+                    Envelope.Create(
+                        ScheduleError.NoConnection,
+                        scheduleNoConnection.Message,
                         traceId),
                     LogLevel.Information);
 

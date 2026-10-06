@@ -58,7 +58,7 @@ using Chronicleaf.Infrastructure.Media;
 using Chronicleaf.Infrastructure.Medium;
 using Chronicleaf.Infrastructure.Media.S3;
 using Chronicleaf.Infrastructure.Narrative;
-using Chronicleaf.Infrastructure.Operations;
+using Chronicleaf.Publishers.GitHubPages;using Chronicleaf.Infrastructure.Operations;
 using Chronicleaf.Infrastructure.Persistence;
 using Chronicleaf.Infrastructure.Projects;
 using Chronicleaf.Infrastructure.Publishing;
@@ -402,6 +402,15 @@ builder.Services.AddPublisherContract();
 builder.Services.AddSingleton<
     Chronicleaf.Application.Publishing.IPublisherCredentialSource,
     VaultPublisherCredentialSource>();
+
+// PUBLISHER-GITHUB-PAGES-ADAPTER-001/002. The first real transport behind the publisher
+// contract: one IPublisherAdapter for the `github-pages` slot, pushing the approved snapshot's
+// rendered files to the operator's explicit repository, branch and subdirectory through the Git
+// Data API with a conditional ref write. The target is demand-gated: without an explicit
+// Chronicleaf:GitHubPages section this registers nothing and the slot answers
+// publisher_unknown_target, exactly as the contract says an unclaimed target does. The other
+// five slots are still separate roadmap packages and stay unclaimed.
+builder.Services.AddGitHubPagesPublisher(builder.Configuration);
 
 // The rotation guard is applied once at start-up, so an access token that was changed since the
 // last run revokes every existing session before this process serves anything.

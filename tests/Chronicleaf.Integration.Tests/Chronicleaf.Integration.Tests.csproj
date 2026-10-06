@@ -29,6 +29,7 @@
     <ProjectReference Include="../../src/Chronicleaf.Application/Chronicleaf.Application.csproj" />
     <ProjectReference Include="../../src/Chronicleaf.Core/Chronicleaf.Core.csproj" />
     <ProjectReference Include="../../src/Chronicleaf.Infrastructure/Chronicleaf.Infrastructure.csproj" />
+    <ProjectReference Include="../../src/Chronicleaf.Publishers/Chronicleaf.Publishers.csproj" />
   </ItemGroup>
 
 </Project>

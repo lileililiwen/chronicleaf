@@ -561,7 +561,21 @@ else
   # host, with the real vault sealing and leasing the publisher credential and only the far
   # end of the wire (a test-local fake on a target id production never takes) scripted. No
   # stage here reaches any remote side: this contract ships no transport.
-  step "publisher contract tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~PublisherContractTests"  # SCREENSHOT-EVOLUTION-IMAGES-001/002. That a same-viewport comparison preserves source
+  step "publisher contract tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~PublisherContractTests"
+  # PUBLISHER-GITHUB-PAGES-ADAPTER-001/002. That a confirmed current preview pushes the
+  # approved snapshot's rendered files to the operator's explicit repository, branch and
+  # subdirectory through the Git Data API - repository read, base read, blobs, tree, commit,
+  # one force=false ref move - with the scope's publisher credential leased for the call as
+  # the one bearer header; that approval-covered pictures travel under generated asset paths
+  # with rewritten sources; that a refused credential fails without exposing the secret or
+  # moving the approval while draft mode and a post-preview target change are each refused
+  # before any upstream call; that a moved branch fails without a force push; that a lost
+  # ref move becomes unknown with the planned commit SHA and reconciles to published when
+  # the branch holds it, while a timeout before the commit stays unknown with no reconcile
+  # call; and that an identical resubmit returns the receipt with no second push - all proven
+  # against the same real disposable PostgreSQL and the real API host, with only the far end
+  # of the wire scripted. No stage here reaches any real GitHub endpoint.
+  step "publisher github pages adapter tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~PublisherGithubPagesAdapterTests"  # SCREENSHOT-EVOLUTION-IMAGES-001/002. That a same-viewport comparison preserves source
   # pixels, order and provenance in a re-derivable manifest; that a milestone without a
   # selected screenshot is an unavailable gap rather than a fabrication, and a candidate is
   # never compared and never promoted; that mixed viewports outside the gallery are a 422

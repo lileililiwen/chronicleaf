@@ -26,6 +26,7 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chronicleaf.Capture", "src\Chronicleaf.Capture\Chronicleaf.Capture.csproj", "{0867E9C4-CE09-4B34-80E8-870D2C9932D0}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chronicleaf.AI.OpenAI", "src\Chronicleaf.AI\Providers\OpenAI\Chronicleaf.AI.OpenAI.csproj", "{BDAA85D8-B5F5-463E-B727-05358848A3F1}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chronicleaf.AI.Gemini", "src\Chronicleaf.AI\Providers\Gemini\Chronicleaf.AI.Gemini.csproj", "{789AC0C7-2D8C-47A5-889F-40CE0CF42D34}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chronicleaf.AI.Anthropic", "src\Chronicleaf.AI\Providers\Anthropic\Chronicleaf.AI.Anthropic.csproj", "{C41D9E2F-7B3A-4E5C-8D6F-0A1B2C3D4E5F}"
@@ -33,6 +34,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chronicleaf.AI.OpenRouter", "src\Chronicleaf.AI\Providers\OpenRouter\Chronicleaf.AI.OpenRouter.csproj", "{D5E6F7A8-9B0C-4D6E-8F1A-2B3C4D5E6F70}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chronicleaf.AI.Ollama", "src\Chronicleaf.AI\Providers\Ollama\Chronicleaf.AI.Ollama.csproj", "{E9CFE6C2-D8AE-413F-BBE9-44402E903B9E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chronicleaf.Publishers", "src\Chronicleaf.Publishers\Chronicleaf.Publishers.csproj", "{BF5B5658-7848-4758-B687-25DAB4A7F6A6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -212,6 +215,18 @@ Global
 		{E9CFE6C2-D8AE-413F-BBE9-44402E903B9E}.Release|x64.Build.0 = Release|Any CPU
 		{E9CFE6C2-D8AE-413F-BBE9-44402E903B9E}.Release|x86.ActiveCfg = Release|Any CPU
 		{E9CFE6C2-D8AE-413F-BBE9-44402E903B9E}.Release|x86.Build.0 = Release|Any CPU
+		{BF5B5658-7848-4758-B687-25DAB4A7F6A6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BF5B5658-7848-4758-B687-25DAB4A7F6A6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BF5B5658-7848-4758-B687-25DAB4A7F6A6}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{BF5B5658-7848-4758-B687-25DAB4A7F6A6}.Debug|x64.Build.0 = Debug|Any CPU
+		{BF5B5658-7848-4758-B687-25DAB4A7F6A6}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{BF5B5658-7848-4758-B687-25DAB4A7F6A6}.Debug|x86.Build.0 = Debug|Any CPU
+		{BF5B5658-7848-4758-B687-25DAB4A7F6A6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BF5B5658-7848-4758-B687-25DAB4A7F6A6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BF5B5658-7848-4758-B687-25DAB4A7F6A6}.Release|x64.ActiveCfg = Release|Any CPU
+		{BF5B5658-7848-4758-B687-25DAB4A7F6A6}.Release|x64.Build.0 = Release|Any CPU
+		{BF5B5658-7848-4758-B687-25DAB4A7F6A6}.Release|x86.ActiveCfg = Release|Any CPU
+		{BF5B5658-7848-4758-B687-25DAB4A7F6A6}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -231,5 +246,6 @@ Global
 		{C41D9E2F-7B3A-4E5C-8D6F-0A1B2C3D4E5F} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{D5E6F7A8-9B0C-4D6E-8F1A-2B3C4D5E6F70} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{E9CFE6C2-D8AE-413F-BBE9-44402E903B9E} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{BF5B5658-7848-4758-B687-25DAB4A7F6A6} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

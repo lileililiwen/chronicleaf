@@ -26,6 +26,15 @@
     <ProjectReference Include="../Chronicleaf.Application/Chronicleaf.Application.csproj" />
     <ProjectReference Include="../Chronicleaf.Core/Chronicleaf.Core.csproj" />
     <ProjectReference Include="../Chronicleaf.Infrastructure/Chronicleaf.Infrastructure.csproj" />
+    <!--
+      The GitHub Pages transport, pointed at the publisher contract rather than the other way
+      round. It is referenced here because this file is the composition root, and a composition
+      root is the only place allowed to know that a publisher target exists at all.
+      Chronicleaf.Publishers references the contract and nothing else in the repository that
+      stores anything, so adding it here cannot give the transport reach of the vault, the
+      attempt store or the domain records.
+    -->
+    <ProjectReference Include="../Chronicleaf.Publishers/Chronicleaf.Publishers.csproj" />
   </ItemGroup>
 
   <ItemGroup>

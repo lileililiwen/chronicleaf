@@ -12,10 +12,11 @@
     <!--
       The publisher contract and the approved-byte shapes, and nothing else in the repository.
       PUBLISHER-GITHUB-PAGES-ADAPTER-001/002 own one thing: how the reviewed snapshot is pushed
-      to a GitHub Pages branch through the Git Data API. Everything on the Chronicleaf side of a
-      publish - the approval, the preview hash, the attempt row, the operation, the credential's
-      revision, the audit row - belongs to the packages that already shipped it, so this project
-      cannot reach any of it.
+      to a GitHub Pages branch through the Git Data API. PUBLISHER-DEVTO-ADAPTER-001/002 own one
+      thing beside it: how the reviewed snapshot becomes one Forem article through the Dev.to
+      article API. Everything on the Chronicleaf side of a publish - the approval, the preview
+      hash, the attempt row, the operation, the credential's revision, the audit row - belongs
+      to the packages that already shipped it, so this project cannot reach any of it.
 
       That is why the credential arrives as a leased SecretLease handed to the one call rather
       than through Chronicleaf.Application.Secrets.ISecretVault: a project reference to the vault

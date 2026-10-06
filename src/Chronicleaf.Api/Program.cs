@@ -58,6 +58,7 @@ using Chronicleaf.Infrastructure.Media;
 using Chronicleaf.Infrastructure.Medium;
 using Chronicleaf.Infrastructure.Media.S3;
 using Chronicleaf.Infrastructure.Narrative;
+using Chronicleaf.Publishers.DevTo;
 using Chronicleaf.Publishers.GitHubPages;using Chronicleaf.Infrastructure.Operations;
 using Chronicleaf.Infrastructure.Persistence;
 using Chronicleaf.Infrastructure.Projects;
@@ -411,6 +412,17 @@ builder.Services.AddSingleton<
 // publisher_unknown_target, exactly as the contract says an unclaimed target does. The other
 // five slots are still separate roadmap packages and stay unclaimed.
 builder.Services.AddGitHubPagesPublisher(builder.Configuration);
+
+// PUBLISHER-DEVTO-ADAPTER-001/002. The second transport behind the publisher contract: one
+// IPublisherAdapter for the `devto` slot, creating one Forem article per confirmed publish -
+// published or draft by the authorized mode - under the operator's explicit tag configuration
+// with the scope's publisher API key leased for the call as the one api-key header. The
+// target is demand-gated: without an explicit Chronicleaf:DevTo section this registers
+// nothing and the slot answers publisher_unknown_target, exactly as the contract says an
+// unclaimed target does. The transport owns its own client pinned to the Dev.to host with
+// redirects refused, so no bare-handler registration here can rewire the GitHub Pages
+// transport. The remaining slots are still separate roadmap packages and stay unclaimed.
+builder.Services.AddDevToPublisher(builder.Configuration);
 
 // The rotation guard is applied once at start-up, so an access token that was changed since the
 // last run revokes every existing session before this process serves anything.

@@ -575,7 +575,19 @@ else
   # call; and that an identical resubmit returns the receipt with no second push - all proven
   # against the same real disposable PostgreSQL and the real API host, with only the far end
   # of the wire scripted. No stage here reaches any real GitHub endpoint.
-  step "publisher github pages adapter tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~PublisherGithubPagesAdapterTests"  # SCREENSHOT-EVOLUTION-IMAGES-001/002. That a same-viewport comparison preserves source
+  step "publisher github pages adapter tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~PublisherGithubPagesAdapterTests"
+  # PUBLISHER-DEVTO-ADAPTER-001/002. That a confirmed draft preview creates one draft article
+  # and a confirmed publish creates one published article with the operator's tags - the
+  # approved title and bytes verbatim, the leased key as the one api-key header, the vendor
+  # Accept, and the receipt carrying the remote id, URL and exact body hash; that a refused
+  # key and a rejected body each fail with a redacted code, no secret and no moved approval
+  # while a post-preview tag change stales the confirmation before any call; that a redirect
+  # is refused without a second hop; that a lost create answer becomes unknown with a manual
+  # hint the target cannot reconcile; and that an identical resubmit returns the receipt with
+  # no second create - all proven against the same real disposable PostgreSQL and the real
+  # API host, with only the far end of the wire scripted. No stage here reaches real Dev.to.
+  step "publisher devto adapter tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~PublisherDevtoAdapterTests"
+  # SCREENSHOT-EVOLUTION-IMAGES-001/002. That a same-viewport comparison preserves source
   # pixels, order and provenance in a re-derivable manifest; that a milestone without a
   # selected screenshot is an unavailable gap rather than a fabrication, and a candidate is
   # never compared and never promoted; that mixed viewports outside the gallery are a 422

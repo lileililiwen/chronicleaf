@@ -1,6 +1,6 @@
 # Chronicleaf handoff
 
-current_spec: publisher-contract
+current_spec: publisher-github-pages-adapter
 
 ## Current state — 2026-10-05
 
@@ -1377,3 +1377,50 @@ browser posting). Deployment stays `deployable: false`; there is no remote, no p
 publication.
 Next: `current_spec` is `publisher-contract`, the next package in drain order after
 `medium-import-package`.
+`publisher-contract` is archived
+(`8e53d58`, canonical spec `openspec/specs/publisher-contract/spec.md`): the contract all
+six publisher adapters implement, with Community behavior the only behavior (Hosted adds
+per-project read/publish grants through the delivered teams check). The adapter registry
+(`IPublisherRegistry` plain singleton) classifies medium/linkedin as export-only; every
+transport target is classified by its adapter's own `Describe()` where no descriptor was
+contributed beside it, so the two can never drift. The reviewed-publication workflow
+publishes only approved-while-bindings-hold content: preview is pure, publish freezes the
+approval/body/evidence/preview bindings plus an explicit per-target confirmation into a
+`publication_attempts` row (forward migration `20261019090000`, unique scope/key and
+unique operation, terminal states immutable), the durable `publication.publish` run
+re-checks every binding, leases the scope's `publisher` credential for the one call through
+the vault-backed singleton source (deleted-between-request-and-run is the delivered
+`credential_missing`), and records the receipt; an ambiguous timeout and a post-commit
+crash both become `unknown` with exactly one dispatch and no retry (`publication_unknown`
+on the attempt and the operation), and reconcile resolves where the target permits while a
+target that cannot keeps `unknown` with a `manual` hint and a 422. Medium/LinkedIn publish
+is refused with this package's own `publisher_target_export_only`, classified in the
+registry rather than colliding with the export packages' `publisher_unsupported`. This
+package ships no transport: the only adapter-shaped object is the test-local fake on
+`test-fake`, proven test-only by the production host answering `publisher_unknown_target`
+for its slot. Read that package's own boundary before extending it, and note the six
+defects verification found, none worked around in a test: the registry first knew only its
+two static descriptors, so the fake's slot answered `publisher_unknown_target` at preview
+and at run time (adapter declarations are now authoritative where no descriptor exists,
+export-only still winning over any declaration); the run path read the registry directly
+and needed the same resolution; `TryCompleteAsync` only moved prepared/sending, so a
+reconcile could never leave `unknown` (dedicated `TryReconcileAsync`, unknown to
+published/remote-draft only); `ApprovedAssetSnapshot` already existed in the content
+package, so the contract reuses the delivered snapshot with its picture bytes (missing
+bytes are the delivered `media_unavailable`, read under the portable-artifact bound)
+rather than duplicating it; the delivered conflict code is `operation_idempotency_conflict`
+and `reconcileHint` serializes null rather than absent; and EF stamped the migration with
+the machine clock (`20261006084950`), renamed to `20261019090000` so it sorts after the
+LinkedIn package's. Evidence, all run by the implementer rather than taken on report:
+`bash scripts/verify.sh` exit 0 (`GATE_EXIT=0`, `set -o pipefail`) with the platform-feed
+stage and the new `publisher contract tests` stage (18/18) alongside all existing stages,
+`npm ci`, `tsc` + `vite build`, `dotnet build --nologo --no-incremental` 0 errors with
+the same 12 pre-existing warning grep lines at HEAD (2 src + 4 xUnit1030 doubled, zero
+added), name preflight exit 0, and `openspec validate --all --strict --no-interactive`
+54/54 before and after the archive, which used no `--skip-specs`. No Web UI was shipped:
+the design names it optional, the scenarios are API-observable, and no new browser suite
+was added. The opt-in real-transport run was not performed (structural: no transport
+exists) and no claim is made about any remote side. Deployment stays `deployable: false`;
+there is no remote, no push and no publication.
+Next: `current_spec` is `publisher-github-pages-adapter`, the next package in drain order
+after `publisher-contract`.

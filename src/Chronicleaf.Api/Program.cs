@@ -8,6 +8,7 @@
 using Chronicleaf.Api;
 using Chronicleaf.Api.Access;
 using Chronicleaf.Api.AI;
+using Chronicleaf.Api.Agency;
 using Chronicleaf.Api.Capture;
 using Chronicleaf.Api.Common;
 using Chronicleaf.Api.Content;
@@ -32,6 +33,7 @@ using Chronicleaf.AI.Ollama;
 using Chronicleaf.AI.OpenAI;
 using Chronicleaf.AI.OpenRouter;
 using Chronicleaf.Infrastructure.Access;
+using Chronicleaf.Infrastructure.Agency;
 using Chronicleaf.Infrastructure.AI;
 using Chronicleaf.Infrastructure.Capture;
 using Chronicleaf.Infrastructure.Content;
@@ -76,6 +78,14 @@ builder.Services.AddChronicleafAccess(builder.Configuration, builder.Environment
 // own to fall back on: a database without the projects-and-milestones migration reports
 // schema_mismatch at /api/ready rather than serving an empty installation.
 builder.Services.AddProjectMilestones();
+
+// AGENCY-CLIENT-PROJECTS-001/002. The owner's agency clients and the one optional client per
+// project, stored by the same context, unit of work and audit trail the packages above
+// delivered, with no store of its own to fall back on: a database without the
+// agency-client-projects migration reports schema_mismatch at /api/ready rather than serving an
+// installation with no clients. No portal, no invoice, no team identity: a client is
+// organizational context over the owner's own records.
+builder.Services.AddAgencyClients();
 
 // MILESTONE-TIMELINE-001/002. The private chronological read over the milestone records above.
 // It keeps no table of its own: the projects-and-milestones migration is its schema, and a
@@ -341,6 +351,12 @@ app.MapAccessEndpoints();
 // marked public, so the access package's default-deny boundary already covers every one of them
 // and the public allow-list stays exactly as the design fixed it.
 app.MapProjectMilestoneEndpoints();
+
+// AGENCY-CLIENT-PROJECTS-001/002: the private client, assignment and report-context routes. None
+// of them is marked public, so the access package's default-deny boundary already covers every
+// one of them and the public allow-list stays exactly as the access package fixed it - a client
+// hierarchy is readable only by the owner it belongs to.
+app.MapAgencyClientEndpoints();
 
 // MILESTONE-TIMELINE-001/002: the private chronological timeline of one project. It is not marked
 // public, so the access package's default-deny boundary already covers it and the public allow-list

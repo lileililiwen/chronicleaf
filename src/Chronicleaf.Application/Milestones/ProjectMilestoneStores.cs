@@ -80,6 +80,32 @@ public interface IProjectStore
         long expectedRevision,
         DateTimeOffset archivedAt,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Groups a live project under <paramref name="clientId"/> (or clears it back to personal when
+    /// <c>null</c>), again only at <paramref name="expectedRevision"/>
+    /// (AGENCY-CLIENT-PROJECTS-001). The client itself is validated by the caller: this write names
+    /// the id it was given, and the revision advances so a later edit is told it is stale.
+    /// </summary>
+    Task<int> SetClientAsync(
+        Guid scopeId,
+        Guid projectId,
+        long expectedRevision,
+        Guid? clientId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads the projects grouped under one client in a scope, ordered by name and then id,
+    /// starting after the cursor position (AGENCY-CLIENT-PROJECTS-001). Passing no position starts
+    /// at the beginning. An archived membership is still listed: the archive preserves history.
+    /// </summary>
+    Task<IReadOnlyList<Project>> ListByClientAsync(
+        Guid scopeId,
+        Guid clientId,
+        string? afterName,
+        Guid? afterId,
+        int limit,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>

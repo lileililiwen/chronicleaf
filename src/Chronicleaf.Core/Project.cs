@@ -19,6 +19,11 @@ namespace Chronicleaf.Core;
 /// as written by the owner and is deliberately never dereferenced: the runtime has no network call
 /// in this package at all.
 /// </para>
+/// <para>
+/// <see cref="ClientId"/> is the one optional agency client this project is grouped under
+/// (AGENCY-CLIENT-PROJECTS-001), or <c>null</c> while it is a personal, unassigned project. At most
+/// one client is ever named: the column is a single nullable foreign key, not a membership list.
+/// </para>
 /// </remarks>
 public sealed class Project
 {
@@ -39,7 +44,8 @@ public sealed class Project
         Guid? repoConnectionId,
         string? projectUrl,
         long revision,
-        DateTimeOffset? archivedAt = null)
+        DateTimeOffset? archivedAt = null,
+        Guid? clientId = null)
     {
         Id = id;
         ScopeId = scopeId;
@@ -49,6 +55,7 @@ public sealed class Project
         ProjectUrl = projectUrl;
         Revision = revision;
         ArchivedAt = archivedAt;
+        ClientId = clientId;
     }
 
     public Guid Id { get; }
@@ -73,6 +80,12 @@ public sealed class Project
 
     /// <summary>When the owner archived the project, or <c>null</c> while it is live.</summary>
     public DateTimeOffset? ArchivedAt { get; }
+
+    /// <summary>
+    /// The agency client this project is grouped under, or <c>null</c> while it is a personal,
+    /// unassigned project. Never a login identity: clients never widen what the owner may read.
+    /// </summary>
+    public Guid? ClientId { get; }
 
     /// <summary>True when the project is archived, and therefore read-only.</summary>
     public bool IsArchived => ArchivedAt.HasValue;

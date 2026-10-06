@@ -51,6 +51,8 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     public DbSet<Project> Projects => Set<Project>();
 
+    public DbSet<Client> Clients => Set<Client>();
+
     public DbSet<Milestone> Milestones => Set<Milestone>();
 
     public DbSet<Operation> Operations => Set<Operation>();
@@ -276,6 +278,7 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
             entity.Property(project => project.ProjectUrl)
                 .HasColumnName("project_url")
                 .HasMaxLength(Project.ProjectUrlMaxLength);
+            entity.Property(project => project.ClientId).HasColumnName("client_id");
             entity.Property(project => project.Revision).HasColumnName("revision").IsRequired();
             entity.Property(project => project.ArchivedAt)
                 .HasColumnName("archived_at")
@@ -288,6 +291,50 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
             // Every read is scoped, and a list is ordered by name, so the index serves both.
             entity.HasIndex(project => new { project.ScopeId, project.Name })
                 .HasDatabaseName("ix_projects_scope_id_name");
+
+            // AGENCY-CLIENT-PROJECTS-001: the one optional client a project is grouped under. The
+            // foreign key is Restrict, so a client with projects cannot be erased by a key action -
+            // and it cannot be erased any other way either, because clients are archived, never
+            // deleted. The scope of the association is enforced by the service, not by the key: a
+            // foreign-scoped client is refused before this column is ever written.
+            entity.HasOne<Client>()
+                .WithMany()
+                .HasForeignKey(project => project.ClientId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_projects_client_id");
+        });
+
+        // AGENCY-CLIENT-PROJECTS-001: a client belongs to exactly one owner scope, carries the
+        // optimistic revision every edit presents, the membership generation every assignment
+        // advances, and is archived rather than deleted.
+        modelBuilder.Entity<Client>(entity =>
+        {
+            entity.ToTable("clients");
+            entity.HasKey(client => client.Id);
+            entity.Property(client => client.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(client => client.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(client => client.Name)
+                .HasColumnName("name")
+                .HasMaxLength(Client.NameMaxLength)
+                .IsRequired();
+            entity.Property(client => client.Notes)
+                .HasColumnName("notes")
+                .HasMaxLength(Client.NotesMaxLength)
+                .IsRequired();
+            entity.Property(client => client.Revision).HasColumnName("revision").IsRequired();
+            entity.Property(client => client.ContextRevision).HasColumnName("context_revision").IsRequired();
+            entity.Property(client => client.ArchivedAt)
+                .HasColumnName("archived_at")
+                .HasColumnType("timestamp with time zone");
+
+            // A stale write is a conflict, never an overwrite, for the same reason the projects and
+            // milestones revisions carry a token: the parameterized compare-and-set in
+            // PostgresClientStore matches on it.
+            entity.Property(client => client.Revision).IsConcurrencyToken();
+
+            // Every read is scoped, and a list is ordered by name, so the index serves both.
+            entity.HasIndex(client => new { client.ScopeId, client.Name })
+                .HasDatabaseName("ix_clients_scope_id_name");
         });
 
         // PROJECTS-AND-MILESTONES-001: a milestone is owned by its project and carries the source it

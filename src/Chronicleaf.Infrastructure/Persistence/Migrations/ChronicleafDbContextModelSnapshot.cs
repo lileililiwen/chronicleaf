@@ -1897,6 +1897,10 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("archived_at");
 
+                    b.Property<Guid?>("ClientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_id");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(2000)
@@ -1929,10 +1933,55 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ClientId");
+
                     b.HasIndex("ScopeId", "Name")
                         .HasDatabaseName("ix_projects_scope_id_name");
 
                     b.ToTable("projects", (string)null);
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.Client", b =>
+                {
+                    b.Property<DateTimeOffset?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at");
+
+                    b.Property<long>("ContextRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("context_revision");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(20000)
+                        .HasColumnType("character varying(20000)")
+                        .HasColumnName("notes");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ScopeId", "Name")
+                        .HasDatabaseName("ix_clients_scope_id_name");
+
+                    b.ToTable("clients", (string)null);
                 });
 
                         modelBuilder.Entity("Chronicleaf.Core.ProjectJourneyRow", b =>
@@ -2707,6 +2756,15 @@ modelBuilder.Entity("Chronicleaf.Core.ProjectSummary", b =>
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_project_summaries_project_id");
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.Project", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Client", null)
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_projects_client_id");
                 });
 
                         modelBuilder.Entity("Chronicleaf.Core.ProjectJourneyRow", b =>

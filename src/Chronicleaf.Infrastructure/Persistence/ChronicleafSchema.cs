@@ -196,6 +196,15 @@ public static class ChronicleafSchema
     /// </summary>
     public const string PublicProjectJourneyMigrationId = "20261014090000_AddPublicProjectJourney";
 
+    /// <summary>
+    /// The forward migration that adds the <c>clients</c> table and the nullable
+    /// <c>projects.client_id</c> association (AGENCY-CLIENT-PROJECTS-001/002). A database that has
+    /// never applied it has nowhere to record an agency client, so its client routes would fail
+    /// against a missing table; readiness says so by name rather than answering 200 and failing
+    /// on the first request.
+    /// </summary>
+    public const string AgencyClientProjectsMigrationId = "20261015090000_AddAgencyClientProjects";
+
     /// <summary>Every migration a database must carry before this build calls itself ready.</summary>
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
@@ -220,6 +229,7 @@ public static class ChronicleafSchema
         ScreenshotEvolutionImagesMigrationId,
         StaticBlogExportMigrationId,
         PublicProjectJourneyMigrationId,
+        AgencyClientProjectsMigrationId,
     ];
 
     /// <summary>
@@ -227,7 +237,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = PublicProjectJourneyMigrationId;
+    public const string ExpectedMigrationId = AgencyClientProjectsMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

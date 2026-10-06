@@ -66,13 +66,51 @@ public sealed class PostgresProjectStore(ChronicleafDbContext dbContext) : IProj
         return ChronicleafSql.QueryAsync(dbContext, sql, parameters, ProjectRowReader.Read, cancellationToken);
     }
 
+    public Task<IReadOnlyList<Project>> ListByClientAsync(
+        Guid scopeId,
+        Guid clientId,
+        string? afterName,
+        Guid? afterId,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        // The same positional paging as the owner-wide list, narrowed to one client's membership.
+        // An archived project grouped under the client is still listed: the archive preserves
+        // history, and the hierarchy reads what is stored rather than what is live.
+        var positioned = afterName is not null && afterId is not null;
+
+        var sql = $"""
+            SELECT {ProjectRowReader.Columns}
+            FROM projects
+            WHERE scope_id = @p0 AND client_id = @p4
+              {(positioned ? "AND (name, id) > (@p1, @p2)" : string.Empty)}
+            ORDER BY name, id
+            LIMIT @p3
+            """;
+
+        var parameters = new List<SqlParameter>(5)
+        {
+            new("@p0", NpgsqlDbType.Uuid, scopeId),
+            new("@p3", NpgsqlDbType.Integer, limit),
+            new("@p4", NpgsqlDbType.Uuid, clientId),
+        };
+
+        if (positioned)
+        {
+            parameters.Add(new("@p1", NpgsqlDbType.Varchar, afterName));
+            parameters.Add(new("@p2", NpgsqlDbType.Uuid, afterId));
+        }
+
+        return ChronicleafSql.QueryAsync(dbContext, sql, parameters, ProjectRowReader.Read, cancellationToken);
+    }
+
     public async Task<bool> InsertAsync(Project project, CancellationToken cancellationToken = default)
     {
         var inserted = await ChronicleafSql.ScalarAsync<Guid>(
             dbContext,
             """
-            INSERT INTO projects (id, scope_id, name, description, repo_connection_id, project_url, revision, archived_at)
-            VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, NULL)
+            INSERT INTO projects (id, scope_id, name, description, repo_connection_id, project_url, revision, archived_at, client_id)
+            VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, NULL, NULL)
             ON CONFLICT (id) DO NOTHING
             RETURNING id
             """,
@@ -136,6 +174,31 @@ public sealed class PostgresProjectStore(ChronicleafDbContext dbContext) : IProj
                 new("@p0", NpgsqlDbType.Uuid, projectId),
                 new("@p1", NpgsqlDbType.Uuid, scopeId),
                 new("@p2", NpgsqlDbType.TimestampTz, archivedAt.ToUniversalTime()),
+                new("@p3", NpgsqlDbType.Bigint, expectedRevision),
+            ],
+            cancellationToken);
+
+    public Task<int> SetClientAsync(
+        Guid scopeId,
+        Guid projectId,
+        long expectedRevision,
+        Guid? clientId,
+        CancellationToken cancellationToken = default) =>
+        ChronicleafSql.ExecuteAsync(
+            dbContext,
+            // The association is one nullable column, so grouping and ungrouping are the same
+            // statement: a client id names the group, NULL names personal. The revision bump tells
+            // a client that still holds the old revision that its view is stale, and the archived
+            // guard keeps a frozen history frozen.
+            """
+            UPDATE projects
+            SET client_id = @p2, revision = revision + 1
+            WHERE id = @p0 AND scope_id = @p1 AND revision = @p3 AND archived_at IS NULL
+            """,
+            [
+                new("@p0", NpgsqlDbType.Uuid, projectId),
+                new("@p1", NpgsqlDbType.Uuid, scopeId),
+                new("@p2", NpgsqlDbType.Uuid, clientId),
                 new("@p3", NpgsqlDbType.Bigint, expectedRevision),
             ],
             cancellationToken);

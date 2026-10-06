@@ -20,7 +20,7 @@ internal static class ProjectRowReader
     /// because no lookup is by position.
     /// </summary>
     public const string Columns =
-        "id, scope_id, name, description, repo_connection_id, project_url, revision, archived_at";
+        "id, scope_id, name, description, repo_connection_id, project_url, revision, archived_at, client_id";
 
     public static Project Read(DbDataReader reader) =>
         new(
@@ -31,7 +31,8 @@ internal static class ProjectRowReader
             reader.IsDBNull(4) ? null : reader.GetGuid(4),
             reader.IsDBNull(5) ? null : reader.GetString(5),
             reader.GetInt64(6),
-            reader.IsDBNull(7) ? null : reader.GetFieldValue<DateTimeOffset>(7));
+            reader.IsDBNull(7) ? null : reader.GetFieldValue<DateTimeOffset>(7),
+            reader.IsDBNull(8) ? null : reader.GetGuid(8));
 }
 
 /// <summary>Reads one stored milestone row into its domain record, positionally as above.</summary>

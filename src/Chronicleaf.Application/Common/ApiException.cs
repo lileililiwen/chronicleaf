@@ -172,6 +172,13 @@ public static class ApiErrorStatus
         Journey.JourneyError.SlugConflict => 409,
         Journey.JourneyError.SelectionStale => 409,
 
+        // The agency-client-projects package's code. Additive in the same way: 409 for an
+        // assignment naming an archived client, because the remedy is another client (or
+        // clearing back to personal) rather than a corrected body - the same shape as the
+        // project-archived conflict above. The foreign-client refusal deliberately reuses the
+        // delivered NotFound, so a caller cannot probe for another scope's clients.
+        Agency.AgencyError.ClientArchived => 409,
+
         // The narrative-memory package's codes. Additive in the same way. 422 for a context that
         // does not fit the byte budget without losing a pinned fact, because the remedy is to
         // narrow the cutoff or shorten entries - the same shape as every other semantic refusal

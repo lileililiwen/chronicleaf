@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Chronicleaf.Application.Access;
+using Chronicleaf.Application.Agency;
 using Chronicleaf.Application.AI;
 using Chronicleaf.Application.Capture;
 using Chronicleaf.Application.Common;
@@ -140,6 +141,15 @@ public sealed class ApiErrorMiddleware(
 
             case ProjectArchivedException archived:
                 return (Envelope.Create(MilestoneError.ProjectArchived, archived.Message, traceId), LogLevel.Information);
+
+            // AGENCY-CLIENT-PROJECTS-001/002. Written here for the same reason as the refusals
+            // above: the agency package raises it, and this middleware is still the only place an
+            // envelope is written. The message is authored in the agency package and names no
+            // client and no project: the 409 says the archived client accepts no new assignments
+            // while its history stays readable, and the remedy is another client (or clearing
+            // back to personal) rather than a retry.
+            case ClientArchivedException clientArchived:
+                return (Envelope.Create(AgencyError.ClientArchived, clientArchived.Message, traceId), LogLevel.Information);
 
             // BACKGROUND-JOBS-001/002. Written here for the same reason as the refusals above: the
             // feature package raises them and this middleware is still the only place an envelope is

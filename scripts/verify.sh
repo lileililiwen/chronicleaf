@@ -536,6 +536,17 @@ else
   # delivered provider seam and the pictures by real capture jobs behind the delivered
   # browser seam.
   step "public project journey tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~PublicProjectJourneyTests"
+  # AGENCY-CLIENT-PROJECTS-001/002. That two projects assigned to Client A read back under it
+  # while a personal project stays ungrouped; that a foreign-scope client is 404 without exposure
+  # and an invented id is the same 404; that a move follows Client B with both context revisions
+  # bumped and neither client revision moved; that an archived client refuses new assignments as
+  # 409 while keeping its historical tree and still letting a project move away; that a report
+  # context depicts exactly the requested projects grouped under that client; that a duplicate
+  # assignment is a no-op and stale revisions are 409 with missing ones 428; and that the clients
+  # table, the nullable projects.client_id column, the foreign key and the indexes come from the
+  # forward migration readiness requires - all proven against the same real disposable PostgreSQL
+  # through the real API host.
+  step "agency client project tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~AgencyClientProjectsTests"
   # COMMUNITY-COMPOSE-RELEASE-001/002. That a clean install completes the
   # milestone-to-approved-Markdown flow with the timeline telling it back; that the compose
   # file describes exactly app plus postgres on the pinned digest with named volumes, a

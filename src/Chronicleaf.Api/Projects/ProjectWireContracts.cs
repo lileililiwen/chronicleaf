@@ -29,7 +29,8 @@ public sealed record ProjectResponse(
     [property: JsonPropertyName("projectUrl")] string? ProjectUrl,
     [property: JsonPropertyName("repoConnectionId")] string? RepoConnectionId,
     [property: JsonPropertyName("revision")] long Revision,
-    [property: JsonPropertyName("archivedAt")] string? ArchivedAt)
+    [property: JsonPropertyName("archivedAt")] string? ArchivedAt,
+    [property: JsonPropertyName("clientId")] string? ClientId)
 {
     public static ProjectResponse From(Project project) =>
         new(
@@ -39,7 +40,8 @@ public sealed record ProjectResponse(
             project.ProjectUrl,
             project.RepoConnectionId?.ToString("D"),
             project.Revision,
-            project.ArchivedAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+            project.ArchivedAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
+            project.ClientId?.ToString("D"));
 }
 
 public sealed record ProjectListResponse(

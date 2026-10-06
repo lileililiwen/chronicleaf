@@ -1,6 +1,6 @@
 # Chronicleaf handoff
 
-current_spec: publisher-ghost-adapter
+current_spec: publisher-wordpress-adapter
 
 ## Current state — 2026-10-05
 
@@ -1556,3 +1556,53 @@ post, any publication capability, or any rate-limit behavior. Deployment stays
 `deployable: false`; there is no remote, no push and no publication.
 Next: `current_spec` is `publisher-ghost-adapter`, the next package in drain order after
 `publisher-hashnode-adapter`.
+`publisher-ghost-adapter` is archived
+(`49707ac`, canonical spec `openspec/specs/publisher-ghost-adapter/spec.md`): the fourth
+transport behind the publisher contract, creating one Admin post per confirmed publish
+under the operator's explicit HTTPS origin and API version through `POST
+{origin}/ghost/api/admin/posts/?source=html` - status `draft` for a draft, `published`
+only on an explicitly confirmed publish - with the approved title verbatim, the shared
+HTML export's sanitized article body, the operator's tags, and one short-lived
+`Authorization: Ghost` token signed per call (HS256, `kid` naming the integration id,
+`iat` now, `exp` five minutes later, `aud` `/admin/`, over the hex-decoded secret of the
+leased `id:secret` key; BCL-only, no JWT package). A new `Ghost/` folder in the delivered
+`Chronicleaf.Publishers` leaf holds the `ghost` adapter, its origin-per-call transport
+(no base address - every request URI is built absolute from the re-validated target;
+redirects refused, no cookies, no bare-handler registration), its origin/version/tags
+options, its short-lived token signer and its eight redacted failure codes (`401`
+credential rejected - including a stored key that is not an `id:hex-secret` pair, refused
+before any byte leaves; `403` publish forbidden; `400`/`415`/`422` invalid payload;
+`409` update conflict; `429` rate limited; `3xx` redirect refused without a second hop;
+anything else unavailable; plus `ghost_incompatible_target` for a well-formed but
+unsupported API major, refused before any byte leaves rather than a guessed endpoint;
+error bodies disposed unread in every branch); registration is demand-gated (absent
+`Chronicleaf:Ghost` section registers nothing and the slot answers
+`publisher_unknown_target`, present-but-invalid fails startup) and is the whole rollback
+lever. The preview is pure and binds the origin, version and exact rendered HTML byte
+count into its warnings - which the contract hashes - so a post-preview origin change is
+refused as `publisher_preview_stale` before any job exists; pictures do not travel and
+are named in the warnings instead, so the confirmed preview consents to an HTML-text-only
+post rendered with an empty picture set (no packaged section, no relative image path),
+and the post URL is derived from the post's `url`, never guessed from a slug. The
+transport exposes no PUT: the contract dispatches each attempt exactly once, so every
+publish is a create and the provider's `updated_at` guard stays provider-side. Only the
+create answers ambiguously: a lost create answer becomes `unknown` with a `manual` hint
+no reconcile can resolve (`SupportsReconcile: false`, the route answers
+`publisher_reconcile_unavailable` with no further upstream call), and an answered success
+in JSON this client does not understand becomes `unknown` rather than a second create.
+No per-target table was added so no migration was needed (schema unchanged). Read that
+package's own boundary before extending it. Evidence, all run by the implementer rather
+than taken on report: `bash scripts/verify.sh` exit 0 (`GATE_EXIT=0`, `set -o pipefail`,
+run twice) with the platform-feed stage and the new `publisher ghost adapter tests` stage
+(12/12, filter asserted to select 12) alongside all existing stages, `npm ci`, `tsc` +
+`vite build`, `dotnet build --nologo --no-incremental` 0 errors with the same 12
+pre-existing warning grep lines at HEAD (zero added), name preflight exit 0, and
+`openspec validate --all --strict --no-interactive` 54/54 before and after the archive,
+which used no `--skip-specs`. No Web UI was shipped: no publisher UI exists to extend,
+the scenarios are API-observable, and no new browser suite was added. The opt-in
+real-Ghost run was not performed: only the far end of the wire is scripted and no claim
+is made about any real post, any real origin, any version beyond the scripted
+`Accept-Version`, or any rate-limit behavior. Deployment stays `deployable: false`;
+there is no remote, no push and no publication.
+Next: `current_spec` is `publisher-wordpress-adapter`, the next package in drain order
+after `publisher-ghost-adapter`.

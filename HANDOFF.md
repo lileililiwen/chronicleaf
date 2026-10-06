@@ -1,6 +1,6 @@
 # Chronicleaf handoff
 
-current_spec: static-blog-export
+current_spec: public-project-journey
 
 ## Current state — 2026-10-05
 
@@ -38,6 +38,7 @@ next POST-MVP package in ROADMAP order after `html-content-export`.
 | 26 | `html-content-export` | `aae5181` | `openspec/specs/html-content-export/spec.md` |
 | 27 | `content-asset-variants` | `65309ac` | `openspec/specs/content-asset-variants/spec.md` |
 | 28 | `screenshot-evolution-images` | `f2916e1` | `openspec/specs/screenshot-evolution-images/spec.md` |
+| 29 | `static-blog-export` | `066e153` | `openspec/specs/static-blog-export/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -392,8 +393,21 @@ owner's words; the e2e seed's candidate rows name the two real capture jobs the 
 PNG behind all three. Deployment stays `deployable: false`; there is no remote, no push and no
 publication.
 
-Next: `current_spec` is `static-blog-export`, the POST-MVP package ROADMAP orders
-immediately after `screenshot-evolution-images`. `screenshot-evolution-images` is archived
+Next: `current_spec` is `public-project-journey`, the POST-MVP package ROADMAP orders
+immediately after `static-blog-export`. `static-blog-export` is archived
+(`066e153`, canonical spec `openspec/specs/static-blog-export/spec.md`): a job-built
+deterministic ZIP (`index.html` timeline oldest-first, `posts/{assetId}.html` rendered through
+the HTML export package's own sanitizing adapter, `assets/{mediaId}.png` deduplicated,
+`manifest.json` with per-file checksums, `.nojekyll`) covering exactly the explicitly selected
+approved assets; the request freezes per-asset bindings (content revision, body hash, evidence
+bundle/revision, media selection hash) and the run re-resolves them, so a revocation ends the
+job `static_blog_superseded` with no completed archive while the download re-checks the same
+bindings before serving a byte. Unapproved is `approval_required`, moved is `approval_stale`,
+missing bytes are `media_unavailable`, traversal base paths are 422, and the same selection
+builds reproducible checksums twice. Read that package's own boundary before extending it, and
+note the one defect its tests found: the base-path validator split `/journey` on `/` and
+refused the leading slash's empty segment as a parent directory - every export POST answered
+422 until the first segment was skipped. `screenshot-evolution-images` is archived
 (`f2916e1`, canonical spec `openspec/specs/screenshot-evolution-images/spec.md`): derived
 comparison PNGs (before-after, horizontal-timeline, vertical-long, gallery) rendered from
 SELECTED screenshots across 2..12 confirmed milestones through a BCL-only composer (native-size
@@ -530,6 +544,44 @@ without `--skip-specs`, then make the implementation commit and the HANDOFF-only
 stop. Do not push.
 
 ## Package notes
+
+`static-blog-export` is archived (`066e153`, canonical spec
+`openspec/specs/static-blog-export/spec.md`). Read that package's own boundary before
+extending it, and note what it decided that a later reader would otherwise have to rediscover.
+
+**Release evidence (`static-blog-export`, commit `066e153`, all run by the implementer
+rather than taken on report).** `CHRONICLEAF_E2E=1 bash scripts/verify.sh` exit 0
+(`GATE_EXIT=0`) with the platform-feed stage and thirty filtered stages (the prior
+twenty-nine plus `static blog export tests`) each asserted to select at least one
+test, including **15/15 static blog export** run directly against the same real
+disposable PostgreSQL and the real API host (two approved posts with text, one
+allowlisted picture and a matching manifest; unapproved refused 409 before any job;
+foreign-asset 404; nonroot `/journey` base path as metadata with offline relative
+links; revocation superseded with no archive; moved evidence stale; missing picture
+`media_unavailable`; traversal base paths 422; idempotent replay; byte-repeatability
+across two exports; migration/schema plus builder unit cases for cancel, 413, hostile
+text and base-path normalization). `npm ci`, `tsc` and `vite build` all green, and
+`bash scripts/e2e.sh` green across all fourteen database-isolated browser suites
+(67/67 Playwright, no new suite: this package ships no UI).
+`dotnet build --nologo --no-incremental` 0 errors with the same 2 pre-existing warnings at
+HEAD. Name preflight exit 0; `openspec validate --all --strict --no-interactive` 54/54 before
+and after the archive, which used no `--skip-specs`.
+
+**An archive holds only what an approval still authorizes.** The POST reuses the review
+package's own bindings rather than redefining them - never approved is
+`approval_required`, once approved but moved is `approval_stale` - and freezes them into
+`static_blog_export_requests` beside the canonical selection; the job kind
+`project.static-blog-export` binds the project so a project edited mid-run supersedes at
+the worker's own commit. Posts are rendered per asset through the delivered
+`IContentExportAdapter`, whose generated `images/image-N.png` paths are the only strings
+rewritten (to shared `assets/{mediaId}.png`), so the sanitizer stays single-sourced and a
+template change breaks loudly in the success test rather than silently. The site checksum
+covers the canonical file listing only, entries pack in sorted order with a fixed
+timestamp, and the download re-renders and compares digests before serving - a mismatch is
+a 500, not a download. No UI was shipped (route-only, the `html-content-export`
+precedent; the design marks it optional), no bytes reach any host (no Pages push: the
+export is a local artifact), and no approval, generation or publication lives here.
+Deployment stays `deployable: false`; there is no remote, no push and no publication.
 
 `screenshot-evolution-images` is archived (`f2916e1`, canonical spec
 `openspec/specs/screenshot-evolution-images/spec.md`). Read that package's own boundary before

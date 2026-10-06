@@ -1,6 +1,6 @@
 # Chronicleaf handoff
 
-current_spec: team-project-permissions
+current_spec: cloud-object-storage
 
 ## Current state — 2026-10-05
 
@@ -42,6 +42,7 @@ next POST-MVP package in ROADMAP order after `html-content-export`.
 | 30 | `public-project-journey` | `6bc7e8e` | `openspec/specs/public-project-journey/spec.md` |
 | 31 | `agency-client-projects` | `764eb0e` | `openspec/specs/agency-client-projects/spec.md` |
 | 32 | `cloud-tenant-boundary` | `0a6a935` | `openspec/specs/cloud-tenant-boundary/spec.md` |
+| 33 | `team-project-permissions` | `0f47fca` | `openspec/specs/team-project-permissions/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -396,8 +397,38 @@ owner's words; the e2e seed's candidate rows name the two real capture jobs the 
 PNG behind all three. Deployment stays `deployable: false`; there is no remote, no push and no
 publication.
 
-Next: `current_spec` is `team-project-permissions`, the next package in drain order after
-`cloud-tenant-boundary`. `cloud-tenant-boundary` is archived
+Next: `current_spec` is `cloud-object-storage`, the next package in drain order after
+`team-project-permissions`. `team-project-permissions` is archived
+(`0f47fca`, canonical spec `openspec/specs/team-project-permissions/spec.md`): Hosted team
+invitations plus per-project roles, with Community behavior byte-identical. One
+`tenant_invitations` row per invite carrying a normalized email label, a tenant role, a
+SHA-256 token hash, a 7-day expiry and single-use accept/revoke stamps, plus one
+`project_memberships(project_id, user_id, permission)` row per explicit grant
+(reader|editor|approver|publisher) and an optimistic `tenant_memberships.revision` column
+(backfilled 1); private invitation, team-member and project-grant routes plus a service-layer
+`team-check` probe and `team-access` read, with the real domain project read and edit gated
+in Hosted mode through `RequireProjectPermissionAsync` (owner bypasses implicitly, Community
+takes no branch). Reader reads, editor edits, approver approves/exports, publisher publishes
+only an approved head (`approval_required` 409 otherwise); last-owner demote/remove is
+`team_last_owner` 409, expired token `invitation_expired` 410, used/revoked/unknown tokens
+`invitation_reused` 409 (unknown reuses delivered 404), duplicate pending invite
+`invitation_exists` 409, and duplicate grants no-op with no write and no audit row. A
+revoked member's sessions die while grant and audit rows stay as history. The role and
+permission vocabularies are closed by database check constraints. Hosted identity is
+issuer/subject with no email claim, so the email is the owner's label and the 32-byte bearer
+token disclosed exactly once is the grant. Read that package's own boundary before extending
+it, and note the two defects verification found: the token is 32 bytes (64 hex chars, not
+128), and the tenant boundary already owns `DELETE .../members/{userId}`, so team
+administration lives under `.../team-members` rather than answering one path twice (the
+first run failed ambiguous-match 500 on exactly that collision). Evidence, all run by the
+implementer rather than taken on report: `bash scripts/verify.sh` exit 0 with the
+platform-feed stage and the new `team project permission tests` stage (12/12) alongside all
+existing stages, `npm ci`, `tsc` + `vite build`, name preflight exit 0, and
+`openspec validate --all --strict --no-interactive` 54/54 before and after the archive,
+which used no `--skip-specs`. No Web UI was shipped: the design names it optional, the
+scenarios are API-observable, and no new browser suite was added. Deployment stays
+`deployable: false`; there is no remote, no push and no publication.
+`cloud-tenant-boundary` is archived
 (`0a6a935`, canonical spec `openspec/specs/cloud-tenant-boundary/spec.md`): Hosted end-user
 identity plus tenant data isolation, with Community behavior byte-identical. One OIDC
 issuer/subject user row per verified login (single-use hashed state/nonce, exact

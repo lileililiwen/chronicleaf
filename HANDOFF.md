@@ -1,6 +1,6 @@
 # Chronicleaf handoff
 
-current_spec: linkedin-copy-package
+current_spec: medium-import-package
 
 ## Current state — 2026-10-05
 
@@ -1310,3 +1310,37 @@ was shipped: the design's React panel is satisfied API-observable (setup/connect
 plus the delivery receipt), and no new browser suite was added. The opt-in real-GitHub run was
 not performed: only the wire bytes are scripted and no claim is made about any real installation
 or mint. Deployment stays `deployable: false`; there is no remote, no push and no publication.
+`linkedin-copy-package` is archived
+(`637a1fc`, canonical spec `openspec/specs/linkedin-copy-package/spec.md`): reviewed copy-ready
+LinkedIn post as a manual content package, with Community behavior the only behavior (no Hosted
+surface). Adapting an approved markdown-story renders deterministic plain-text copy (title bound
+by the effective voice, summary + change + limitation citations, owner's verbatim CTA/hashtags,
+footnote definitions) into a new `linkedin-copy` asset revision carrying the voice value
+snapshot, with selected pictures in `linkedin_copy_media` (one row per picture per revision,
+append-only, max 4, alt text 1..500); the derivative starts with no approval row and the
+delivered edit/approve/review routes are reused unchanged. `GET export?format=linkedin` serves a
+ZIP (`copy.txt` exact approved bytes, `images/*.png`, `manifest.json` with per-image digests)
+under the same bindings the Markdown export re-checks; native publish is an unconditional 422
+`publisher_unsupported` with no credential lease, no job, no audit row and no socket (there is
+no HttpClient anywhere in the package). Length/hashtag rules are deterministic: hashtags
+`#[A-Za-z][A-Za-z0-9_]*` max 5 exact-deduped, CTA max 280 chars, internal 10000-char ceiling
+(`linkedin_copy_too_long` 422) with warning at 9000, and the composed bytes re-pass the package's
+own grounding validator so an owner digit the evidence never stated refuses before storage. Read
+that package's own boundary before extending it, and note the three defects verification found:
+the migration shipped without the `[Migration]` discovery attribute (table silently absent,
+adapt 500 — Designer added, model byte-identical since the table is raw-SQL-only); each new
+envelope code needs an explicit middleware type-arm (a bare `ApiException` answers 500, so
+`CopyTooLong` is its own exception type); and the summary schema caps change text at 8000 chars,
+so the length fixtures use 4500/6000-char texts. Also recorded, not hidden: the access boundary
+audits its own per-mutation antiforgery rotation, so the publish no-side-effect assertion counts
+non-session audits. Evidence, all run by the implementer rather than taken on report:
+`bash scripts/verify.sh` exit 0 (`GATE_EXIT=0`, `set -o pipefail`) with the platform-feed stage
+and the new `linkedin copy package tests` stage (10/10) alongside all existing stages (neighbors
+re-run in isolation: variants/review-export/html-export/voice 53/53), `npm ci`, `tsc` + `vite
+build`, `dotnet build --nologo --no-incremental` 0 errors with only the 6 pre-existing warnings
+in untouched files, name preflight exit 0, and `openspec validate --all --strict
+--no-interactive` 54/54 before and after the archive, which used no `--skip-specs`. No Web UI
+was shipped: the design names it optional, the scenarios are API-observable, and no new browser
+suite was added. No LinkedIn network exists to test against (structural: no transport), and the
+opt-in real-provider/browser runs were not performed. Deployment stays `deployable: false`;
+there is no remote, no push and no publication.

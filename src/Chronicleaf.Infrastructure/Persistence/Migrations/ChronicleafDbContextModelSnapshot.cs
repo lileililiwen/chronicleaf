@@ -2094,6 +2094,64 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.StaticBlogExportRequestRow", b =>
+                {
+                    b.Property<string>("AssetIdsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("asset_ids_json");
+
+                    b.Property<string>("BasePath")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("base_path");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("FrozenJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("frozen_json");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<string>("SelectionHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("selection_hash");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("ScopeId", "OperationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_static_blog_export_requests_scope_id_operation_id");
+
+                    b.ToTable("static_blog_export_requests", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_static_blog_export_requests_selection_hash_sha256_hex", "selection_hash ~ '^[0-9a-f]{64}$'");
+                        });
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.SyncSource", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2585,6 +2643,16 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_screenshot_candidates_milestone_id");
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.StaticBlogExportRequestRow", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_static_blog_export_requests_project_id");
                 });
 
             modelBuilder.Entity("Chronicleaf.Core.SyncSource", b =>

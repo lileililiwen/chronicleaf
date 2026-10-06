@@ -107,6 +107,8 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     public DbSet<EvolutionImage> EvolutionImages => Set<EvolutionImage>();
 
+    public DbSet<StaticBlogExportRequestRow> StaticBlogExportRequests => Set<StaticBlogExportRequestRow>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Installation>(entity =>
@@ -2213,6 +2215,58 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_evolution_images_artifact_media_id");
         });
+
+        // STATIC-BLOG-EXPORT-001/002: one export selection per row. The canonical asset list and
+        // the frozen approval bindings are references the run re-resolves against the asset,
+        // evidence and media stores - never approved text, which a queue row is the wrong place
+        // for. The unique index on (scope, operation) is what lets a re-delivered enqueue find
+        // the row its job was accepted with rather than growing a second one.
+        modelBuilder.Entity<StaticBlogExportRequestRow>(entity =>
+        {
+            entity.ToTable(
+                "static_blog_export_requests",
+                table =>
+                {
+                    table.HasCheckConstraint(
+                        "ck_static_blog_export_requests_selection_hash_sha256_hex",
+                        "selection_hash ~ '^[0-9a-f]{64}$'");
+                });
+            entity.HasKey(request => request.Id);
+            entity.Property(request => request.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(request => request.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(request => request.OperationId).HasColumnName("operation_id").IsRequired();
+            entity.Property(request => request.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(request => request.BasePath)
+                .HasColumnName("base_path")
+                .HasMaxLength(StaticBlogExportBasePathMaxLength)
+                .IsRequired();
+            entity.Property(request => request.AssetIdsJson)
+                .HasColumnName("asset_ids_json")
+                .HasColumnType("jsonb")
+                .IsRequired();
+            entity.Property(request => request.SelectionHash)
+                .HasColumnName("selection_hash")
+                .HasMaxLength(Sha256HexMaxLength)
+                .IsRequired();
+            entity.Property(request => request.FrozenJson)
+                .HasColumnName("frozen_json")
+                .HasColumnType("jsonb")
+                .IsRequired();
+            entity.Property(request => request.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            entity.HasIndex(request => new { request.ScopeId, request.OperationId })
+                .IsUnique()
+                .HasDatabaseName("ux_static_blog_export_requests_scope_id_operation_id");
+
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(request => request.ProjectId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_static_blog_export_requests_project_id");
+        });
     }
 
     /// <summary>At most 40 characters for a content kind, matching the Core record's own bound.</summary>
@@ -2384,6 +2438,9 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     /// <summary>At most 32 characters; the longest evolution status is <c>approved</c>.</summary>
     private const int EvolutionStatusMaxLength = 32;
+
+    /// <summary>At most 128 characters for a deployment base path, matching the builder's own bound.</summary>
+    private const int StaticBlogExportBasePathMaxLength = 128;
 
     /// <summary>
     /// Refuses a stored status this build does not know. A value that is not one of the six is not a

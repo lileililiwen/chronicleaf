@@ -278,6 +278,13 @@ builder.Services.AddContentAssetVariants();
 // screenshot-evolution-images migration reports schema_mismatch at /api/ready.
 builder.Services.AddScreenshotEvolutionImages();
 
+// STATIC-BLOG-EXPORT-001/002. The export request store, service and job handler that render
+// selected approved assets into a portable static site. It registers no provider, no approval
+// and no publisher: rendering reuses the HTML export package's own sanitizing adapter, approval
+// stays the review package's table, and publication is a later package's. A database without
+// the static-blog-export migration reports schema_mismatch at /api/ready.
+builder.Services.AddStaticBlogExport();
+
 // The rotation guard is applied once at start-up, so an access token that was changed since the
 // last run revokes every existing session before this process serves anything.
 builder.Services.AddHostedService<AccessTokenRotationStartup>();
@@ -436,6 +443,13 @@ app.MapNarrativeEndpoints();
 // selected screenshots, the preview is reviewable as a draft, and the download serves the exact
 // approved bytes only while the approval still describes the stored selection.
 app.MapEvolutionEndpoints();
+
+// STATIC-BLOG-EXPORT-001/002: the private export request, status and download routes. None of
+// them is marked public, so the access package's default-deny boundary already covers every one
+// of them. There is no generation here, no approval and no publication: a request freezes the
+// approved selection a job builds, the status route reports that job, and the download serves
+// the deterministic archive only while every frozen binding still describes the stored state.
+app.MapStaticBlogExportEndpoints();
 
 // SHELL-001/SHELL-002: every unmatched path is either an unknown API path, an unknown
 // static asset, or a client route. Only the last one falls back to the SPA entry point. This

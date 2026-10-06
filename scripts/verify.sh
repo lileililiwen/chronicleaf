@@ -513,6 +513,17 @@ else
   # selected pictures produced by real capture jobs behind the delivered browser seam and
   # composed by this package's own BCL renderer.
   step "screenshot evolution image tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~ScreenshotEvolutionImagesTests"
+  # STATIC-BLOG-EXPORT-001/002. That only explicitly selected approved assets reach the archive
+  # with their local pictures, and private candidates and unselected bytes never do; that an
+  # unapproved selection is refused before a job exists while a foreign asset is 404; that a
+  # nonroot base path travels as deployment metadata with offline relative links; that a
+  # revocation before the build supersedes the run with no completed archive while a missing
+  # picture fails it as media_unavailable; and that the same immutable selection builds
+  # reproducible checksums twice - all proven against the same real disposable PostgreSQL
+  # through the real API host, with the approved stories produced by real generation jobs
+  # behind the delivered provider seam and the pictures by real capture jobs behind the
+  # delivered browser seam.
+  step "static blog export tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~StaticBlogExportTests"
   # COMMUNITY-COMPOSE-RELEASE-001/002. That a clean install completes the
   # milestone-to-approved-Markdown flow with the timeline telling it back; that the compose
   # file describes exactly app plus postgres on the pinned digest with named volumes, a

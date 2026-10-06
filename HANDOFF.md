@@ -1709,5 +1709,53 @@ in `openspec/changes` and are held, not named as current: `semantic-narrative-re
 on owner decisions (demand, embedding model/provider/dimension and consent policy must be selected;
 owner Chronicleaf maintainer), and `hosted-managed-ai` is BLOCKED on owner decisions (Managed AI
 provider/model/quota/unit weights and financial settlement policy; owner Chronicleaf maintainer).
-Four further DEMAND-GATED changes (`agency-weekly-reports`, `evolution-gif-export`,
-`video-story-scripts`, `xiaohongshu-content-package`) await recorded demand before activation.
+`evolution-gif-export` is archived
+(`95350b3`, canonical spec `openspec/specs/evolution-gif-export/spec.md`): reviewed
+chronological GIF evolution over the delivered curation, evidence and media contracts, with
+Community behavior unchanged. One `evolution_gifs` row per render carrying the
+`evolution-gif-manifest/1` JSON (frame order, per-frame media/caption/evidence revisions,
+durations, loop, canvas, byte length, selection and artifact hashes), the deterministic GIF
+bytes (`bytea`), canvas, frame count, total duration, loop flag, draft/approved status and
+idempotency key under check constraints (status vocabulary, SHA-256 hex, positive dimensions,
+2..12 frames, 1..60000ms) with project FK Restrict and the scoped unique key index; the
+bytes live in this row because the delivered media store is PNG-only by its own contract and
+widening that vocabulary is that package's boundary, and row plus bytes land in one INSERT
+so a failed render stores nothing. `POST /api/projects/{id}/evolution/gifs` renders 2..12
+confirmed same-project milestones in chronological order (or the owner's explicit manual
+order) from selected pictures only - a candidate is never depicted and naming one is 422,
+a milestone with no selected picture is `insufficient_selected` 422, missing bytes are
+`media_unavailable` 409, over-cap durations/dimensions are 422/413 - with per-frame
+500..5000 whole-centisecond milliseconds (null, one, or one per frame; total at most 60s)
+and loop default false; the BCL-only GIF89a encoder uses the fixed grey-ramp palette,
+max-dimension canvas with neutral centering, GCE delays and the NETSCAPE switch only when
+looping, so an unchanged selection rebuilds byte-identically. `GET` read/list,
+`POST .../approve` binding the exact selection hash, reviewable `GET .../preview` (the
+animation, or `?mode=static` serving the exact first frame as PNG for reduced-motion review)
+and gated `GET .../download` serving the exact approved bytes only while the approval still
+describes the stored selection (`approval_required`/`approval_stale` under the review
+package's codes). Read that package's own boundary before extending it, and note the three
+defects verification found: GIF LZW decoders must widen their codes one table entry earlier
+than the encoder (the decoder learns each entry a read later - the shared-threshold decoder
+silently desynced past 9-bit codes, proven against Pillow as ground truth, which reads the
+encoder's bytes pixel-perfect with correct delays and loop); the test probe read the GCE
+packed byte as part of the delay; and a single `[1000]` duration is the legal one-value
+form, so the wrong-count probe is three values for two frames. Evidence, all run by the
+implementer rather than taken on report: `bash scripts/verify.sh` exit 0 (`GATE_EXIT=0`,
+`set -o pipefail`, 53 stages, every filtered stage asserted to select at least one test)
+with the platform-feed stage and the new `evolution gif export tests` stage (10/10) alongside
+all existing stages, `npm ci`, `tsc` + `vite build`, `dotnet build --nologo --no-incremental`
+0 errors with the same 12 pre-existing warning grep lines at HEAD (zero added, baseline
+confirmed before changes), name preflight exit 0, and `openspec validate --all --strict
+--no-interactive` 54/54 before and after the archive, which used no `--skip-specs`. The
+first gate run hit the recorded GithubEvidenceTests class-cleanup `TaskCanceledException`
+with all 27 tests passed and nothing from this package in that stage; the second run was
+fully green. No Web UI was shipped: the design's React preview is satisfied API-observable
+(preview plus the static first-frame mode, asserted pixel-equal to the animation's first
+frame), and no new browser suite was added - the reduced-motion browser assertion was not
+run on this host, where real capture stays `capture_sandbox_unavailable` behind the
+delivered seam. Deployment stays `deployable: false`; there is no remote, no push and no
+publication.
+Three further DEMAND-GATED changes (`agency-weekly-reports`, `video-story-scripts`,
+`xiaohongshu-content-package`) await recorded demand before activation.
+
+current_spec: xiaohongshu-content-package

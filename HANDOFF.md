@@ -1,6 +1,6 @@
 # Chronicleaf handoff
 
-current_spec: cloud-tenant-boundary
+current_spec: team-project-permissions
 
 ## Current state — 2026-10-05
 
@@ -41,6 +41,7 @@ next POST-MVP package in ROADMAP order after `html-content-export`.
 | 29 | `static-blog-export` | `066e153` | `openspec/specs/static-blog-export/spec.md` |
 | 30 | `public-project-journey` | `6bc7e8e` | `openspec/specs/public-project-journey/spec.md` |
 | 31 | `agency-client-projects` | `764eb0e` | `openspec/specs/agency-client-projects/spec.md` |
+| 32 | `cloud-tenant-boundary` | `0a6a935` | `openspec/specs/cloud-tenant-boundary/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -395,8 +396,31 @@ owner's words; the e2e seed's candidate rows name the two real capture jobs the 
 PNG behind all three. Deployment stays `deployable: false`; there is no remote, no push and no
 publication.
 
-Next: `current_spec` is `cloud-tenant-boundary`, the next package in drain order after
-`agency-client-projects`. `agency-client-projects` is archived
+Next: `current_spec` is `team-project-permissions`, the next package in drain order after
+`cloud-tenant-boundary`. `cloud-tenant-boundary` is archived
+(`0a6a935`, canonical spec `openspec/specs/cloud-tenant-boundary/spec.md`): Hosted end-user
+identity plus tenant data isolation, with Community behavior byte-identical. One OIDC
+issuer/subject user row per verified login (single-use hashed state/nonce, exact
+issuer/audience/lifetime/nonce match, RS256 against the issuer key set, BCL-only), one tenant
+with a fresh scope id plus owner membership and explicit select per verified user (default quota
+1), and revocation that stamps the membership and kills that tenant's sessions. Every domain
+route resolves the active tenant's scope through a request-scoped `IOwnerAccessService`
+decorator - zero endpoint edits, Community path delegates branch-free - so all existing
+`scope_id` predicates isolate projects/credentials/evidence/media/operations in SQL; FORCED
+row-level policies on the tenant tables back it per transaction context (`SET LOCAL`
+`app.tenant_id`). A Community volume in Hosted mode 409s (`community_import_required`) until
+the explicit per-tenant import is recorded, and Community rows are never moved. In Hosted mode
+the operator token path is closed and owner cookies authenticate nothing. Read that package's
+own boundary before extending it, and note the three defects verification found: a double-join
+DTO-ordered LINQ does not translate (order entities, project raw, format client-side); a custom
+GUC first touched by `SET LOCAL` reads back `''` not NULL afterwards, so the RLS unset-branch
+is `nullif(..., '')`; and the fixture's `chronicleaf` role is a superuser that bypasses RLS
+unconditionally, so the pooled-connection proof runs as a least-privilege role. Also note the
+two adjacent fixes in the same commit: the OIDC transport holds its own client rather than a
+bare `HttpClient` singleton (three delivered transports already resolve one bare client, so a
+second would make resolution order-dependent), and the static-blog ZIP assertion sorted actual
+but not expected while asset ids are random GUIDs (a coin-flip the gate lost twice) - now
+sorted on both sides, test-only. `agency-client-projects` is archived
 (`764eb0e`, canonical spec `openspec/specs/agency-client-projects/spec.md`): one
 `clients` row per agency client carrying a name (1..160), plain-text notes (20k), an
 optimistic revision, a membership context revision and a soft-archive stamp, plus one

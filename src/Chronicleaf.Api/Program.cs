@@ -15,6 +15,7 @@ using Chronicleaf.Api.Content;
 using Chronicleaf.Api.Curation;
 using Chronicleaf.Api.Evidence;
 using Chronicleaf.Api.Evolution;
+using Chronicleaf.Api.EvolutionGifs;
 using Chronicleaf.Api.Git;
 using Chronicleaf.Api.GitHub;
 using Chronicleaf.Api.GitHubEnrichment;
@@ -48,6 +49,7 @@ using Chronicleaf.Infrastructure.Content;
 using Chronicleaf.Infrastructure.Curation;
 using Chronicleaf.Infrastructure.Evidence;
 using Chronicleaf.Infrastructure.Evolution;
+using Chronicleaf.Infrastructure.EvolutionGifs;
 using Chronicleaf.Infrastructure.Git;
 using Chronicleaf.Infrastructure.GitHub;
 using Chronicleaf.Infrastructure.GitHubEnrichment;
@@ -382,6 +384,14 @@ builder.Services.AddMediumImport();
 // screenshot-evolution-images migration reports schema_mismatch at /api/ready.
 builder.Services.AddScreenshotEvolutionImages();
 
+// EVOLUTION-GIF-EXPORT-001/002. The evolution GIF store and service that animate selected
+// screenshots into a deterministic GIF with a re-derivable manifest, and approve the exact
+// selection and artifact hashes for export. It registers no provider, no browser and no
+// publisher: rendering encodes stored bytes deterministically, selection stays the curation
+// package's and prose approval stays the review package's. A database without the
+// evolution-gif-export migration reports schema_mismatch at /api/ready.
+builder.Services.AddEvolutionGifExport();
+
 // STATIC-BLOG-EXPORT-001/002. The export request store, service and job handler that render
 // selected approved assets into a portable static site. It registers no provider, no approval
 // and no publisher: rendering reuses the HTML export package's own sanitizing adapter, approval
@@ -693,6 +703,14 @@ app.MapNarrativeEndpoints();
 // selected screenshots, the preview is reviewable as a draft, and the download serves the exact
 // approved bytes only while the approval still describes the stored selection.
 app.MapEvolutionEndpoints();
+
+// EVOLUTION-GIF-EXPORT-001/002: the private render, read, approve, preview and download
+// routes. None of them is marked public, so the access package's default-deny boundary already
+// covers every one of them. There is no capture here and no promotion: an animation depicts
+// selected screenshots, the preview is reviewable as a draft - as motion or as the static
+// first frame - and the download serves the exact approved bytes only while the approval still
+// describes the stored selection.
+app.MapEvolutionGifEndpoints();
 
 // STATIC-BLOG-EXPORT-001/002: the private export request, status and download routes. None of
 // them is marked public, so the access package's default-deny boundary already covers every one

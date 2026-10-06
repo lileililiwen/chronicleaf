@@ -2740,6 +2740,92 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .HasConstraintName("fk_evolution_images_artifact_media_id");
         });
 
+        // EVOLUTION-GIF-EXPORT-001/002: one rendered animation per row. The manifest is the
+        // provenance - every depicted frame beside the media and caption revisions it was built
+        // from, in canvas order, with the playback the review authorized - so the GIF is
+        // re-derivable rather than a second store of truth. The artifact bytes live in this row
+        // because the delivered media store is PNG-only by its own contract, and widening that
+        // vocabulary is that package's boundary rather than this one's: bytes and manifest are
+        // written in one INSERT, so a row can never name bytes that were not stored. Selection
+        // stays the curation package's and approval stays a decision about this row's two
+        // hashes, which is why no trigger here refuses anything: staleness is recomputed on
+        // read rather than enforced on write.
+        modelBuilder.Entity<EvolutionGif>(entity =>
+        {
+            entity.ToTable(
+                "evolution_gifs",
+                table =>
+                {
+                    table.HasCheckConstraint("ck_evolution_gifs_status", "status IN ('draft', 'approved')");
+                    table.HasCheckConstraint(
+                        "ck_evolution_gifs_selection_hash_sha256_hex",
+                        "selection_hash ~ '^[0-9a-f]{64}$'");
+                    table.HasCheckConstraint(
+                        "ck_evolution_gifs_artifact_sha256_hex",
+                        "artifact_sha256 ~ '^[0-9a-f]{64}$'");
+                    table.HasCheckConstraint("ck_evolution_gifs_dimensions_positive", "width > 0 AND height > 0");
+                    table.HasCheckConstraint("ck_evolution_gifs_frame_count", "frame_count BETWEEN 2 AND 12");
+                    table.HasCheckConstraint("ck_evolution_gifs_total_duration_ms", "total_duration_ms > 0 AND total_duration_ms <= 60000");
+                });
+            entity.HasKey(gif => gif.Id);
+            entity.Property(gif => gif.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(gif => gif.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(gif => gif.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(gif => gif.ManifestJson)
+                .HasColumnName("manifest_json")
+                .HasColumnType("jsonb")
+                .IsRequired();
+            entity.Property(gif => gif.SelectionHash)
+                .HasColumnName("selection_hash")
+                .HasMaxLength(Sha256HexMaxLength)
+                .IsRequired();
+            entity.Property(gif => gif.ArtifactSha256)
+                .HasColumnName("artifact_sha256")
+                .HasMaxLength(Sha256HexMaxLength)
+                .IsRequired();
+            entity.Property(gif => gif.ArtifactBytes)
+                .HasColumnName("artifact_bytes")
+                .HasColumnType("bytea")
+                .IsRequired();
+            entity.Property(gif => gif.Width).HasColumnName("width").IsRequired();
+            entity.Property(gif => gif.Height).HasColumnName("height").IsRequired();
+            entity.Property(gif => gif.FrameCount).HasColumnName("frame_count").IsRequired();
+            entity.Property(gif => gif.TotalDurationMs).HasColumnName("total_duration_ms").IsRequired();
+            entity.Property(gif => gif.Loop).HasColumnName("loop").IsRequired();
+            entity.Property(gif => gif.Status)
+                .HasColumnName("status")
+                .HasMaxLength(EvolutionStatusMaxLength)
+                .IsRequired();
+            entity.Property(gif => gif.ApprovedBy).HasColumnName("approved_by");
+            entity.Property(gif => gif.ApprovedAt)
+                .HasColumnName("approved_at")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(gif => gif.IdempotencyKey)
+                .HasColumnName("idempotency_key")
+                .HasMaxLength(OperationIdempotencyKeyMaxLength);
+            entity.Property(gif => gif.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            entity.HasIndex(gif => gif.ProjectId)
+                .HasDatabaseName("IX_evolution_gifs_project_id");
+
+            // One selection per key: the same key with the same selection replays the row, and
+            // with another selection it is a conflict rather than a second row. Null keys are
+            // distinct by definition, so keyless renders never collide with each other.
+            entity.HasIndex(gif => new { gif.ScopeId, gif.ProjectId, gif.IdempotencyKey })
+                .IsUnique()
+                .HasDatabaseName("ux_evolution_gifs_scope_id_project_id_idempotency_key")
+                .HasFilter("idempotency_key IS NOT NULL");
+
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(gif => gif.ProjectId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_evolution_gifs_project_id");
+        });
+
         // STATIC-BLOG-EXPORT-001/002: one export selection per row. The canonical asset list and
         // the frozen approval bindings are references the run re-resolves against the asset,
         // evidence and media stores - never approved text, which a queue row is the wrong place

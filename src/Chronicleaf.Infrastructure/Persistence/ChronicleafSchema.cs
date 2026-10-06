@@ -276,6 +276,14 @@ public static class ChronicleafSchema
     /// readiness says so by name rather than answering 200 and failing on the first request.
     /// </summary>
     public const string PublisherContractMigrationId = "20261019090000_AddPublisherContract";
+    /// <summary>
+    /// The forward migration that adds the <c>evolution_gifs</c> table
+    /// (EVOLUTION-GIF-EXPORT-001/002). A database that has never applied it has nowhere to
+    /// record a rendered animation, so its evolution GIF routes would fail against a missing
+    /// table; readiness says so by name rather than answering 200 and failing on the first
+    /// render.
+    /// </summary>
+    public const string EvolutionGifExportMigrationId = "20261020090000_AddEvolutionGifExport";
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
         InitialMigrationId,
@@ -308,6 +316,7 @@ public static class ChronicleafSchema
         GitHubAppConnectionMigrationId,
         LinkedInCopyPackageMigrationId,
         PublisherContractMigrationId,
+        EvolutionGifExportMigrationId,
     ];
 
     /// <summary>
@@ -315,7 +324,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = PublisherContractMigrationId;
+    public const string ExpectedMigrationId = EvolutionGifExportMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

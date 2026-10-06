@@ -655,6 +655,16 @@ else
   # selected pictures produced by real capture jobs behind the delivered browser seam and
   # composed by this package's own BCL renderer.
   step "screenshot evolution image tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~ScreenshotEvolutionImagesTests"
+  # EVOLUTION-GIF-EXPORT-001/002. That a valid selected sequence encodes to a deterministic
+  # GIF whose decoded frames, durations and loop flag match its manifest; that a missing
+  # picture fails the render with no partial artifact while a candidate is never depicted;
+  # that over-cap durations and dimensions are refused before anything is stored; that the
+  # static preview is exactly the animation's first frame; that an edit after approval
+  # requires renewed approval while a reorder is a new draft; and that a cancelled encoder
+  # stores nothing - all proven against the same real disposable PostgreSQL through the
+  # real API host, with the selected pictures produced by real capture jobs behind the
+  # delivered browser seam and composed by this package's own BCL encoder.
+  step "evolution gif export tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~EvolutionGifExportTests"
   # STATIC-BLOG-EXPORT-001/002. That only explicitly selected approved assets reach the archive
   # with their local pictures, and private candidates and unselected bytes never do; that an
   # unapproved selection is refused before a job exists while a foreign asset is 404; that a

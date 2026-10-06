@@ -7,6 +7,7 @@ using Chronicleaf.Application.Capture;
 using Chronicleaf.Application.Common;
 using Chronicleaf.Application.Content;
 using Chronicleaf.Application.Evolution;
+using Chronicleaf.Application.EvolutionGifs;
 using Chronicleaf.Application.Git;
 using Chronicleaf.Application.GitHub;
 using Chronicleaf.Application.GitHubCandidates;
@@ -740,6 +741,38 @@ public sealed class ApiErrorMiddleware(
                     Envelope.Create(
                         EvolutionError.MediaUnavailable,
                         evolutionMediaGone.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            // EVOLUTION-GIF-EXPORT-001/002. Written here for the same reason as every other
+            // feature package's refusals: the evolution GIF package raises them and this
+            // middleware is still the only place an envelope is written. The messages are
+            // authored in the GIF package and name no bytes and no scope: the 409 says the
+            // reviewed selection moved, the 413 says the animation does not fit the ceiling,
+            // and the missing-bytes refusal reuses the HTML export's media_unavailable because
+            // the condition and the remedy - reselect the picture and render again - are the
+            // same.
+            case EvolutionGifSelectionSupersededException gifSuperseded:
+                return (
+                    Envelope.Create(
+                        EvolutionGifError.SelectionSuperseded,
+                        gifSuperseded.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            case EvolutionGifTooLargeException gifTooLarge:
+                return (
+                    Envelope.Create(
+                        EvolutionGifError.OutputTooLarge,
+                        gifTooLarge.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            case EvolutionGifMediaUnavailableException gifMediaGone:
+                return (
+                    Envelope.Create(
+                        EvolutionGifError.MediaUnavailable,
+                        gifMediaGone.Message,
                         traceId),
                     LogLevel.Information);
 

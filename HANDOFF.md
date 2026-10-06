@@ -1,6 +1,6 @@
 # Chronicleaf handoff
 
-current_spec: scheduled-project-sync
+current_spec: hosted-archive-operations
 
 ## Current state — 2026-10-05
 
@@ -44,6 +44,7 @@ next POST-MVP package in ROADMAP order after `html-content-export`.
 | 32 | `cloud-tenant-boundary` | `0a6a935` | `openspec/specs/cloud-tenant-boundary/spec.md` |
 | 33 | `team-project-permissions` | `0f47fca` | `openspec/specs/team-project-permissions/spec.md` |
 | 34 | `cloud-object-storage` | `bdfcec9` | `openspec/specs/cloud-object-storage/spec.md` |
+| 35 | `scheduled-project-sync` | `bfa302a` | `openspec/specs/scheduled-project-sync/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -398,36 +399,39 @@ owner's words; the e2e seed's candidate rows name the two real capture jobs the 
 PNG behind all three. Deployment stays `deployable: false`; there is no remote, no push and no
 publication.
 
-Next: `current_spec` is `scheduled-project-sync`, the next package in drain order after
-`cloud-object-storage`. `cloud-object-storage` is archived
-(`bdfcec9`, canonical spec `openspec/specs/cloud-object-storage/spec.md`): Hosted
-S3-compatible scoped media adapter, with Community behavior byte-identical. An S3-backed
-`IMediaStore` sibling to the Local store with the same stage/verify/promote/register sequence
-(rows land with `provider_id=s3`), tenant-scoped `scopes/{scope}/` prefixes checked on stored
-keys as well as generated ones, scoped GET presigns bounded to five minutes through
-`POST /api/media/{id}/presign`, and `media_in_use` honored through the same checker on either
-backend; credentials travel as a vault reference to a sealed `s3` JSON document (never in rows,
-messages or logs); the installation's `Chronicleaf:StorageMode` selects the backend for new
-writes while each row's own provider decides its reads, and the migration copies, re-verifies
-and compare-and-set flips one scope's rows with the source never deleted, recording
-checksum/source key/target key/state per object in `media_migration_copies` for restart. Read
-that package's own boundary before extending it, and note the three defects verification found:
-the composition root's always-registered vault bridge needs its options in every mode (Local
-hosts failed to build without them); the adopted adapter mints presigned URLs in https even
-against a plain-http endpoint, so the factory restores the endpoint's own scheme on an exact
-authority match (SigV4 signs host and query, never scheme); and a test baseline that ignored
-the promotion re-read counted the upload's own download as a leak. Evidence, all run by the
-implementer rather than taken on report: `bash scripts/verify.sh` exit 0 (`GATE_EXIT=0`) with
-the platform-feed stage and the new `cloud object storage tests` stage (11/11) alongside all
-existing stages, `npm ci`, `tsc` + `vite build`, `dotnet build --nologo --no-incremental` 0
-errors with the same 2 pre-existing warnings at HEAD, name preflight exit 0, and
-`openspec validate --all --strict --no-interactive` 54/54 before and after the archive,
-which used no `--skip-specs`. No Web UI was shipped: the design names it optional, the
-scenarios are API-observable, and no new browser suite was added. The opt-in real-cloud run
-was not performed: MinIO (`minio/minio:RELEASE.2024-10-13T13-34-11Z`) over the real SDK and
-the real platform adapter is the S3 conformance, and no claim is made about AWS/R2 beyond
-compatibility through the same adapter. Deployment stays `deployable: false`; there is no
-remote, no push and no publication.
+Next: `current_spec` is `hosted-archive-operations`, the next package in drain order after
+`scheduled-project-sync`. `scheduled-project-sync` is archived
+(`bfa302a`, canonical spec `openspec/specs/scheduled-project-sync/spec.md`): opt-in
+recurring repository synchronization, with Community behavior byte-identical. One
+`project_sync_schedules` row per project carrying an enabled flag, a 15..10080-minute cadence,
+a `next_run_at`, the last operation id and an optimistic revision; `PUT
+/api/projects/{id}/sync-schedule` creates at If-Match zero and edits under compare-and-set
+(428 missing, 409 stale, 422 interval, 409 `schedule_no_connection` without a readable
+connection, 429 `schedule_quota` past 10 enabled schedules per scope) while `GET` serves the
+stored intent with the last operation's redacted status, error code and completion stamp. A
+one-minute `ProjectSyncTicker` loop fires due rows into kind `project.scheduled-sync` operations
+on the delivered queue keyed `scheduleId:dueUnix` (target project, input revision bound, one
+active sync per project across both sync kinds, misses collapsed to one interval past now), and
+the handler runs the delivered candidate poll — no second poll, transport or store — so a moved
+project supersedes through the delivered `project` target mapping and provider outcomes keep
+their delivered codes. Archive/disconnect disables the schedule and cancels polls that never
+started; Hosted reads/edits gate through `RequireProjectPermissionAsync` (read/edit) with the
+Community path branch-free. Read that package's own boundary before extending it, and note the
+three defects verification found: `AddHostedService` alone does not resolve the ticker by
+concrete type (registered as its own singleton first, then hosted from it); the domain record's
+stored revision needs a `Rehydrate` factory rather than replaying `Change` in the store reader;
+and the collapse test's expectation was wrong, not the code (an active op holds `next_run_at`
+until it finishes). Evidence, all run by the implementer rather than taken on report:
+`bash scripts/verify.sh` exit 0 (`GATE_EXIT=0`, `set -o pipefail`) with the platform-feed stage
+and the new `scheduled project sync tests` stage (12/12) alongside all existing stages, `npm
+ci`, `tsc` + `vite build`, `dotnet build --nologo --no-incremental` 0 errors with the same 2
+pre-existing warnings at HEAD, name preflight exit 0, and `openspec validate --all --strict
+--no-interactive` 54/54 before and after the archive, which used no `--skip-specs`. No Web UI
+was shipped: the design's React settings are satisfied API-observable (candidate-only behavior
+is structural — the tick can only start the delivered poll — and off-by-default is the absent
+row), and no new browser suite was added. The opt-in real-GitHub run was not performed: only
+the wire bytes are scripted and no claim is made about any real repository. Deployment stays
+`deployable: false`; there is no remote, no push and no publication.
 `team-project-permissions` is archived
 (`0f47fca`, canonical spec `openspec/specs/team-project-permissions/spec.md`): Hosted team
 invitations plus per-project roles, with Community behavior byte-identical. One

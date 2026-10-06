@@ -135,6 +135,10 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     public DbSet<ProjectSyncSchedule> ProjectSyncSchedules => Set<ProjectSyncSchedule>();
 
+    public DbSet<ArchiveTombstone> ArchiveTombstones => Set<ArchiveTombstone>();
+
+    public DbSet<ArchiveBackupManifest> ArchiveBackupManifests => Set<ArchiveBackupManifest>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Installation>(entity =>
@@ -2174,6 +2178,144 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .HasForeignKey(schedule => schedule.ProjectId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_project_sync_schedules_project_id");
+        });
+
+        // HOSTED-ARCHIVE-OPERATIONS-002: one project's recoverable archive-deletion marker. A
+        // delete suspends the projection and the poll and opens a thirty-day window; nothing is
+        // erased by this row. The revision is the compare-and-set token a stale restore loses
+        // with, and the partial unique index is what makes a second live tombstone for one
+        // project a conflict in the database rather than a merged window.
+        modelBuilder.Entity<ArchiveTombstone>(entity =>
+        {
+            entity.ToTable("archive_tombstones");
+            entity.HasKey(tombstone => tombstone.Id);
+            entity.Property(tombstone => tombstone.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(tombstone => tombstone.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(tombstone => tombstone.ProjectId).HasColumnName("project_id").IsRequired();
+            entity.Property(tombstone => tombstone.ProjectName)
+                .HasColumnName("project_name")
+                .IsRequired();
+            entity.Property(tombstone => tombstone.DeletedAt)
+                .HasColumnName("deleted_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(tombstone => tombstone.RecoveryUntil)
+                .HasColumnName("recovery_until")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(tombstone => tombstone.EraseRequested)
+                .HasColumnName("erase_requested")
+                .IsRequired();
+            entity.Property(tombstone => tombstone.HoldReason).HasColumnName("hold_reason");
+            entity.Property(tombstone => tombstone.RestoredAt)
+                .HasColumnName("restored_at")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(tombstone => tombstone.PurgedAt)
+                .HasColumnName("purged_at")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(tombstone => tombstone.Revision).HasColumnName("revision").IsRequired();
+            entity.Property(tombstone => tombstone.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(tombstone => tombstone.UpdatedAt)
+                .HasColumnName("updated_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            entity.Property(tombstone => tombstone.Revision).IsConcurrencyToken();
+
+            // One live tombstone per project: restored and purged rows stay as history and never
+            // collide with the live one.
+            entity.HasIndex(tombstone => new { tombstone.ScopeId, tombstone.ProjectId })
+                .IsUnique()
+                .HasFilter("restored_at IS NULL AND purged_at IS NULL")
+                .HasDatabaseName("ux_archive_tombstones_scope_id_project_id_live");
+
+            // The operator purge pass reads candidates oldest-window first.
+            entity.HasIndex(tombstone => tombstone.RecoveryUntil)
+                .HasDatabaseName("ix_archive_tombstones_recovery_until");
+
+            entity.ToTable(
+                table =>
+                {
+                    table.HasCheckConstraint(
+                        "ck_archive_tombstones_window",
+                        "recovery_until > deleted_at");
+                    table.HasCheckConstraint(
+                        "ck_archive_tombstones_revision",
+                        "revision >= 1");
+                });
+
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(tombstone => tombstone.ProjectId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_archive_tombstones_project_id");
+        });
+
+        // HOSTED-ARCHIVE-OPERATIONS-001: one operator-recorded backup manifest over a
+        // tenant-scoped store. Recording proves nothing: the row reads unverified until a
+        // rehearsal stamps it, and the only later write is that stamp under compare-and-set. No
+        // route serves these rows, so the backup reference and the key version never reach an
+        // owner-facing response.
+        modelBuilder.Entity<ArchiveBackupManifest>(entity =>
+        {
+            entity.ToTable("archive_backup_manifests");
+            entity.HasKey(manifest => manifest.Id);
+            entity.Property(manifest => manifest.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(manifest => manifest.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(manifest => manifest.SchemaVersion)
+                .HasColumnName("schema_version")
+                .IsRequired();
+            entity.Property(manifest => manifest.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(manifest => manifest.DbBackupRef)
+                .HasColumnName("db_backup_ref")
+                .HasMaxLength(ArchiveBackupManifest.BackupRefMaxLength)
+                .IsRequired();
+            entity.Property(manifest => manifest.MediaInventoryHash)
+                .HasColumnName("media_inventory_hash")
+                .HasMaxLength(ArchiveBackupManifest.HashHexLength)
+                .IsFixedLength()
+                .IsRequired();
+            entity.Property(manifest => manifest.ContentDigest)
+                .HasColumnName("content_digest")
+                .HasMaxLength(ArchiveBackupManifest.HashHexLength)
+                .IsFixedLength()
+                .IsRequired();
+            entity.Property(manifest => manifest.EncryptionKeyVersion)
+                .HasColumnName("encryption_key_version")
+                .IsRequired();
+            entity.Property(manifest => manifest.RestoreVerifiedAt)
+                .HasColumnName("restore_verified_at")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(manifest => manifest.Revision).HasColumnName("revision").IsRequired();
+            entity.Property(manifest => manifest.UpdatedAt)
+                .HasColumnName("updated_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            entity.Property(manifest => manifest.Revision).IsConcurrencyToken();
+
+            entity.HasIndex(manifest => new { manifest.ScopeId, manifest.CreatedAt })
+                .HasDatabaseName("ix_archive_backup_manifests_scope_id_created_at");
+
+            entity.ToTable(
+                table =>
+                {
+                    table.HasCheckConstraint(
+                        "ck_archive_backup_manifests_schema",
+                        "schema_version >= 1");
+                    table.HasCheckConstraint(
+                        "ck_archive_backup_manifests_key",
+                        "encryption_key_version >= 1");
+                    table.HasCheckConstraint(
+                        "ck_archive_backup_manifests_revision",
+                        "revision >= 1");
+                });
         });
 
         // NARRATIVE-MEMORY-001: one explicit, owner-written line of project history, attributed to

@@ -18,6 +18,7 @@ using Chronicleaf.Api.Evolution;
 using Chronicleaf.Api.Git;
 using Chronicleaf.Api.GitHub;
 using Chronicleaf.Api.GitHubEnrichment;
+using Chronicleaf.Api.Archive;
 using Chronicleaf.Api.Candidates;
 using Chronicleaf.Api.Journey;
 using Chronicleaf.Api.Media;
@@ -40,6 +41,7 @@ using Chronicleaf.AI.OpenRouter;
 using Chronicleaf.Infrastructure.Access;
 using Chronicleaf.Infrastructure.Agency;
 using Chronicleaf.Infrastructure.AI;
+using Chronicleaf.Infrastructure.Archive;
 using Chronicleaf.Infrastructure.Capture;
 using Chronicleaf.Infrastructure.Content;
 using Chronicleaf.Infrastructure.Curation;
@@ -260,6 +262,15 @@ builder.Services.AddGitHubCandidates();
 // scheduled-project-sync migration reports schema_mismatch at /api/ready.
 builder.Services.AddProjectSyncSchedules(builder.Configuration);
 
+// HOSTED-ARCHIVE-OPERATIONS-001/002. Recoverable archive deletion plus operator backup and
+// purge state over the delivered project, journey, schedule, media, evidence and approval
+// contracts: the tombstone suspends the projection and the poll, the manifest records the
+// operator's backup measurements for rehearsal, and the purge retires only eligible
+// unreferenced media after the window. No route here serves a manifest and no route here
+// deletes evidence: manifests are operator rows and the purge is an operator method. A database
+// without the hosted-archive-operations migration reports schema_mismatch at /api/ready.
+builder.Services.AddHostedArchiveOperations(builder.Configuration);
+
 // GITHUB-GRAPHQL-ENRICHMENT-001/002. The optional relationship reader over the delivered GitHub
 // transport - no second HttpClient, so no second host, redirect policy or timeout to disagree
 // about - plus the run store, the service and the one job handler that appends attributed
@@ -475,6 +486,13 @@ app.MapGitHubCandidateEndpoints();
 // or returns a URL, a ref or a SHA: the repository is the delivered connection's two names, and the
 // route carries only the switch, the cadence and the schedule's own revision.
 app.MapProjectSyncScheduleEndpoints();
+
+// HOSTED-ARCHIVE-OPERATIONS-002: the private archive read, delete and restore. None is marked
+// public, so the access package's default-deny boundary already covers every one of them. No
+// route here serves a backup manifest and none deletes evidence: a delete suspends the
+// projection and the poll and opens the recovery window, and only the operator purge - which
+// is a service method, not a route - removes anything after that window lapses.
+app.MapArchiveEndpoints();
 
 // GITHUB-GRAPHQL-ENRICHMENT-001/002: the private enrichment request route. It is not marked
 // public, so the access package's default-deny boundary already covers it. No route here accepts

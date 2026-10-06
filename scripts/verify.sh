@@ -9,7 +9,7 @@
 # MILESTONE-TIMELINE-001/002, MARKDOWN-REVIEW-EXPORT-001/002,
 # COMMUNITY-COMPOSE-RELEASE-001/002, CLOUD-TENANT-BOUNDARY-001/002,
 # TEAM-PROJECT-PERMISSIONS-001/002, CLOUD-OBJECT-STORAGE-001/002,
-# SCHEDULED-PROJECT-SYNC-001/002).
+# SCHEDULED-PROJECT-SYNC-001/002, HOSTED-ARCHIVE-OPERATIONS-001/002).
 #
 # Required chain, in order:
 #   1. platform feed           - the committed packages/platform-feed is what the build resolves, from
@@ -648,6 +648,21 @@ else
   # with only the bytes on the wire scripted. No stage here may be read as evidence that GitHub
   # works or that any real repository was polled.
   step "scheduled project sync tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~ScheduledProjectSyncTests"
+  # HOSTED-ARCHIVE-OPERATIONS-001/002. That a measured, recorded and rehearsed backup proves the
+  # live scope still hashes to the recorded media and content digests, and that a backup under an
+  # unknown key version, an unknown schema or a drifted inventory or digest is refused without
+  # promotion; that recording alone claims no recovery and another scope's rows move neither
+  # digest; that a confirmed delete at the project's own revision suspends the public projection
+  # and the recurring poll while evidence, media, credentials and the project itself still read
+  # back; that a wrong name is 422, a stale revision 409, a missing If-Match 428, a second
+  # delete 409 and a foreign restore the delivered 404 with no foreign data; that a restore
+  # inside the thirty-day window lifts the deletion while one past it is 410; and that the purge
+  # after the window retires only unreferenced media with a receipt - referenced media, evidence,
+  # assets and approvals retained - while an open window, a live approval or a hold each skip
+  # with their reason - all proven against the same real disposable PostgreSQL and the real API
+  # host, with the clock moved rather than waited on. No stage here serves a backup manifest:
+  # manifests are operator rows resolved through the service, never through a route.
+  step "hosted archive operations tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~HostedArchiveOperationsTests"
 fi
 
 step "frontend install" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm ci'

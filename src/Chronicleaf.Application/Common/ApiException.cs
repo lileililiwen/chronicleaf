@@ -249,6 +249,22 @@ public static class ApiErrorStatus
         Schedules.ScheduleError.QuotaExceeded => 429,
         Schedules.ScheduleError.NoConnection => 409,
 
+        // The hosted-archive-operations package's codes. Additive in the same way, and the
+        // choices are this package's failure policy rather than defaults. 409 for a backup whose
+        // schema, key version or content no longer matches the live scope: nothing is wrong with
+        // the request, and the remedy is a fresh backup rather than a retry of the rehearsal.
+        // 409 for a deletion that raced another deletion, because the remedy is to read the
+        // stored tombstone rather than to delete again. 410 for a restore past the recovery
+        // window, because the remedy is the operator purge rather than a retry - the same shape
+        // as the teams package's expired invitation. The foreign-tombstone refusal deliberately
+        // reuses the delivered NotFound above, so a caller cannot probe for another scope's
+        // deletions.
+        Archive.ArchiveError.KeyMismatch => 409,
+        Archive.ArchiveError.MediaMismatch => 409,
+        Archive.ArchiveError.SchemaMismatch => 409,
+        Archive.ArchiveError.AlreadyDeleted => 409,
+        Archive.ArchiveError.RestoreExpired => 410,
+
         _ => 500,
     };
 }

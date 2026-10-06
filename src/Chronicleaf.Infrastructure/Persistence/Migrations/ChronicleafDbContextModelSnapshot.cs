@@ -121,6 +121,152 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.ToTable("session", (string)null);
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.ArchiveBackupManifest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ContentDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .HasColumnName("content_digest")
+                        .IsFixedLength();
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DbBackupRef")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("db_backup_ref");
+
+                    b.Property<int>("EncryptionKeyVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("encryption_key_version");
+
+                    b.Property<string>("MediaInventoryHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .HasColumnName("media_inventory_hash")
+                        .IsFixedLength();
+
+                    b.Property<DateTimeOffset?>("RestoreVerifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("restore_verified_at");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("schema_version");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ScopeId", "CreatedAt")
+                        .HasDatabaseName("ix_archive_backup_manifests_scope_id_created_at");
+
+                    b.ToTable("archive_backup_manifests", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_archive_backup_manifests_key", "encryption_key_version >= 1");
+
+                            t.HasCheckConstraint("ck_archive_backup_manifests_revision", "revision >= 1");
+
+                            t.HasCheckConstraint("ck_archive_backup_manifests_schema", "schema_version >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.ArchiveTombstone", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("EraseRequested")
+                        .HasColumnType("boolean")
+                        .HasColumnName("erase_requested");
+
+                    b.Property<string>("HoldReason")
+                        .HasColumnType("text")
+                        .HasColumnName("hold_reason");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("ProjectName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("project_name");
+
+                    b.Property<DateTimeOffset?>("PurgedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("purged_at");
+
+                    b.Property<DateTimeOffset>("RecoveryUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recovery_until");
+
+                    b.Property<DateTimeOffset?>("RestoredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("restored_at");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("RecoveryUntil")
+                        .HasDatabaseName("ix_archive_tombstones_recovery_until");
+
+                    b.HasIndex("ScopeId", "ProjectId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_archive_tombstones_scope_id_project_id_live")
+                        .HasFilter("restored_at IS NULL AND purged_at IS NULL");
+
+                    b.ToTable("archive_tombstones", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_archive_tombstones_revision", "revision >= 1");
+
+                            t.HasCheckConstraint("ck_archive_tombstones_window", "recovery_until > deleted_at");
+                        });
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.AuditEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2995,6 +3141,16 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ux_voice_profiles_scope_id_project_id");
 
                     b.ToTable("voice_profiles", (string)null);
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.ArchiveTombstone", b =>
+                {
+                    b.HasOne("Chronicleaf.Core.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_archive_tombstones_project_id");
                 });
 
             modelBuilder.Entity("Chronicleaf.Core.CaptureRequestRow", b =>

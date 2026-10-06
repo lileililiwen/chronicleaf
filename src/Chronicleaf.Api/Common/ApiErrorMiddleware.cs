@@ -2,6 +2,7 @@ using System.Text.Json;
 using Chronicleaf.Application.Access;
 using Chronicleaf.Application.Agency;
 using Chronicleaf.Application.AI;
+using Chronicleaf.Application.Archive;
 using Chronicleaf.Application.Capture;
 using Chronicleaf.Application.Common;
 using Chronicleaf.Application.Content;
@@ -664,6 +665,55 @@ public sealed class ApiErrorMiddleware(
                     Envelope.Create(
                         EvolutionError.MediaUnavailable,
                         evolutionMediaGone.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            // HOSTED-ARCHIVE-OPERATIONS-001/002. Written here for the same reason as every other
+            // feature package's refusals: this package raises them and this middleware is still the
+            // only place an envelope is written. The messages are authored in the archive package
+            // and name no backup reference, no key version, no hash and no other scope's state: the
+            // three rehearsal 409s say the remedy is a fresh backup rather than a retry, the second
+            // 409 says the remedy is to read the stored tombstone rather than to delete again, the
+            // 410 says the window the delete disclosed has lapsed and the remedy is the operator
+            // purge. The foreign-tombstone refusal deliberately reuses the delivered NotFound, so a caller
+            // cannot probe for another scope's deletions by comparing codes.
+            case ArchiveKeyMismatchException keyMismatch:
+                return (
+                    Envelope.Create(
+                        ArchiveError.KeyMismatch,
+                        keyMismatch.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            case ArchiveMediaMismatchException mediaMismatch:
+                return (
+                    Envelope.Create(
+                        ArchiveError.MediaMismatch,
+                        mediaMismatch.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            case ArchiveSchemaMismatchException schemaMismatch:
+                return (
+                    Envelope.Create(
+                        ArchiveError.SchemaMismatch,
+                        schemaMismatch.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            case ArchiveAlreadyDeletedException alreadyDeleted:
+                return (
+                    Envelope.Create(
+                        ArchiveError.AlreadyDeleted,
+                        alreadyDeleted.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            case ArchiveRestoreExpiredException restoreExpired:
+                return (
+                    Envelope.Create(
+                        ArchiveError.RestoreExpired,
+                        restoreExpired.Message,
                         traceId),
                     LogLevel.Information);
 

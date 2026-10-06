@@ -245,6 +245,15 @@ public static class ChronicleafSchema
     /// readiness says so by name rather than answering 200 and failing on the first request.
     /// </summary>
     public const string ScheduledProjectSyncMigrationId = "20261016090000_AddScheduledProjectSync";
+
+    /// <summary>
+    /// The forward migration that adds the <c>archive_tombstones</c> and
+    /// <c>archive_backup_manifests</c> tables (HOSTED-ARCHIVE-OPERATIONS-001/002). A database
+    /// that has never applied it has nowhere to record a recoverable deletion or an operator
+    /// backup manifest, so its archive routes would fail against missing tables; readiness says
+    /// so by name rather than answering 200 and failing on the first request.
+    /// </summary>
+    public const string HostedArchiveOperationsMigrationId = "20261006051619_AddHostedArchiveOperations";
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
         InitialMigrationId,
@@ -273,6 +282,7 @@ public static class ChronicleafSchema
         TeamProjectPermissionsMigrationId,
         CloudObjectStorageMigrationId,
         ScheduledProjectSyncMigrationId,
+        HostedArchiveOperationsMigrationId,
     ];
 
     /// <summary>
@@ -280,7 +290,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = ScheduledProjectSyncMigrationId;
+    public const string ExpectedMigrationId = HostedArchiveOperationsMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

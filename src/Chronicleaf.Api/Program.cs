@@ -59,6 +59,7 @@ using Chronicleaf.Infrastructure.Medium;
 using Chronicleaf.Infrastructure.Media.S3;
 using Chronicleaf.Infrastructure.Narrative;
 using Chronicleaf.Publishers.DevTo;
+using Chronicleaf.Publishers.Hashnode;
 using Chronicleaf.Publishers.GitHubPages;using Chronicleaf.Infrastructure.Operations;
 using Chronicleaf.Infrastructure.Persistence;
 using Chronicleaf.Infrastructure.Projects;
@@ -423,6 +424,18 @@ builder.Services.AddGitHubPagesPublisher(builder.Configuration);
 // redirects refused, so no bare-handler registration here can rewire the GitHub Pages
 // transport. The remaining slots are still separate roadmap packages and stay unclaimed.
 builder.Services.AddDevToPublisher(builder.Configuration);
+
+// PUBLISHER-HASHNODE-ADAPTER-001/002. The third transport behind the publisher contract: one
+// IPublisherAdapter for the `hashnode` slot, creating one draft per confirmed publish under
+// the operator's explicit publication id - stopping there for a draft, continuing to
+// publishDraft for the created draft on an explicitly confirmed publish - with the scope's
+// publisher personal access token leased for the call as the one bearer header. The target
+// is demand-gated: without an explicit Chronicleaf:Hashnode section this registers nothing
+// and the slot answers publisher_unknown_target, exactly as the contract says an unclaimed
+// target does. The transport owns its own client pinned to the Hashnode GraphQL host with
+// redirects refused, so no bare-handler registration here can rewire a sibling transport.
+// The remaining slots are still separate roadmap packages and stay unclaimed.
+builder.Services.AddHashnodePublisher(builder.Configuration);
 
 // The rotation guard is applied once at start-up, so an access token that was changed since the
 // last run revokes every existing session before this process serves anything.

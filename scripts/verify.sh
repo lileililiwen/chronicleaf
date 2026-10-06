@@ -587,6 +587,21 @@ else
   # no second create - all proven against the same real disposable PostgreSQL and the real
   # API host, with only the far end of the wire scripted. No stage here reaches real Dev.to.
   step "publisher devto adapter tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~PublisherDevtoAdapterTests"
+  # PUBLISHER-HASHNODE-ADAPTER-001/002. That a confirmed draft preview creates one remote draft
+  # and a confirmed publish drafts then publishes for the created draft - the approved title and
+  # bytes verbatim under the operator's publication, the fixed GraphQL documents with values in
+  # variables, the leased token as the one bearer header, and the receipt carrying the remote
+  # draft or post id, the post URL derived from post.url, and the exact body hash; that a refused
+  # token, a rejected body and a GraphQL errors array each fail with a redacted code, no secret
+  # and no moved approval while a forbidden role and a plan gate are permanent refusals and a
+  # post-preview publication change stales the confirmation before any call; that a redirect is
+  # refused without a second hop; that a lost create answer becomes unknown with a manual hint
+  # the target cannot reconcile while a lost publish answer keeps its draft id and a refused
+  # publish keeps a recoverable draft receipt with no new create; and that an identical resubmit
+  # returns the receipt with no second call - all proven against the same real disposable
+  # PostgreSQL and the real API host, with only the far end of the wire scripted. No stage here
+  # reaches real Hashnode.
+  step "publisher hashnode adapter tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~PublisherHashnodeAdapterTests"
   # SCREENSHOT-EVOLUTION-IMAGES-001/002. That a same-viewport comparison preserves source
   # pixels, order and provenance in a re-derivable manifest; that a milestone without a
   # selected screenshot is an unavailable gap rather than a fabrication, and a candidate is

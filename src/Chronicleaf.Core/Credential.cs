@@ -163,6 +163,13 @@ public static class CredentialProviders
     /// when it delivers a signed event. Reusing one slot would mean saving a webhook secret overwrote
     /// the read token (or the other way round), so the two are two names and both are refused if the
     /// owner stores the wrong kind of value under the wrong one.
+    /// <para>
+    /// <b><c>s3</c> is the object-storage slot (CLOUD-OBJECT-STORAGE-001).</b> It holds the
+    /// installation's S3-compatible access key pair as one sealed JSON document, named by the
+    /// operator's configuration rather than by a tenant row. A tenant's media rows never carry it:
+    /// isolation between tenants is by the <c>scopes/{scope}/</c> key prefix, not by per-tenant
+    /// keys, so one slot per scope is the whole vocabulary this package needs.
+    /// </para>
     /// </remarks>
     public static readonly IReadOnlyList<string> All =
     [
@@ -174,6 +181,7 @@ public static class CredentialProviders
         "openrouter",
         "ollama",
         "publisher",
+        "s3",
     ];
 
     /// <summary>The widest stored value, so the column and the API are bounded by the same number.</summary>

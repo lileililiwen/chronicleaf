@@ -28,8 +28,9 @@ PLATFORM_VERSION="${PLATFORM_VERSION:-0.1.0}"
 FEED_DIR="${FEED_DIR:-$repo_root/packages/platform-feed}"
 
 # The whole transitive closure Chronicleaf needs: Platform.Storage carries the IObjectStorage
-# contract and the key validation, Platform.Storage.Local is the filesystem adapter, and
-# Platform.Core is Platform.Storage's own dependency. Platform.Jobs carries the IJobDispatcher
+# contract and the key validation, Platform.Storage.Local is the filesystem adapter,
+# Platform.Storage.S3 is the S3-compatible adapter the cloud object storage package is scoped to,
+# and Platform.Core is Platform.Storage's own dependency. Platform.Jobs carries the IJobDispatcher
 # contract and the JobPayload shape, Platform.Jobs.Hangfire is the durable scheduling adapter, and
 # Platform.Core is Platform.Jobs's dependency too. The whole closure is listed because a feed
 # that carries only the direct references is a feed that fails to restore on a cold cache, which
@@ -40,6 +41,7 @@ PACKAGES=(
   Platform.Core
   Platform.Storage
   Platform.Storage.Local
+  Platform.Storage.S3
   Platform.Jobs
   Platform.Jobs.Hangfire
 )

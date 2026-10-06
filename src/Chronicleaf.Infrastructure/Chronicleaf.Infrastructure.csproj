@@ -96,6 +96,16 @@
     -->
     <PackageReference Include="Platform.Storage" Version="0.1.0" />
     <PackageReference Include="Platform.Storage.Local" Version="0.1.0" />
+    <!--
+      Adopted S3-compatible storage (CLOUD-OBJECT-STORAGE-001/002). The same Ruling 12 provenance
+      as the two references above: pinned exactly, resolved from the .nupkg committed under
+      packages/platform-feed, with no sibling checkout, no absolute path and no environment
+      variable. Platform.Storage.S3 owns the S3-compatible IObjectStorage adapter behind the
+      leased backend this package builds per call; AWSSDK.S3 is its transport pin, referenced
+      directly at the same version so the client this package constructs and the adapter agree.
+    -->
+    <PackageReference Include="Platform.Storage.S3" Version="0.1.0" />
+    <PackageReference Include="AWSSDK.S3" Version="4.0.102.2" />
   </ItemGroup>
 
   <ItemGroup>

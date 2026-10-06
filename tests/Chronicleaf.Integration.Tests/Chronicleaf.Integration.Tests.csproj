@@ -12,6 +12,13 @@
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageReference Include="Testcontainers.PostgreSql" Version="4.15.0" />
+    <!--
+      CLOUD-OBJECT-STORAGE-001/002. The S3 SDK the MinIO conformance scenarios drive the real
+      platform adapter with, pinned to the version the adopted Platform.Storage.S3 pins, so the
+      client the tests build and the adapter agree. No MinIO module package: the container is a
+      plain pinned minio/minio image driven by the Testcontainers primitives above.
+    -->
+    <PackageReference Include="AWSSDK.S3" Version="4.0.102.2" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
   </ItemGroup>

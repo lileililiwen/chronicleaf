@@ -226,6 +226,17 @@ public static class ChronicleafSchema
     /// request.
     /// </summary>
     public const string TeamProjectPermissionsMigrationId = "20261006024003_AddTeamProjectPermissions";
+
+    /// <summary>
+    /// The forward migration that adds the <c>media.provider_id</c> column and the
+    /// <c>media_migration_copies</c> ledger table (CLOUD-OBJECT-STORAGE-001/002). A database that
+    /// has never applied it has nowhere to record which backend a media object's verified bytes
+    /// live on or what a migration run did, so its S3 routes would fail against a missing column
+    /// and table; readiness says so by name rather than answering 200 and failing on the first
+    /// request. Existing rows read <c>local</c> through the column default, so a database that
+    /// stops here still serves everything it served before.
+    /// </summary>
+    public const string CloudObjectStorageMigrationId = "20261006032737_AddCloudObjectStorage";
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
         InitialMigrationId,
@@ -252,6 +263,7 @@ public static class ChronicleafSchema
         AgencyClientProjectsMigrationId,
         CloudTenantBoundaryMigrationId,
         TeamProjectPermissionsMigrationId,
+        CloudObjectStorageMigrationId,
     ];
 
     /// <summary>
@@ -259,7 +271,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = TeamProjectPermissionsMigrationId;
+    public const string ExpectedMigrationId = CloudObjectStorageMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

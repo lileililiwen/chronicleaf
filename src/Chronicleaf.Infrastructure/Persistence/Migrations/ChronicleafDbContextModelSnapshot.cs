@@ -1696,6 +1696,14 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("project_id");
 
+                    b.Property<string>("ProviderId")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("local")
+                        .HasColumnName("provider_id");
+
                     b.Property<long>("Revision")
                         .IsConcurrencyToken()
                         .HasColumnType("bigint")
@@ -1738,6 +1746,72 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_media_scope_id_created_at_id");
 
                     b.ToTable("media", (string)null);
+                });
+
+            modelBuilder.Entity("Chronicleaf.Core.MediaMigrationCopy", b =>
+                {
+                    b.Property<Guid>("MediaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("media_id");
+
+                    b.Property<string>("CopiedSha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("copied_sha256");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<string>("SourceKey")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("source_key");
+
+                    b.Property<string>("SourceProvider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("source_provider");
+
+                    b.Property<string>("SourceSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("source_sha256");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("state");
+
+                    b.Property<string>("TargetKey")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("target_key");
+
+                    b.Property<string>("TargetProvider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("target_provider");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("MediaId");
+
+                    b.HasIndex("ScopeId", "State")
+                        .HasDatabaseName("ix_media_migration_copies_scope_id_state");
+
+                    b.ToTable("media_migration_copies", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_media_migration_copies_state", "state IN ('started', 'verified', 'failed')");
+                        });
                 });
 
             modelBuilder.Entity("Chronicleaf.Core.Milestone", b =>

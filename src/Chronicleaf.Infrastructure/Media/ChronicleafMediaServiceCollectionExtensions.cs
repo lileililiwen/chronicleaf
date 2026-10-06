@@ -80,7 +80,12 @@ public static class ChronicleafMediaServiceCollectionExtensions
         services.TryAddScoped<IMediaReferenceChecker, NoMediaReferenceChecker>();
 
         services.AddScoped<IMediaRepository, PostgresMediaRepository>();
-        services.AddScoped<IMediaStore, LocalMediaStore>();
+
+        // Registered as itself as well as behind the store contract, so the S3-mode router routes
+        // to the same single instance rather than to a second one. Serving IMediaStore still
+        // answers this instance in Local mode, exactly as before.
+        services.AddScoped<IMediaStore>(provider => provider.GetRequiredService<LocalMediaStore>());
+        services.TryAddScoped<LocalMediaStore>();
 
         return services;
     }

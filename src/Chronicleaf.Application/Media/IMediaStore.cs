@@ -164,6 +164,38 @@ public interface IMediaRepository
     /// from the filesystem alone.
     /// </summary>
     Task<MediaRecord?> FindByStorageKeyAsync(string storageKey, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Moves a record's bytes from one backend to another, and to no other, while it still names
+    /// <paramref name="expectedProvider"/> (CLOUD-OBJECT-STORAGE-002).
+    /// </summary>
+    /// <remarks>
+    /// The compare-and-set is what stops two migration runs from both flipping the same record, and
+    /// what stops a flip from landing on a record whose bytes moved on without this call. Only the
+    /// migration service calls it, and only after the target copy has verified.
+    /// </remarks>
+    /// <returns>How many rows changed. Zero means the record moved on without this call.</returns>
+    Task<int> UpdateProviderAsync(
+        Guid scopeId,
+        Guid mediaId,
+        string expectedProvider,
+        string newProvider,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads this scope's ready records that still name <paramref name="provider"/>, oldest first,
+    /// bounded by <paramref name="limit"/> (CLOUD-OBJECT-STORAGE-002).
+    /// </summary>
+    /// <remarks>
+    /// These are the only rows a migration run may consider: anything not ready is never served and
+    /// therefore never needs moving, and anything already naming the target is done. The bound is
+    /// what keeps a run finite.
+    /// </remarks>
+    Task<IReadOnlyList<MediaRecord>> ListReadyByProviderAsync(
+        Guid scopeId,
+        string provider,
+        int limit,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>

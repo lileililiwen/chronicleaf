@@ -175,7 +175,8 @@ public sealed class LocalMediaStore(
                 MediaStatus.Ready,
                 clock.GetUtcNow().ToUniversalTime(),
                 input.OwnerOperationId,
-                MediaValues.InitialRevision);
+                MediaValues.InitialRevision,
+                StorageModes.Local);
 
             await RegisterAsync(owner, record, cancellationToken).ConfigureAwait(false);
 
@@ -359,7 +360,8 @@ public sealed class LocalMediaStore(
                     MediaStatus.Deleted,
                     record.CreatedAt,
                     record.OwnerOperationId,
-                    record.Revision + 1);
+                    record.Revision + 1,
+                    record.ProviderId);
             },
             cancellationToken).ConfigureAwait(false);
 
@@ -380,10 +382,15 @@ public sealed class LocalMediaStore(
         // The rows first, because they decide what counts as an orphan. A staged record older than the
         // cutoff is unreferenced by definition - nothing can reference a record that was never
         // published - and a pending record is unreferenced by definition whatever its age, so neither
-        // needs a reference check to justify being swept.
+        // needs a reference check to justify being swept. Only this backend's rows are swept: the
+        // S3 store sweeps its own, and neither may move the other's. In a Local-only database every
+        // row is a Local row, so the filter changes nothing there.
         var stale = await media.ListStalePendingAsync(stagedBefore, limit, cancellationToken)
             .ConfigureAwait(false);
-        var swept = stale
+        var own = stale
+            .Where(record => string.Equals(record.ProviderId, StorageModes.Local, StringComparison.Ordinal))
+            .ToList();
+        var swept = own
             .Select(record => record.StorageKey)
             .ToHashSet(StringComparer.Ordinal);
 
@@ -412,7 +419,7 @@ public sealed class LocalMediaStore(
         // Finally the rows whose object is gone. A staged record that has just been swept names
         // nothing, and moving it to a terminal status stops it being a candidate for every future
         // pass. It was never servable and nothing here makes it so.
-        foreach (var record in stale)
+        foreach (var record in own)
         {
             cancellationToken.ThrowIfCancellationRequested();
 

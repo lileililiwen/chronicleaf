@@ -92,6 +92,32 @@ public static class MediaLimits
 }
 
 /// <summary>
+/// The backends a stored media object may live on (CLOUD-OBJECT-STORAGE-001/002).
+/// </summary>
+/// <remarks>
+/// The set is closed and only this package's stores move a record between them. The value is a
+/// record of where the verified bytes are, not a request: a row says <see cref="S3"/> only after
+/// the migration has copied its bytes to the configured bucket and verified the digest there, and
+/// it says <see cref="Local"/> otherwise. Serving reads the value rather than the installation's
+/// configured mode, which is what lets a migration move one installation's rows gradually while
+/// every row keeps pointing at bytes that exist.
+/// </remarks>
+public static class StorageModes
+{
+    /// <summary>The filesystem adapter the Community media package is scoped to.</summary>
+    public const string Local = "local";
+
+    /// <summary>The S3-compatible adapter this package is scoped to.</summary>
+    public const string S3 = "s3";
+
+    public static IReadOnlyList<string> All { get; } = [Local, S3];
+
+    /// <summary>True only for one of the two fixed values, compared ordinally.</summary>
+    public static bool IsSupported(string? mode) =>
+        mode is not null && All.Contains(mode, StringComparer.Ordinal);
+}
+
+/// <summary>
 /// One stored image, and the only description of it that exists (LOCAL-MEDIA-STORAGE-001/002).
 /// </summary>
 /// <remarks>
@@ -135,6 +161,9 @@ public sealed class Media
     /// <summary>The longest <see cref="MediaStatus"/> value; see the <c>media.status</c> column.</summary>
     public const int StatusMaxLength = 16;
 
+    /// <summary>The longest storage-mode value; see the <c>media.provider_id</c> column.</summary>
+    public const int ProviderIdMaxLength = 32;
+
     /// <summary>The longest accepted media type; see the <c>media.media_type</c> column.</summary>
     public const int MediaTypeMaxLength = 100;
 
@@ -149,7 +178,8 @@ public sealed class Media
         string status,
         DateTimeOffset createdAt,
         Guid? ownerOperationId,
-        long revision)
+        long revision,
+        string providerId)
     {
         Id = id;
         ScopeId = scopeId;
@@ -162,6 +192,7 @@ public sealed class Media
         CreatedAt = createdAt;
         OwnerOperationId = ownerOperationId;
         Revision = revision;
+        ProviderId = providerId;
     }
 
     /// <summary>This record's identity, and the id a caller addresses it by.</summary>
@@ -201,11 +232,120 @@ public sealed class Media
     public long Revision { get; }
 
     /// <summary>
+    /// The backend the verified bytes live on: one of the fixed <see cref="StorageModes"/> values.
+    /// A row names <c>s3</c> only after the migration has verified its bytes under the same scoped
+    /// key in the configured bucket, so serving can trust the value rather than re-proving it.
+    /// </summary>
+    public string ProviderId { get; }
+
+    /// <summary>
     /// True only while this record may be served. It is
     /// <see cref="MediaStatus.IsServable"/> applied to this record, so a read path that forgot to
     /// test a status cannot accidentally agree with this by accident.
     /// </summary>
     public bool IsServable => MediaStatus.IsServable(Status);
+}
+
+/// <summary>
+/// The states one copied media object may hold in the migration ledger
+/// (CLOUD-OBJECT-STORAGE-002).
+/// </summary>
+/// <remarks>
+/// The set is closed. A copy is <see cref="Started"/> from the moment its bytes are being moved and
+/// <see cref="Verified"/> only after the target's own bytes hash to the source row's digest, at
+/// which point the media row may name the target provider. <see cref="Failed"/> records a copy
+/// whose bytes did not verify or could not be moved; the source row is untouched in both cases, so
+/// a retry resumes rather than repairs.
+/// </remarks>
+public static class MediaCopyStates
+{
+    /// <summary>The copy is in flight or was interrupted before verification.</summary>
+    public const string Started = "started";
+
+    /// <summary>The target bytes hash to the source digest; the row may switch providers.</summary>
+    public const string Verified = "verified";
+
+    /// <summary>The copy could not be moved or did not verify; the source row is still authoritative.</summary>
+    public const string Failed = "failed";
+
+    public static IReadOnlyList<string> All { get; } = [Started, Verified, Failed];
+}
+
+/// <summary>
+/// One media object's migration ledger entry (CLOUD-OBJECT-STORAGE-002).
+/// </summary>
+/// <remarks>
+/// <para>
+/// This is the restart record, not the bytes: it names the source and target keys, the digest the
+/// source row carries and the digest that was actually read back from the target, and the state that
+/// decides whether a later run copies again or skips. A second run that finds
+/// <see cref="MediaCopyStates.Verified"/> re-verifies the target rather than trusting this row, so
+/// the ledger can resume work but can never declare bytes good that are not.
+/// </para>
+/// <para>
+/// The two keys are usually the same scoped string on two backends - the key shape is portable by
+/// design - and both are recorded anyway, so a future backend whose physical layout differs is
+/// described rather than assumed.
+/// </para>
+/// </remarks>
+public sealed class MediaMigrationCopy
+{
+    /// <summary>The longest copy-state value; see the <c>media_migration_copies.state</c> column.</summary>
+    public const int StateMaxLength = 16;
+
+    public MediaMigrationCopy(
+        Guid mediaId,
+        Guid scopeId,
+        string sourceProvider,
+        string targetProvider,
+        string sourceKey,
+        string targetKey,
+        string sourceSha256,
+        string? copiedSha256,
+        string state,
+        DateTimeOffset updatedAt)
+    {
+        MediaId = mediaId;
+        ScopeId = scopeId;
+        SourceProvider = sourceProvider;
+        TargetProvider = targetProvider;
+        SourceKey = sourceKey;
+        TargetKey = targetKey;
+        SourceSha256 = sourceSha256;
+        CopiedSha256 = copiedSha256;
+        State = state;
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>The media record this copy is about; also the ledger's primary key.</summary>
+    public Guid MediaId { get; }
+
+    /// <summary>The installation that owns the image; every ledger read is filtered by it.</summary>
+    public Guid ScopeId { get; }
+
+    /// <summary>Where the authoritative bytes were read from; one of <see cref="StorageModes"/>.</summary>
+    public string SourceProvider { get; }
+
+    /// <summary>Where the bytes were written to; one of <see cref="StorageModes"/>.</summary>
+    public string TargetProvider { get; }
+
+    /// <summary>The scoped key the bytes were read from.</summary>
+    public string SourceKey { get; }
+
+    /// <summary>The scoped key the bytes were written to.</summary>
+    public string TargetKey { get; }
+
+    /// <summary>The digest the source media row carries.</summary>
+    public string SourceSha256 { get; }
+
+    /// <summary>The digest read back from the target, or null before anything verified.</summary>
+    public string? CopiedSha256 { get; }
+
+    /// <summary>One of the fixed <see cref="MediaCopyStates"/> values.</summary>
+    public string State { get; }
+
+    /// <summary>When this entry was last written, always UTC and always from the injected clock.</summary>
+    public DateTimeOffset UpdatedAt { get; }
 }
 
 /// <summary>

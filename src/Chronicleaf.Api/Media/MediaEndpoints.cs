@@ -42,6 +42,13 @@ public static class MediaEndpoints
         endpoints.MapGet("/api/media/{mediaId:guid}", GetMediaAsync).RequireOwnerSession();
         endpoints.MapDelete("/api/media/{mediaId:guid}", RetireMediaAsync).RequireOwnerSession();
 
+        // CLOUD-OBJECT-STORAGE-001. The bounded presigned read of one stored image. Private like the
+        // other three routes, by the same default-deny boundary rather than by a check here: a
+        // matched /api endpoint without the public marker has already been given an authenticated
+        // owner session. The lifetime arrives as a query value in seconds and defaults to the full
+        // five minutes; the service refuses anything longer before the provider is touched.
+        endpoints.MapPost("/api/media/{mediaId:guid}/presign", PresignMediaAsync).RequireOwnerSession();
+
         return endpoints;
     }
 
@@ -124,6 +131,41 @@ public static class MediaEndpoints
         var retired = await media.RetireAsync(owner, mediaId, cancellationToken).ConfigureAwait(false);
 
         return Results.Json(RetiredMediaResponse.From(retired));
+    }
+
+    private static async Task<IResult> PresignMediaAsync(
+        Guid mediaId,
+        HttpContext context,
+        IS3MediaLinkService links,
+        IOwnerAccessService access,
+        CancellationToken cancellationToken)
+    {
+        var owner = await OwnerScopeAsync(context, access, cancellationToken).ConfigureAwait(false);
+
+        var raw = context.Request.Query["lifetimeSeconds"].ToString();
+        var lifetime = S3MediaOptions.MaxPresignLifetime;
+
+        if (raw is { Length: > 0 })
+        {
+            if (!long.TryParse(
+                    raw,
+                    System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var seconds))
+            {
+                // An unparseable lifetime is a semantic validation failure, not a not-found: there
+                // is no duration here to look up, and answering 404 would imply there was.
+                throw new ValidationFailedException("lifetimeSeconds", "A lifetime in seconds is required.");
+            }
+
+            lifetime = TimeSpan.FromSeconds(seconds);
+        }
+
+        var link = await links.PresignGetAsync(owner, mediaId, lifetime, cancellationToken).ConfigureAwait(false);
+
+        context.Response.Headers.CacheControl = "private, no-store";
+
+        return Results.Json(PresignedMediaUrlResponse.From(link));
     }
 
     /// <summary>

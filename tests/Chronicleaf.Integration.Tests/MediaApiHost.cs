@@ -1,6 +1,8 @@
 using Chronicleaf.Application.Access;
 using Chronicleaf.Application.Media;
 using Chronicleaf.Application.Persistence;
+using Chronicleaf.Application.Secrets;
+using Chronicleaf.Infrastructure.Media.S3;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -49,6 +51,12 @@ public sealed class MediaApiHost : WebApplicationFactory<Program>
     private readonly MediaFaults? _faults;
     private readonly bool _withRepositoryFaults;
     private readonly IMediaIdSource? _ids;
+    private readonly bool _s3Mode;
+    private readonly S3HostOptions? _s3;
+    private readonly IS3BackendFactory? _backendFactory;
+    private readonly IS3CredentialSource? _credentialSource;
+    private readonly ICredentialIdSource? _credentialIds;
+    private readonly string? _keyFile;
 
     private MediaApiHost(
         string connectionString,
@@ -58,7 +66,13 @@ public sealed class MediaApiHost : WebApplicationFactory<Program>
         MediaReferenceScript? references,
         MediaFaults? faults,
         bool withRepositoryFaults,
-        IMediaIdSource? ids)
+        IMediaIdSource? ids,
+        bool s3Mode = false,
+        S3HostOptions? s3 = null,
+        IS3BackendFactory? backendFactory = null,
+        IS3CredentialSource? credentialSource = null,
+        ICredentialIdSource? credentialIds = null,
+        string? keyFile = null)
     {
         _connectionString = connectionString;
         _clock = clock;
@@ -68,6 +82,12 @@ public sealed class MediaApiHost : WebApplicationFactory<Program>
         _faults = faults;
         _withRepositoryFaults = withRepositoryFaults;
         _ids = ids;
+        _s3Mode = s3Mode;
+        _s3 = s3;
+        _backendFactory = backendFactory;
+        _credentialSource = credentialSource;
+        _credentialIds = credentialIds;
+        _keyFile = keyFile;
     }
 
     /// <summary>The connection string this host was started with, for the assertions that read the database.</summary>
@@ -122,6 +142,45 @@ public sealed class MediaApiHost : WebApplicationFactory<Program>
         IMediaIdSource? ids = null) =>
         new(connectionString, new FixedTimeProvider(clock), mediaRoot, null, null, null, true, ids);
 
+    /// <summary>
+    /// Starts a host in S3 storage mode (CLOUD-OBJECT-STORAGE-001/002).
+    /// </summary>
+    /// <remarks>
+    /// The S3 options travel through the production configuration keys and the production
+    /// validation, so an option this host applies is one a deployment could set too. Either the
+    /// backend factory or the credential source - or both - may be replaced: replacing the factory
+    /// substitutes the whole backend, while replacing only the source keeps the production factory
+    /// (and therefore the real platform adapter and the real client it builds) over scripted keys.
+    /// The vault key file is the production one, so a scenario can store a real sealed credential
+    /// and prove the reference never reaches a row or a log.
+    /// </remarks>
+    public static MediaApiHost StartS3(
+        string connectionString,
+        DateTimeOffset clock,
+        string mediaRoot,
+        S3HostOptions s3,
+        IS3BackendFactory? backendFactory = null,
+        IS3CredentialSource? credentialSource = null,
+        MediaReferenceScript? references = null,
+        IMediaIdSource? ids = null,
+        ICredentialIdSource? credentialIds = null,
+        string? keyFile = null) =>
+        new(
+            connectionString,
+            new FixedTimeProvider(clock),
+            mediaRoot,
+            null,
+            references,
+            null,
+            false,
+            ids,
+            s3Mode: true,
+            s3: s3,
+            backendFactory: backendFactory,
+            credentialSource: credentialSource,
+            credentialIds: credentialIds,
+            keyFile: keyFile);
+
     /// <summary>The real MediaRoot guard this host resolved, for the boundary assertions.</summary>
     public Infrastructure.Media.MediaRoot ResolvedRoot() =>
         Services.GetRequiredService<Infrastructure.Media.MediaRoot>();
@@ -133,6 +192,28 @@ public sealed class MediaApiHost : WebApplicationFactory<Program>
         builder.UseSetting(AccessSettings.PublicOriginSettingName, OwnerClient.PublicOrigin);
         builder.UseSetting(MediaSettings.MediaRootSettingName, _mediaRoot);
         builder.UseEnvironment("Production");
+
+        if (_s3Mode)
+        {
+            ArgumentNullException.ThrowIfNull(_s3);
+
+            builder.UseSetting(MediaSettings.StorageModeSettingName, "s3");
+            builder.UseSetting($"{S3MediaOptions.SectionName}:Endpoint", _s3.Endpoint);
+            builder.UseSetting($"{S3MediaOptions.SectionName}:BucketName", _s3.BucketName);
+            builder.UseSetting($"{S3MediaOptions.SectionName}:Region", _s3.Region);
+            builder.UseSetting(
+                $"{S3MediaOptions.SectionName}:ForcePathStyle",
+                _s3.ForcePathStyle.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            builder.UseSetting($"{S3MediaOptions.SectionName}:KeyPrefix", _s3.KeyPrefix);
+            builder.UseSetting(
+                $"{S3MediaOptions.SectionName}:CredentialId",
+                _s3.CredentialId.ToString("D"));
+        }
+
+        if (_keyFile is not null)
+        {
+            builder.UseSetting(SecretVaultSettings.EncryptionKeyFileSettingName, _keyFile);
+        }
 
         if (_maximumByteLength is { } limit)
         {
@@ -184,8 +265,55 @@ public sealed class MediaApiHost : WebApplicationFactory<Program>
                 services.RemoveAll<IMediaIdSource>();
                 services.AddSingleton(_ids);
             }
+
+            if (_backendFactory is not null)
+            {
+                // Registered against the contract rather than the concrete script: AddSingleton
+                // would otherwise infer the script's own type and register a service nothing
+                // resolves. The production factory is removed first, so the bundle of seams stays
+                // one registration and a scenario cannot accidentally hold both.
+                services.RemoveAll<IS3BackendFactory>();
+                services.AddSingleton<IS3BackendFactory>(_backendFactory);
+            }
+
+            if (_credentialSource is not null)
+            {
+                // Keeps the production factory - and therefore the real platform adapter and the
+                // real client it builds - while the keys come from the script. This is the seam a
+                // MinIO scenario uses: everything above the credential is production code.
+                services.RemoveAll<IS3CredentialSource>();
+                services.AddSingleton<IS3CredentialSource>(_credentialSource);
+            }
+
+            if (_credentialIds is not null)
+            {
+                services.RemoveAll<ICredentialIdSource>();
+                services.AddSingleton(_credentialIds);
+            }
         });
     }
+}
+
+/// <summary>
+/// The S3 options an S3-mode test host is configured with, through the production keys.
+/// </summary>
+/// <param name="Endpoint">The S3-compatible endpoint. A dummy host is never dialled when the backend factory is scripted.</param>
+/// <param name="BucketName">The bucket this installation owns.</param>
+/// <param name="Region">The signing region.</param>
+/// <param name="ForcePathStyle">Path-style addressing, as MinIO and R2 require.</param>
+/// <param name="KeyPrefix">The optional installation prefix.</param>
+/// <param name="CredentialId">The vault reference of the sealed s3 credential document.</param>
+public sealed record S3HostOptions(
+    string Endpoint,
+    string BucketName,
+    string Region,
+    bool ForcePathStyle,
+    string KeyPrefix,
+    Guid CredentialId)
+{
+    /// <summary>Options that pass production validation but dial nothing: the backend is scripted.</summary>
+    public static S3HostOptions UnusedBackend(Guid? credentialId = null) =>
+        new("http://127.0.0.1:9", "test-bucket", "us-east-1", true, string.Empty, credentialId ?? Guid.NewGuid());
 }
 
 /// <summary>
@@ -343,6 +471,21 @@ public sealed class MediaRepositoryFaults(IMediaRepository inner) : IMediaReposi
         DateTimeOffset changedAt,
         CancellationToken cancellationToken = default) =>
         inner.TransitionStatusAsync(scopeId, mediaId, expectedStatus, newStatus, changedAt, cancellationToken);
+
+    public Task<int> UpdateProviderAsync(
+        Guid scopeId,
+        Guid mediaId,
+        string expectedProvider,
+        string newProvider,
+        CancellationToken cancellationToken = default) =>
+        inner.UpdateProviderAsync(scopeId, mediaId, expectedProvider, newProvider, cancellationToken);
+
+    public Task<IReadOnlyList<MediaRecord>> ListReadyByProviderAsync(
+        Guid scopeId,
+        string provider,
+        int limit,
+        CancellationToken cancellationToken = default) =>
+        inner.ListReadyByProviderAsync(scopeId, provider, limit, cancellationToken);
 
     public Task<bool> InsertAsync(MediaRecord media, CancellationToken cancellationToken = default) =>
         FailInsert

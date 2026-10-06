@@ -61,3 +61,25 @@ public sealed record RetiredMediaResponse(
             result.Ref.Revision,
             result.BytesReleased);
 }
+
+/// <summary>
+/// The <c>POST /api/media/{id}/presign</c> response body (CLOUD-OBJECT-STORAGE-001).
+/// </summary>
+/// <remarks>
+/// It carries the URL and the instant the provider stops authorizing it, because a bounded read is
+/// only honest when the bound travels with it. The URL is opaque - a signature over the bucket, the
+/// scoped key and the expiry - and discloses no key material, no bucket layout beyond the one
+/// object, and no credential. There is no field for a lifetime the caller asked for: the expiry is
+/// the provider's answer, not an echo.
+/// </remarks>
+public sealed record PresignedMediaUrlResponse(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("url")] string Url,
+    [property: JsonPropertyName("expiresAt")] DateTimeOffset ExpiresAt)
+{
+    public static PresignedMediaUrlResponse From(PresignedMediaLink link) =>
+        new(
+            link.MediaId.ToString("D"),
+            link.Url.ToString(),
+            link.ExpiresAt);
+}

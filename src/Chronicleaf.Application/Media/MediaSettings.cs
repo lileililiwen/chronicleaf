@@ -44,6 +44,9 @@ public sealed class MediaSettings
     /// <summary>The configuration key the pixel limit is read from.</summary>
     public const string MaximumPixelCountSettingName = "Chronicleaf:Media:MaximumPixelCount";
 
+    /// <summary>The configuration key the storage mode is read from.</summary>
+    public const string StorageModeSettingName = "Chronicleaf:StorageMode";
+
     /// <summary>
     /// The root used when nothing is configured, relative to the application's content root and
     /// therefore outside <c>wwwroot</c>.
@@ -63,6 +66,25 @@ public sealed class MediaSettings
     public long MaximumPixelCount { get; init; } = MediaLimits.MaximumPixelCount;
 
     /// <summary>
+    /// Which backend new uploads are written to: one of the fixed <see cref="StorageModes"/> values,
+    /// defaulting to <see cref="StorageModes.Local"/>. Read from <c>Chronicleaf:StorageMode</c>.
+    /// </summary>
+    /// <remarks>
+    /// The mode selects the backend for new writes only: serving reads each record's own provider,
+    /// so a migration can move rows gradually without stranding the ones it has not reached. A value
+    /// outside the fixed vocabulary fails the start rather than silently storing somewhere the
+    /// operator did not choose.
+    /// </remarks>
+    public string StorageMode { get; init; } = StorageModes.Local;
+
+    /// <summary>
+    /// True when new uploads are written to the S3-compatible backend. The S3 backend itself is only
+    /// registered in this mode, which is what keeps a Local self-host free of S3 clients,
+    /// S3 credentials and S3 network calls.
+    /// </summary>
+    public bool IsS3Mode => string.Equals(StorageMode, StorageModes.S3, StringComparison.Ordinal);
+
+    /// <summary>
     /// Reads the settings, clamping both limits to the design's bounds.
     /// </summary>
     /// <remarks>
@@ -76,6 +98,13 @@ public sealed class MediaSettings
         ArgumentNullException.ThrowIfNull(configuration);
 
         var configuredRoot = configuration[MediaRootSettingName];
+        var configuredMode = configuration[StorageModeSettingName];
+
+        if (configuredMode is { Length: > 0 } && !StorageModes.IsSupported(configuredMode))
+        {
+            throw new InvalidOperationException(
+                $"Chronicleaf:StorageMode must be one of '{StorageModes.Local}' or '{StorageModes.S3}'.");
+        }
 
         return new MediaSettings
         {
@@ -86,6 +115,7 @@ public sealed class MediaSettings
             MaximumPixelCount = Clamp(
                 ReadPositiveLong(configuration[MaximumPixelCountSettingName]),
                 MediaLimits.MaximumPixelCount),
+            StorageMode = string.IsNullOrWhiteSpace(configuredMode) ? StorageModes.Local : configuredMode,
         };
     }
 

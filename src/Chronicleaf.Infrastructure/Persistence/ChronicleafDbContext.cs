@@ -131,6 +131,8 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     public DbSet<ProjectMembership> ProjectMemberships => Set<ProjectMembership>();
 
+    public DbSet<MediaMigrationCopy> MediaMigrationCopies => Set<MediaMigrationCopy>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Installation>(entity =>
@@ -546,6 +548,16 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
             entity.Property(media => media.OwnerOperationId).HasColumnName("owner_operation_id");
             entity.Property(media => media.Revision).HasColumnName("revision").IsRequired();
 
+            // CLOUD-OBJECT-STORAGE-001/002: the backend the verified bytes live on. Added by this
+            // package's forward migration with a 'local' default that backfills every existing row,
+            // so a database that has never seen S3 reads exactly what it always read. New rows name
+            // the backend their bytes were verified on.
+            entity.Property(media => media.ProviderId)
+                .HasColumnName("provider_id")
+                .HasMaxLength(MediaRecord.ProviderIdMaxLength)
+                .HasDefaultValue(StorageModes.Local)
+                .IsRequired();
+
             // A stale write is a conflict, never an overwrite, for the same reason the projects and
             // milestones tables carry a token.
             entity.Property(media => media.Revision).IsConcurrencyToken();
@@ -573,6 +585,59 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .HasForeignKey(media => media.ProjectId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_media_project_id");
+        });
+
+        // CLOUD-OBJECT-STORAGE-002: one migration ledger entry per media object. The media id is the
+        // primary key, so two runs recording the same object converge rather than diverging, and the
+        // state check is what keeps a retry from re-copying a verified object without re-verifying
+        // it first. Deliberately not a foreign key to media: the ledger is this package's working
+        // state, and a media row that outlives its ledger entry - or the reverse - must not cascade
+        // into the other.
+        modelBuilder.Entity<MediaMigrationCopy>(entity =>
+        {
+            entity.ToTable("media_migration_copies");
+            entity.HasKey(copy => copy.MediaId);
+            entity.Property(copy => copy.MediaId).HasColumnName("media_id").ValueGeneratedNever();
+            entity.Property(copy => copy.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(copy => copy.SourceProvider)
+                .HasColumnName("source_provider")
+                .HasMaxLength(MediaRecord.ProviderIdMaxLength)
+                .IsRequired();
+            entity.Property(copy => copy.TargetProvider)
+                .HasColumnName("target_provider")
+                .HasMaxLength(MediaRecord.ProviderIdMaxLength)
+                .IsRequired();
+            entity.Property(copy => copy.SourceKey)
+                .HasColumnName("source_key")
+                .HasMaxLength(MediaLimits.MaximumKeyLength)
+                .IsRequired();
+            entity.Property(copy => copy.TargetKey)
+                .HasColumnName("target_key")
+                .HasMaxLength(MediaLimits.MaximumKeyLength)
+                .IsRequired();
+            entity.Property(copy => copy.SourceSha256)
+                .HasColumnName("source_sha256")
+                .HasMaxLength(MediaRecord.Sha256HexLength)
+                .IsRequired();
+            entity.Property(copy => copy.CopiedSha256)
+                .HasColumnName("copied_sha256")
+                .HasMaxLength(MediaRecord.Sha256HexLength);
+            entity.Property(copy => copy.State)
+                .HasColumnName("state")
+                .HasMaxLength(MediaMigrationCopy.StateMaxLength)
+                .IsRequired();
+            entity.Property(copy => copy.UpdatedAt)
+                .HasColumnName("updated_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            entity.ToTable(table => table.HasCheckConstraint(
+                "ck_media_migration_copies_state",
+                "state IN ('started', 'verified', 'failed')"));
+
+            // A run's only query shape: this scope's copies, with the unverified ones resumable.
+            entity.HasIndex(copy => new { copy.ScopeId, copy.State })
+                .HasDatabaseName("ix_media_migration_copies_scope_id_state");
         });
 
         // MILESTONE-EVIDENCE-001/002: the immutable provenance snapshots. A bundle row is a revision

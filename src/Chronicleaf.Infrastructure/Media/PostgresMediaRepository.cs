@@ -40,7 +40,7 @@ public sealed class PostgresMediaRepository(ChronicleafDbContext dbContext) : IM
     /// <summary>The media columns in the order <see cref="MediaRowReader.Read"/> expects.</summary>
     public const string Columns =
         "id, scope_id, project_id, storage_key, media_type, byte_length, sha256, status, created_at, "
-        + "owner_operation_id, revision";
+        + "owner_operation_id, revision, provider_id";
 
     public Task<MediaRecord?> FindAsync(Guid scopeId, Guid mediaId, CancellationToken cancellationToken = default) =>
         dbContext.Set<MediaRecord>()
@@ -59,7 +59,7 @@ public sealed class PostgresMediaRepository(ChronicleafDbContext dbContext) : IM
             dbContext,
             $"""
              INSERT INTO media ({Columns})
-             VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10)
+             VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11)
              ON CONFLICT (id) DO NOTHING
              RETURNING id
              """,
@@ -75,6 +75,7 @@ public sealed class PostgresMediaRepository(ChronicleafDbContext dbContext) : IM
                 new("@p8", NpgsqlDbType.TimestampTz, record.CreatedAt),
                 new("@p9", NpgsqlDbType.Uuid, record.OwnerOperationId),
                 new("@p10", NpgsqlDbType.Bigint, record.Revision),
+                new("@p11", NpgsqlDbType.Varchar, record.ProviderId),
             ],
             cancellationToken).ConfigureAwait(false);
 
@@ -109,6 +110,66 @@ public sealed class PostgresMediaRepository(ChronicleafDbContext dbContext) : IM
                 new("@p3", NpgsqlDbType.Varchar, newStatus),
             ],
             cancellationToken);
+    }
+
+    public Task<int> UpdateProviderAsync(
+        Guid scopeId,
+        Guid mediaId,
+        string expectedProvider,
+        string newProvider,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(expectedProvider);
+        ArgumentException.ThrowIfNullOrWhiteSpace(newProvider);
+
+        // The same compare-and-set shape as the status transition above, for the same reason: the
+        // flip lands only while the row still names the provider whose bytes were verified, so two
+        // migration runs cannot both claim the same record and a flip cannot land on a record whose
+        // bytes moved on without this call. The revision does not advance: the bytes are unchanged,
+        // only where they are authoritative, and a stale If-Match must not start failing because a
+        // migration ran.
+        return ChronicleafSql.ExecuteAsync(
+            dbContext,
+            """
+            UPDATE media
+            SET provider_id = @p3
+            WHERE id = @p1 AND scope_id = @p0 AND provider_id = @p2
+            """,
+            [
+                new("@p0", NpgsqlDbType.Uuid, scopeId),
+                new("@p1", NpgsqlDbType.Uuid, mediaId),
+                new("@p2", NpgsqlDbType.Varchar, expectedProvider),
+                new("@p3", NpgsqlDbType.Varchar, newProvider),
+            ],
+            cancellationToken);
+    }
+
+    public Task<IReadOnlyList<MediaRecord>> ListReadyByProviderAsync(
+        Guid scopeId,
+        string provider,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(provider);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(limit);
+
+        var sql = $"""
+            SELECT {Columns}
+            FROM media
+            WHERE scope_id = @p0 AND status = @p1 AND provider_id = @p2
+            ORDER BY created_at, id
+            LIMIT @p3
+            """;
+
+        var parameters = new List<SqlParameter>(4)
+        {
+            new("@p0", NpgsqlDbType.Uuid, scopeId),
+            new("@p1", NpgsqlDbType.Varchar, MediaStatus.Ready),
+            new("@p2", NpgsqlDbType.Varchar, provider),
+            new("@p3", NpgsqlDbType.Integer, limit),
+        };
+
+        return ChronicleafSql.QueryAsync(dbContext, sql, parameters, MediaRowReader.Read, cancellationToken);
     }
 
     public Task<IReadOnlyList<MediaRecord>> ListStalePendingAsync(
@@ -183,5 +244,6 @@ internal static class MediaRowReader
             reader.GetString(7),
             reader.GetFieldValue<DateTimeOffset>(8),
             reader.IsDBNull(9) ? null : reader.GetGuid(9),
-            reader.GetInt64(10));
+            reader.GetInt64(10),
+            reader.GetString(11));
 }

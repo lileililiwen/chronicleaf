@@ -24,6 +24,7 @@ using Chronicleaf.Api.Media;
 using Chronicleaf.Api.Narrative;
 using Chronicleaf.Api.Operations;
 using Chronicleaf.Api.Projects;
+using Chronicleaf.Api.S3;
 using Chronicleaf.Api.Secrets;
 using Chronicleaf.Api.Tenancy;
 using Chronicleaf.Api.Timeline;
@@ -32,6 +33,7 @@ using Chronicleaf.Api.Voice;
 using Chronicleaf.AI.Anthropic;
 using Chronicleaf.AI.Gemini;
 using Chronicleaf.AI.Ollama;
+using Chronicleaf.Application.Media;
 using Chronicleaf.AI.OpenAI;
 using Chronicleaf.AI.OpenRouter;
 using Chronicleaf.Infrastructure.Access;
@@ -48,6 +50,7 @@ using Chronicleaf.Infrastructure.GitHubEnrichment;
 using Chronicleaf.Infrastructure.GitHubCandidates;
 using Chronicleaf.Infrastructure.Journey;
 using Chronicleaf.Infrastructure.Media;
+using Chronicleaf.Infrastructure.Media.S3;
 using Chronicleaf.Infrastructure.Narrative;
 using Chronicleaf.Infrastructure.Operations;
 using Chronicleaf.Infrastructure.Persistence;
@@ -129,6 +132,18 @@ builder.Services.AddChronicleafMedia(
     builder.Configuration,
     builder.Environment.ContentRootPath,
     webAssets.WebRootPath);
+
+// CLOUD-OBJECT-STORAGE-001/002. The S3-compatible scoped media adapter, registered only when the
+// installation selects S3 storage mode: in Local mode this adds nothing but the unconfigured
+// presign answer, so a Community self-host builds no S3 client, leases no S3 credential and makes
+// no S3 network call. In S3 mode it validates the operator's endpoint, bucket and vault credential
+// reference at start-up and serves each record from the backend its own provider names, so rows the
+// migration has not reached yet still read from disk. The credential source is the composition
+// root's own bridge, next to the provider key sources: the backend declares that it needs keys
+// briefly, and only this wiring knows the answer comes from a sealed vault document. A database
+// without the cloud-object-storage migration reports schema_mismatch at /api/ready.
+builder.Services.AddSingleton<IS3CredentialSource, VaultS3CredentialSource>();
+builder.Services.AddChronicleafCloudMedia(builder.Configuration);
 
 // MILESTONE-EVIDENCE-001/002. Private, append-only provenance snapshots over real PostgreSQL. It
 // also replaces the media package's default media-reference checker with the real one, because the

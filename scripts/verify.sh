@@ -7,7 +7,8 @@
 # LLM-OLLAMA-ADAPTER-001/002,
 # SCREENSHOT-CAPTURE-001/002, SCREENSHOT-CURATION-001/002, GROUNDED-MARKDOWN-DRAFTS-001/002,
 # MILESTONE-TIMELINE-001/002, MARKDOWN-REVIEW-EXPORT-001/002,
-# COMMUNITY-COMPOSE-RELEASE-001/002, CLOUD-TENANT-BOUNDARY-001/002).
+# COMMUNITY-COMPOSE-RELEASE-001/002, CLOUD-TENANT-BOUNDARY-001/002,
+# TEAM-PROJECT-PERMISSIONS-001/002, CLOUD-OBJECT-STORAGE-001/002).
 #
 # Required chain, in order:
 #   1. platform feed           - the committed packages/platform-feed is what the build resolves, from
@@ -572,6 +573,24 @@ else
   # one declared substitution the tenant boundary names (a handler answering the issuer's
   # three resources, while the checks and the signature verification are production code).
   step "team project permission tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~TeamProjectPermissionsTests"
+  # CLOUD-OBJECT-STORAGE-001/002. That an S3-mode upload stores the decoded type and hash under a
+  # server-generated scoped key and reads back identically, with the bytes asserted on both sides
+  # of the wire; that another scope's object is denied before any presign is minted and before any
+  # byte is transferred; that an over-long presign lifetime is refused before the provider is
+  # touched and an expired URL authorizes nothing; that a migration copies, verifies and flips each
+  # row to the target provider while the source bytes stay where they are, with each backend
+  # serving its own rows afterwards; that an interrupted copy and a checksum mismatch both keep
+  # the source reference valid and a retry resumes safely; that a Community host with no S3
+  # configuration stores, serves and retires locally with no S3 backend registered; that the S3
+  # keys travel as a vault reference absent from every row and every message; that a reference to
+  # another provider's credential cannot become S3 keys; that referenced S3 media answers
+  # media_in_use; and that an interrupted S3 upload leaves a reconcilable pending row - all proven
+  # against the same real disposable PostgreSQL through the real API host, with the S3 side held
+  # either by a scripted in-memory backend behind the production stores (for interruption and
+  # corruption no real backend produces on demand) or by a real MinIO container over the real SDK
+  # and the real platform adapter. No stage here touches a real bucket, a real cloud account or a
+  # real credential.
+  step "cloud object storage tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~CloudObjectStorageTests"
   # COMMUNITY-COMPOSE-RELEASE-001/002. That a clean install completes the
   # milestone-to-approved-Markdown flow with the timeline telling it back; that the compose
   # file describes exactly app plus postgres on the pinned digest with named volumes, a

@@ -26,8 +26,10 @@ infrastructure="src/Chronicleaf.Infrastructure/Chronicleaf.Infrastructure.csproj
 feed="packages/platform-feed"
 platform_version="0.1.0"
 
-# Platform.Storage.Local is the filesystem adapter this package is scoped to, Platform.Storage is the
-# contract and the key validation, Platform.Core is Platform.Storage's own dependency. Platform.Jobs
+# Platform.Storage.Local is the filesystem adapter the Community media package is scoped to,
+# Platform.Storage.S3 is the S3-compatible adapter the cloud object storage package is scoped to,
+# Platform.Storage is the contract and the key validation, Platform.Core is Platform.Storage's own
+# dependency. Platform.Jobs
 # is the dispatcher contract, Platform.Jobs.Hangfire is the durable scheduling adapter, and
 # Platform.Core is Platform.Jobs's dependency too. The whole transitive closure is listed because a
 # feed that carries only the direct references is a feed that fails to restore on a cold cache,
@@ -36,6 +38,7 @@ expected=(
   "Platform.Core"
   "Platform.Storage"
   "Platform.Storage.Local"
+  "Platform.Storage.S3"
   "Platform.Jobs"
   "Platform.Jobs.Hangfire"
 )
@@ -73,7 +76,7 @@ fi
 echo "    ok: the only platform source is ${feed}, by relative path"
 
 echo "== 3. referenced versions match the committed feed"
-for package in Platform.Storage Platform.Storage.Local Platform.Jobs Platform.Jobs.Hangfire; do
+for package in Platform.Storage Platform.Storage.Local Platform.Storage.S3 Platform.Jobs Platform.Jobs.Hangfire; do
   referenced="$(sed -n "s|.*Include=\"${package}\" Version=\"\([^\"]*\)\".*|\1|p" "$infrastructure")"
   [ -n "$referenced" ] || fail "${infrastructure} does not reference ${package}"
   [ "$referenced" = "$platform_version" ] \

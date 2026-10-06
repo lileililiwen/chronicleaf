@@ -630,6 +630,20 @@ else
   # real API host, with only the far end of the wire scripted. No stage here reaches real
   # WordPress.
   step "publisher wordpress adapter tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~PublisherWordpressAdapterTests"
+  # PUBLISHER-CUSTOM-BLOG-ADAPTER-001/002. That a confirmed draft preview probes capabilities
+  # then creates one v1 post as draft and a confirmed publish creates one published post - the
+  # approved title and Markdown verbatim, the operation id as the idempotency key, mode by the
+  # authorized mode, one bearer credential from the leased API key, and the receipt carrying
+  # the server-named remote id, URL and the exact body hash; that a refused key, a rejected
+  # body, a forbidden write and a hash conflict each fail with a redacted code, no secret and
+  # no moved approval while an incompatible server is refused before any post and a
+  # post-preview origin or formats change stales the confirmation before any call; that a
+  # redirect is refused without a second hop; that a lost create answer or an unreadable
+  # success shape becomes unknown with a manual hint the target cannot reconcile; and that an
+  # identical resubmit returns the receipt with no second call - all proven against the same
+  # real disposable PostgreSQL and the real API host, with only the far end of the wire
+  # scripted. No stage here reaches a real server.
+  step "publisher custom blog adapter tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~PublisherCustomBlogAdapterTests"
   # SCREENSHOT-EVOLUTION-IMAGES-001/002. That a same-viewport comparison preserves source
   # pixels, order and provenance in a re-derivable manifest; that a milestone without a
   # selected screenshot is an unavailable gap rather than a fabrication, and a candidate is

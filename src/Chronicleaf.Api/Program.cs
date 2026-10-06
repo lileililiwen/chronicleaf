@@ -58,6 +58,7 @@ using Chronicleaf.Infrastructure.Media;
 using Chronicleaf.Infrastructure.Medium;
 using Chronicleaf.Infrastructure.Media.S3;
 using Chronicleaf.Infrastructure.Narrative;
+using Chronicleaf.Publishers.CustomBlog;
 using Chronicleaf.Publishers.DevTo;
 using Chronicleaf.Publishers.Ghost;
 using Chronicleaf.Publishers.Hashnode;
@@ -465,6 +466,18 @@ builder.Services.AddGhostPublisher(builder.Configuration);
 // rewire a sibling transport. The remaining slot (custom-blog) is still a separate roadmap
 // package and stays unclaimed.
 builder.Services.AddWordPressPublisher(builder.Configuration);
+
+// PUBLISHER-CUSTOM-BLOG-ADAPTER-001/002. The sixth transport behind the publisher contract: one
+// IPublisherAdapter for the `custom-blog` slot, creating one post per confirmed publish - mode
+// draft or publish by the authorized mode - under the operator's explicit fixed HTTPS origin
+// speaking the Chronicleaf Publisher HTTP v1 contract, sending the approved Markdown verbatim
+// with one bearer credential per call from the scope's leased API key. The target is
+// demand-gated: without an explicit Chronicleaf:CustomBlog section this registers nothing and
+// the slot answers publisher_unknown_target, exactly as the contract says an unclaimed target
+// does. The transport owns its own client with no base address - the origin is the per-call
+// target - with redirects refused, so no bare-handler registration here can rewire a sibling
+// transport. No slot remains unclaimed.
+builder.Services.AddCustomBlogPublisher(builder.Configuration);
 
 // The rotation guard is applied once at start-up, so an access token that was changed since the
 // last run revokes every existing session before this process serves anything.

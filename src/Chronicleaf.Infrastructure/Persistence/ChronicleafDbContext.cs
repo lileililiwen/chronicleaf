@@ -73,6 +73,8 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
 
     public DbSet<GitHubConnection> GitHubConnections => Set<GitHubConnection>();
 
+    public DbSet<GitHubAppInstallation> GitHubAppInstallations => Set<GitHubAppInstallation>();
+
     public DbSet<SyncSource> SyncSources => Set<SyncSource>();
 
     public DbSet<EnrichmentRun> EnrichmentRuns => Set<EnrichmentRun>();
@@ -983,6 +985,12 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .HasColumnName("default_branch")
                 .HasMaxLength(GitHubRefMaxLength);
             entity.Property(connection => connection.RepositoryId).HasColumnName("repository_id");
+            entity.Property(connection => connection.AuthMode)
+                .HasColumnName("auth_mode")
+                .HasMaxLength(16)
+                .HasDefaultValue(GitHubAuthModes.Pat)
+                .IsRequired();
+            entity.Property(connection => connection.InstallationId).HasColumnName("installation_id");
             entity.Property(connection => connection.CreatedAt)
                 .HasColumnName("created_at")
                 .HasColumnType("timestamp with time zone")
@@ -996,11 +1004,64 @@ public sealed class ChronicleafDbContext(DbContextOptions<ChronicleafDbContext> 
                 .IsUnique()
                 .HasDatabaseName("ux_github_connections_scope_id_project_id");
 
+            entity.ToTable(table => table.HasCheckConstraint(
+                "ck_github_connections_auth_mode",
+                "auth_mode IN ('pat','installation')"));
+
             entity.HasOne<Project>()
                 .WithMany()
                 .HasForeignKey(connection => connection.ProjectId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_github_connections_project_id");
+        });
+
+        // GITHUB-APP-CONNECTION-001: one row per App installation bound to one scope. The row
+        // names the installation and the account it was installed on, and holds no token and no
+        // secret of any kind. The unique index on the installation id is what refuses a second
+        // scope's attach of the same installation: the first binding wins and the second
+        // conflicts rather than shares.
+        modelBuilder.Entity<GitHubAppInstallation>(entity =>
+        {
+            entity.ToTable("github_app_installations");
+            entity.HasKey(installation => installation.Id);
+            entity.Property(installation => installation.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(installation => installation.ScopeId).HasColumnName("scope_id").IsRequired();
+            entity.Property(installation => installation.InstallationId).HasColumnName("installation_id").IsRequired();
+            entity.Property(installation => installation.AccountLogin)
+                .HasColumnName("account_login")
+                .HasMaxLength(GitHubOwnerMaxLength)
+                .IsRequired();
+            entity.Property(installation => installation.RepositorySelection)
+                .HasColumnName("repository_selection")
+                .HasMaxLength(16)
+                .IsRequired();
+            entity.Property(installation => installation.Status)
+                .HasColumnName("status")
+                .HasMaxLength(16)
+                .IsRequired();
+            entity.Property(installation => installation.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+            entity.Property(installation => installation.UpdatedAt)
+                .HasColumnName("updated_at")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            entity.HasIndex(installation => installation.InstallationId)
+                .IsUnique()
+                .HasDatabaseName("ux_github_app_installations_installation_id");
+
+            entity.HasIndex(installation => installation.ScopeId)
+                .HasDatabaseName("ix_github_app_installations_scope_id");
+
+            entity.ToTable(table => table.HasCheckConstraint(
+                "ck_github_app_installations_status",
+                "status IN ('active','suspended','removed')"));
+
+            entity.ToTable(table => table.HasCheckConstraint(
+                "ck_github_app_installations_repository_selection",
+                "repository_selection IN ('all','selected')"));
         });
 
         // GITHUB-EVIDENCE-002: one row per collection run, written when the owner asks and completed

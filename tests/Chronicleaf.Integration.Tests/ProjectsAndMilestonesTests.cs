@@ -1429,6 +1429,14 @@ internal sealed class OwnerClient : IDisposable
         Build(HttpMethod.Delete, path, null, revision);
 
     /// <summary>
+    /// A deletion with no revision, such as detaching an App installation connection.
+    /// A fixture addition only: the sign-in, the cookie, the origin and the per-mutation
+    /// antiforgery value are produced by exactly the same code as every other mutation here.
+    /// </summary>
+    public Task<HttpRequestMessage> DeleteAsync(string path) =>
+        Build(HttpMethod.Delete, path, null);
+
+    /// <summary>
     /// A deletion that carries its own confirmation body, such as the archive-data delete that
     /// names the project being deleted. A fixture addition only: the sign-in, the cookie, the
     /// origin, the antiforgery value and the If-Match header are produced by exactly the same

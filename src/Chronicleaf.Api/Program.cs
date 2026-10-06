@@ -243,6 +243,15 @@ builder.Services.AddOllamaProvider(builder.Configuration);
 // migration reports schema_mismatch at /api/ready.
 builder.Services.AddGitHubEvidence();
 
+// GITHUB-APP-CONNECTION-001/002. The scoped installation bindings, the setup states, the
+// single-mint token cache and the App service over the delivered GitHub transport, vault and
+// evidence contracts. There is no App id or PEM here: the id is operator configuration and the
+// PEM and webhook secret are delivered vault credentials resolved by reference. Nothing is ever
+// written to GitHub - the transport's only POST mints a credential - and no token reaches a row,
+// a log or a payload. A database without the github-app-connection migration reports
+// schema_mismatch at /api/ready.
+builder.Services.AddGitHubAppConnection(builder.Configuration);
+
 // GITHUB-RELEASE-CANDIDATES-001/002. The read-only candidate transport - a third registration name,
 // so it shadows neither the hosted evidence transport nor the local one - plus four stores, the service,
 // the one job handler that performs a poll and the one outbox consumer that turns an accepted delivery
@@ -472,6 +481,15 @@ app.MapAIGenerationEndpoints();
 // here accepts or returns a URL and none returns a credential: a repository is an owner and a name,
 // and the host is a constant of the transport.
 app.MapGitHubEvidenceEndpoints();
+
+// GITHUB-APP-CONNECTION-001/002: the private App setup, connect, read and disconnect routes, plus
+// the one public webhook delivery route. The four private ones are not marked public, so the
+// access package's default-deny boundary already covers every one of them. The delivery route is
+// marked public deliberately for the same reason the candidate package's is: its caller is
+// GitHub, it has no session, and the HMAC signature over its own bytes is what authenticates it.
+// No route here accepts or returns a token: the connect body carries two numbers and a setup
+// state, and a token is minted when a collection needs one and held only in memory.
+app.MapGitHubAppConnectionEndpoints();
 
 // GITHUB-RELEASE-CANDIDATES-001/002: the private candidate, poll and subscription routes, plus the one
 // public delivery route. The five private ones are not marked public, so the access package's

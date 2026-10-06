@@ -265,6 +265,26 @@ public static class ApiErrorStatus
         Archive.ArchiveError.AlreadyDeleted => 409,
         Archive.ArchiveError.RestoreExpired => 410,
 
+        // The github-app-connection package's codes. Additive in the same way, and the choices are
+        // this package's failure policy rather than defaults. 400 for a setup state that is
+        // unknown, expired, bound elsewhere or already used: a replayed callback creates nothing.
+        // 401 for a delivery that did not authenticate, and deliberately the same 401 for a
+        // missing App configuration behind the webhook, because a route that answered those
+        // differently would tell anybody which secrets this server holds. 403 for an installation
+        // that belongs to another scope: the installation exists and the request is well formed,
+        // and what is refused is this scope's claim on it. 404 for an installation GitHub does
+        // not know and for a repository outside the installation's selection, because GitHub
+        // answers both identically and this package must not add a second answer. 503 for a
+        // server with no App configured and for a GitHub that cannot answer the App's own calls:
+        // both are answerable without changing the request, and neither is a 500.
+        GitHub.GitHubAppError.StateInvalid => 400,
+        GitHub.GitHubAppError.SignatureInvalid => 401,
+        GitHub.GitHubAppError.InstallationMismatch => 403,
+        GitHub.GitHubAppError.InstallationUnknown => 404,
+        GitHub.GitHubAppError.RepositoryUnselected => 404,
+        GitHub.GitHubAppError.NotConfigured => 503,
+        GitHub.GitHubAppError.Unreachable => 503,
+
         _ => 500,
     };
 }

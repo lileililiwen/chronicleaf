@@ -1078,6 +1078,63 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                     b.ToTable("generation_previews", (string)null);
                 });
 
+            modelBuilder.Entity("Chronicleaf.Core.GitHubAppInstallation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AccountLogin")
+                        .IsRequired()
+                        .HasMaxLength(39)
+                        .HasColumnType("character varying(39)")
+                        .HasColumnName("account_login");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("InstallationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("installation_id");
+
+                    b.Property<string>("RepositorySelection")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("repository_selection");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InstallationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_github_app_installations_installation_id");
+
+                    b.HasIndex("ScopeId")
+                        .HasDatabaseName("ix_github_app_installations_scope_id");
+
+                    b.ToTable("github_app_installations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_github_app_installations_repository_selection", "repository_selection IN ('all','selected')");
+
+                            t.HasCheckConstraint("ck_github_app_installations_status", "status IN ('active','suspended','removed')");
+                        });
+                });
+
             modelBuilder.Entity("Chronicleaf.Core.GitHubCandidate", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1264,6 +1321,14 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("AuthMode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("pat")
+                        .HasColumnName("auth_mode");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -1276,6 +1341,10 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
                         .HasColumnName("default_branch");
+
+                    b.Property<long?>("InstallationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("installation_id");
 
                     b.Property<string>("Owner")
                         .IsRequired()
@@ -1313,7 +1382,10 @@ namespace Chronicleaf.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_github_connections_scope_id_project_id");
 
-                    b.ToTable("github_connections", (string)null);
+                    b.ToTable("github_connections", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_github_connections_auth_mode", "auth_mode IN ('pat','installation')");
+                        });
                 });
 
             modelBuilder.Entity("Chronicleaf.Core.GitHubWebhookDelivery", b =>

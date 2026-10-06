@@ -35,6 +35,16 @@ public sealed class GitHubConnection
     /// <param name="repositoryId">GitHub's own numeric identity for the repository, when it answered.</param>
     /// <param name="createdAt">When the connection was first validated and stored.</param>
     /// <param name="updatedAt">When the connection last changed.</param>
+    /// <param name="authMode">
+    /// How this connection authenticates: <c>pat</c> for the delivered vault token, or
+    /// <c>installation</c> for a scoped App installation token that is minted per collection and
+    /// never stored. Every row written before the App package existed carries <c>pat</c>.
+    /// </param>
+    /// <param name="installationId">
+    /// GitHub's numeric identity for the App installation, when <paramref name="authMode"/> is
+    /// <c>installation</c>. Never a token: the token is minted when it is needed and held only in
+    /// memory until just before it expires.
+    /// </param>
     public GitHubConnection(
         Guid id,
         Guid scopeId,
@@ -45,7 +55,9 @@ public sealed class GitHubConnection
         string? defaultBranch,
         long? repositoryId,
         DateTimeOffset createdAt,
-        DateTimeOffset updatedAt)
+        DateTimeOffset updatedAt,
+        string authMode = GitHubAuthModes.Pat,
+        long? installationId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(owner);
         ArgumentException.ThrowIfNullOrWhiteSpace(repo);
@@ -65,6 +77,17 @@ public sealed class GitHubConnection
             throw new ArgumentException("A connection needs a project.", nameof(projectId));
         }
 
+        if (!string.Equals(authMode, GitHubAuthModes.Pat, StringComparison.Ordinal) &&
+            !string.Equals(authMode, GitHubAuthModes.Installation, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("A connection authenticates with a token or an installation.", nameof(authMode));
+        }
+
+        if (string.Equals(authMode, GitHubAuthModes.Installation, StringComparison.Ordinal) && installationId is null or < 1)
+        {
+            throw new ArgumentException("An installation connection names its installation.", nameof(installationId));
+        }
+
         Id = id;
         ScopeId = scopeId;
         ProjectId = projectId;
@@ -75,6 +98,8 @@ public sealed class GitHubConnection
         RepositoryId = repositoryId;
         CreatedAt = createdAt;
         UpdatedAt = updatedAt;
+        AuthMode = authMode;
+        InstallationId = installationId;
     }
 
     public Guid Id { get; }
@@ -94,6 +119,12 @@ public sealed class GitHubConnection
 
     public long? RepositoryId { get; }
 
+    /// <summary>How this connection authenticates: <c>pat</c> or <c>installation</c>.</summary>
+    public string AuthMode { get; }
+
+    /// <summary>GitHub's installation id, when this connection authenticates through an App.</summary>
+    public long? InstallationId { get; }
+
     public DateTimeOffset CreatedAt { get; }
 
     public DateTimeOffset UpdatedAt { get; }
@@ -103,7 +134,108 @@ public sealed class GitHubConnection
 }
 
 /// <summary>
-/// One record of one GitHub collection run (GITHUB-EVIDENCE-001/002).
+/// The two ways a connection authenticates (GITHUB-APP-CONNECTION-001/002).
+/// </summary>
+public static class GitHubAuthModes
+{
+    /// <summary>The delivered personal-access-token path, and the value every existing row carries.</summary>
+    public const string Pat = "pat";
+
+    /// <summary>A scoped GitHub App installation token, minted per collection and never stored.</summary>
+    public const string Installation = "installation";
+}
+
+/// <summary>
+/// One GitHub App installation bound to one scope (GITHUB-APP-CONNECTION-001).
+/// </summary>
+/// <remarks>
+/// <para>
+/// The row names the installation and the account it was installed on. It holds no token and no
+/// secret of any kind: an installation token is minted when it is needed, cached in memory until
+/// just before it expires, and never written here.
+/// </para>
+/// <para>
+/// One installation belongs to one scope. The unique index on the installation id is what refuses a
+/// second tenant's attach of an installation id it guessed: the first binding wins and the second
+/// is a mismatch, not a share.
+/// </para>
+/// </remarks>
+public sealed class GitHubAppInstallation
+{
+    /// <param name="id">This binding's identifier.</param>
+    /// <param name="scopeId">The owning scope. Every read of this row is scoped by it.</param>
+    /// <param name="installationId">GitHub's numeric identity for the installation.</param>
+    /// <param name="accountLogin">The account or organisation the App was installed on.</param>
+    /// <param name="repositorySelection">Whether the installation covers every repository or a selection.</param>
+    /// <param name="status">Whether the installation is live here: active, suspended or removed.</param>
+    /// <param name="createdAt">When the binding was first stored.</param>
+    /// <param name="updatedAt">When the binding last changed.</param>
+    public GitHubAppInstallation(
+        Guid id,
+        Guid scopeId,
+        long installationId,
+        string accountLogin,
+        string repositorySelection,
+        string status,
+        DateTimeOffset createdAt,
+        DateTimeOffset updatedAt)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountLogin);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repositorySelection);
+        ArgumentException.ThrowIfNullOrWhiteSpace(status);
+
+        if (id == Guid.Empty)
+        {
+            throw new ArgumentException("An installation binding needs an id.", nameof(id));
+        }
+
+        if (scopeId == Guid.Empty)
+        {
+            throw new ArgumentException("An installation binding needs a scope.", nameof(scopeId));
+        }
+
+        if (installationId < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(installationId), installationId, "An installation id is one or greater.");
+        }
+
+        Id = id;
+        ScopeId = scopeId;
+        InstallationId = installationId;
+        AccountLogin = accountLogin;
+        RepositorySelection = repositorySelection;
+        Status = status;
+        CreatedAt = createdAt;
+        UpdatedAt = updatedAt;
+    }
+
+    public Guid Id { get; }
+
+    public Guid ScopeId { get; }
+
+    public long InstallationId { get; }
+
+    public string AccountLogin { get; }
+
+    public string RepositorySelection { get; }
+
+    public string Status { get; }
+
+    public DateTimeOffset CreatedAt { get; }
+
+    public DateTimeOffset UpdatedAt { get; }
+
+    /// <summary>True while this installation may still mint tokens.</summary>
+    public bool IsLive => string.Equals(Status, GitHubAppInstallationStatuses.Active, StringComparison.Ordinal);
+}
+
+/// <summary>The states an installation binding may be in.</summary>
+public static class GitHubAppInstallationStatuses
+{
+    public const string Active = "active";
+    public const string Suspended = "suspended";
+    public const string Removed = "removed";
+}
 /// </summary>
 /// <remarks>
 /// <para>

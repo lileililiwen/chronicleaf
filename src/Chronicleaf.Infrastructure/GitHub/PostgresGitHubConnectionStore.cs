@@ -30,7 +30,7 @@ namespace Chronicleaf.Infrastructure.GitHub;
 public sealed class PostgresGitHubConnectionStore(ChronicleafDbContext dbContext) : IGitHubConnectionStore
 {
     private const string Columns =
-        "id, scope_id, project_id, owner, repo, credential_ref, default_branch, repository_id, created_at, updated_at";
+        "id, scope_id, project_id, owner, repo, credential_ref, default_branch, repository_id, auth_mode, installation_id, created_at, updated_at";
 
     /// <inheritdoc />
     public async Task<GitHubConnection?> FindAsync(
@@ -52,7 +52,7 @@ public sealed class PostgresGitHubConnectionStore(ChronicleafDbContext dbContext
             dbContext,
             $"""
             SELECT c.id, c.scope_id, c.project_id, c.owner, c.repo, c.credential_ref,
-                   c.default_branch, c.repository_id, c.created_at, c.updated_at
+                   c.default_branch, c.repository_id, c.auth_mode, c.installation_id, c.created_at, c.updated_at
             FROM github_connections c
             JOIN milestones m ON m.project_id = c.project_id
             JOIN projects p ON p.id = c.project_id
@@ -75,14 +75,16 @@ public sealed class PostgresGitHubConnectionStore(ChronicleafDbContext dbContext
             dbContext,
             """
             INSERT INTO github_connections
-                (id, scope_id, project_id, owner, repo, credential_ref, default_branch, repository_id, created_at, updated_at)
-            VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9)
+                (id, scope_id, project_id, owner, repo, credential_ref, default_branch, repository_id, auth_mode, installation_id, created_at, updated_at)
+            VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11)
             ON CONFLICT (scope_id, project_id) DO UPDATE
             SET owner = EXCLUDED.owner,
                 repo = EXCLUDED.repo,
                 credential_ref = EXCLUDED.credential_ref,
                 default_branch = EXCLUDED.default_branch,
                 repository_id = EXCLUDED.repository_id,
+                auth_mode = EXCLUDED.auth_mode,
+                installation_id = EXCLUDED.installation_id,
                 updated_at = EXCLUDED.updated_at
             RETURNING id
             """,
@@ -95,13 +97,41 @@ public sealed class PostgresGitHubConnectionStore(ChronicleafDbContext dbContext
                 new("@p5", NpgsqlDbType.Uuid, connection.CredentialRef is { } reference ? reference : DBNull.Value),
                 new("@p6", NpgsqlDbType.Varchar, connection.DefaultBranch is { } branch ? branch : DBNull.Value),
                 new("@p7", NpgsqlDbType.Bigint, connection.RepositoryId is { } repositoryId ? repositoryId : DBNull.Value),
-                new("@p8", NpgsqlDbType.TimestampTz, connection.CreatedAt.UtcDateTime),
-                new("@p9", NpgsqlDbType.TimestampTz, connection.UpdatedAt.UtcDateTime),
+                new("@p8", NpgsqlDbType.Varchar, connection.AuthMode),
+                new("@p9", NpgsqlDbType.Bigint, connection.InstallationId is { } installation ? installation : DBNull.Value),
+                new("@p10", NpgsqlDbType.TimestampTz, connection.CreatedAt.UtcDateTime),
+                new("@p11", NpgsqlDbType.TimestampTz, connection.UpdatedAt.UtcDateTime),
             ],
             cancellationToken).ConfigureAwait(false);
 
         return await FindAsync(connection.ScopeId, connection.ProjectId, cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException("The stored connection could not be read back.");
+    }
+
+    /// <inheritdoc />
+    public async Task DeleteAsync(
+        Guid scopeId,
+        Guid projectId,
+        CancellationToken cancellationToken = default)
+    {
+        await ChronicleafSql.ExecuteAsync(
+            dbContext,
+            "DELETE FROM github_connections WHERE scope_id = @p0 AND project_id = @p1",
+            [new("@p0", NpgsqlDbType.Uuid, scopeId), new("@p1", NpgsqlDbType.Uuid, projectId)],
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task DeleteByInstallationAsync(
+        Guid scopeId,
+        long installationId,
+        CancellationToken cancellationToken = default)
+    {
+        await ChronicleafSql.ExecuteAsync(
+            dbContext,
+            "DELETE FROM github_connections WHERE scope_id = @p0 AND installation_id = @p1",
+            [new("@p0", NpgsqlDbType.Uuid, scopeId), new("@p1", NpgsqlDbType.Bigint, installationId)],
+            cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<GitHubConnection?> ReadAsync(
@@ -127,6 +157,8 @@ public sealed class PostgresGitHubConnectionStore(ChronicleafDbContext dbContext
             reader.IsDBNull(5) ? null : reader.GetGuid(5),
             reader.IsDBNull(6) ? null : reader.GetString(6),
             reader.IsDBNull(7) ? null : reader.GetInt64(7),
-            reader.GetFieldValue<DateTimeOffset>(8),
-            reader.GetFieldValue<DateTimeOffset>(9));
+            reader.GetFieldValue<DateTimeOffset>(10),
+            reader.GetFieldValue<DateTimeOffset>(11),
+            reader.GetString(8),
+            reader.IsDBNull(9) ? null : reader.GetInt64(9));
 }

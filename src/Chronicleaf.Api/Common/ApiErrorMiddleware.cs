@@ -399,6 +399,46 @@ public sealed class ApiErrorMiddleware(
                     Envelope.Create(GitHubError.Unreachable, githubUnavailable.Message, traceId),
                     LogLevel.Warning);
 
+            // GITHUB-APP-CONNECTION-001/002. Written here for the same reason as the refusals
+            // above: this feature package raises them, and this middleware is still the only place
+            // an envelope is written. The messages are authored in the github-app package and name
+            // no token, no secret, no account and no installation beyond what the owner supplied -
+            // a guessed installation id learns only that it cannot be attached here.
+            case GitHubAppStateInvalidException stateInvalid:
+                return (
+                    Envelope.Create(GitHubAppError.StateInvalid, stateInvalid.Message, traceId),
+                    LogLevel.Information);
+
+            case GitHubAppSignatureInvalidException signatureInvalid:
+                return (
+                    Envelope.Create(GitHubAppError.SignatureInvalid, signatureInvalid.Message, traceId),
+                    LogLevel.Warning);
+
+            case GitHubAppInstallationMismatchException installationMismatch:
+                return (
+                    Envelope.Create(GitHubAppError.InstallationMismatch, installationMismatch.Message, traceId),
+                    LogLevel.Warning);
+
+            case GitHubAppInstallationUnknownException installationUnknown:
+                return (
+                    Envelope.Create(GitHubAppError.InstallationUnknown, installationUnknown.Message, traceId),
+                    LogLevel.Information);
+
+            case GitHubAppRepositoryUnselectedException repositoryUnselected:
+                return (
+                    Envelope.Create(GitHubAppError.RepositoryUnselected, repositoryUnselected.Message, traceId),
+                    LogLevel.Information);
+
+            case GitHubAppNotConfiguredException notConfigured:
+                return (
+                    Envelope.Create(GitHubAppError.NotConfigured, notConfigured.Message, traceId),
+                    LogLevel.Warning);
+
+            case GitHubAppUnreachableException appUnreachable:
+                return (
+                    Envelope.Create(GitHubAppError.Unreachable, appUnreachable.Message, traceId),
+                    LogLevel.Warning);
+
             // LOCAL-GIT-EVIDENCE-001/002. Written here for the same reason as the refusals above: this
             // feature package raises them, and this middleware is still the only place an envelope is
             // written. The messages are authored in the local-git package and name no alias, no relative

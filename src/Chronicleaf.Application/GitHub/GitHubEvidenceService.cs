@@ -48,6 +48,7 @@ public sealed class GitHubEvidenceService(
     IAuditWriter audit,
     IUnitOfWork unitOfWork,
     TimeProvider clock,
+    IGitHubInstallationTokenProvider installationTokens,
     ILogger<GitHubEvidenceService> logger) : IGitHubEvidenceService
 {
     /// <summary>
@@ -356,10 +357,19 @@ public sealed class GitHubEvidenceService(
 
         // The credential is leased for the duration of the one call that uses it and returned by the
         // finally below, whatever happens. The leased bytes become a string for the transport and
-        // nothing else: no result, no log line and no exception ever carries it.
-        var lease = connection.CredentialRef is { } reference
+        // nothing else: no result, no log line and no exception ever carries it. An installation
+        // connection mints its token through the App provider instead: the token is held in memory
+        // until just before it expires, and a revoked installation fails here - before any fact is
+        // read - rather than as invented evidence.
+        string? installationBearer = null;
+        var lease = connection.CredentialRef is { } reference && !IsInstallation(connection)
             ? await LeaseAsync(owner, reference, cancellationToken).ConfigureAwait(false)
             : null;
+
+        if (IsInstallation(connection))
+        {
+            installationBearer = await InstallationBearerAsync(owner, connection, cancellationToken).ConfigureAwait(false);
+        }
 
         GitEvidenceResult collected;
         try
@@ -376,7 +386,7 @@ public sealed class GitHubEvidenceService(
                         run.IssueNumber,
                         run.PullRequestNumber,
                         run.ReleaseTag),
-                    lease is null ? null : Encoding.UTF8.GetString(lease.Secret),
+                    installationBearer ?? (lease is null ? null : Encoding.UTF8.GetString(lease.Secret)),
                     cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -796,6 +806,50 @@ public sealed class GitHubEvidenceService(
 
             default:
                 throw new GitHubUnavailableException();
+        }
+    }
+
+    /// <summary>
+    /// Whether a connection authenticates through an App installation rather than a vault token.
+    /// </summary>
+    private static bool IsInstallation(GitHubConnection connection) =>
+        string.Equals(connection.AuthMode, GitHubAuthModes.Installation, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Mints the installation token one collection reads with, classified into the delivered job
+    /// failures. A revoked installation is permanent and publishes nothing; a GitHub that cannot
+    /// mint right now is transient, so the delivered backoff applies.
+    /// </summary>
+    private async Task<string> InstallationBearerAsync(
+        OwnerScope owner,
+        GitHubConnection connection,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await installationTokens
+                .GetAsync(owner.ScopeId, connection.InstallationId ?? 0, connection.RepositoryId, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (GitHubAppNotConfiguredException)
+        {
+            throw new OperationPermanentException(GitHubJobError.CredentialRejected);
+        }
+        catch (GitHubAppInstallationMismatchException)
+        {
+            throw new OperationPermanentException(GitHubJobError.ConnectionMissing);
+        }
+        catch (GitHubAppInstallationUnknownException)
+        {
+            throw new OperationPermanentException(GitHubJobError.ConnectionMissing);
+        }
+        catch (GitHubAppRepositoryUnselectedException)
+        {
+            throw new OperationPermanentException(GitHubJobError.ConnectionMissing);
+        }
+        catch (GitHubAppUnreachableException)
+        {
+            throw new OperationTransientException(GitHubJobError.Unreachable);
         }
     }
 

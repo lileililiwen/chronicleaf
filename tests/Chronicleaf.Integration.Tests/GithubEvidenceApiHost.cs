@@ -198,6 +198,49 @@ public sealed class FakeGitHubHandler : HttpMessageHandler
     public FakeGitHubHandler OnGet(string pathSuffix, HttpStatusCode status, string body = "{}") =>
         OnGet(pathSuffix, status, body, new Dictionary<string, string>());
 
+    /// <summary>Adds a rule that answers a POST whose path ends with <paramref name="pathSuffix"/>.</summary>
+    /// <remarks>
+    /// Added for the App installation-token mint, which is the one POST the GitHub surface makes.
+    /// A fixture addition only: every existing rule still matches GET, and no existing scenario
+    /// is affected.
+    /// </remarks>
+    public FakeGitHubHandler OnPost(string pathSuffix, HttpStatusCode status, string body = "{}") =>
+        OnPost(pathSuffix, status, body, new Dictionary<string, string>());
+
+    /// <summary>Adds a POST rule that answers the path suffix with a JSON body and 200.</summary>
+    public FakeGitHubHandler OnPost(string pathSuffix, string json) =>
+        OnPost(pathSuffix, HttpStatusCode.OK, json);
+
+    /// <summary>Adds a POST rule with response headers.</summary>
+    public FakeGitHubHandler OnPost(
+        string pathSuffix,
+        HttpStatusCode status,
+        string body,
+        IReadOnlyDictionary<string, string> headers)
+    {
+        lock (_gate)
+        {
+            _rules.Add(new Rule("POST", pathSuffix, status, body, headers));
+        }
+
+        return this;
+    }
+
+    /// <summary>Adds a POST rule that answers the first matching request and then removes itself.</summary>
+    public FakeGitHubHandler OnPostOnce(
+        string pathSuffix,
+        HttpStatusCode status,
+        string body = "{}",
+        IReadOnlyDictionary<string, string>? headers = null)
+    {
+        lock (_gate)
+        {
+            _oneShot.Add(new Rule("POST", pathSuffix, status, body, headers ?? new Dictionary<string, string>()));
+        }
+
+        return this;
+    }
+
     /// <summary>Adds a rule with response headers, for the rate-limit headers GitHub sends.</summary>
     public FakeGitHubHandler OnGet(
         string pathSuffix,
@@ -207,7 +250,7 @@ public sealed class FakeGitHubHandler : HttpMessageHandler
     {
         lock (_gate)
         {
-            _rules.Add(new Rule(pathSuffix, status, body, headers));
+            _rules.Add(new Rule("GET", pathSuffix, status, body, headers));
         }
 
         return this;
@@ -233,7 +276,7 @@ public sealed class FakeGitHubHandler : HttpMessageHandler
     {
         lock (_gate)
         {
-            _oneShot.Add(new Rule(pathSuffix, status, body, headers ?? new Dictionary<string, string>()));
+            _oneShot.Add(new Rule("GET", pathSuffix, status, body, headers ?? new Dictionary<string, string>()));
         }
 
         return this;
@@ -263,7 +306,7 @@ public sealed class FakeGitHubHandler : HttpMessageHandler
         }
     }
 
-    protected override Task<HttpResponseMessage> SendAsync(
+    protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
@@ -273,6 +316,9 @@ public sealed class FakeGitHubHandler : HttpMessageHandler
         var host = request.RequestUri?.Host ?? string.Empty;
         var authorization = request.Headers.Authorization?.ToString();
         var userAgent = string.Join(' ', request.Headers.UserAgent.Select(agent => agent.ToString()));
+        var body = request.Content is null
+            ? null
+            : await request.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 
         lock (_gate)
         {
@@ -286,29 +332,31 @@ public sealed class FakeGitHubHandler : HttpMessageHandler
                 request.Headers.Accept.Select(accept => accept.ToString()).ToArray(),
                 request.Headers.TryGetValues("X-GitHub-Api-Version", out var apiVersion)
                     ? apiVersion.First()
-                    : null));
+                    : null,
+                body));
 
             // A one-shot rule is consumed by the request it answers, and a standing rule still wins
             // over it, so a scenario can say "the first attempt only" without a stateful fake.
-            var oneShot = _oneShot.LastOrDefault(candidate => path.EndsWith(candidate.PathSuffix, StringComparison.Ordinal));
+            var method = request.Method.Method;
+            var oneShot = _oneShot.LastOrDefault(candidate => candidate.Method == method && path.EndsWith(candidate.PathSuffix, StringComparison.Ordinal));
             if (oneShot is not null)
             {
                 _oneShot.Remove(oneShot);
             }
 
-            var rule = oneShot ?? _rules.LastOrDefault(candidate => path.EndsWith(candidate.PathSuffix, StringComparison.Ordinal));
+            var rule = oneShot ?? _rules.LastOrDefault(candidate => candidate.Method == method && path.EndsWith(candidate.PathSuffix, StringComparison.Ordinal));
 
             if (rule is null)
             {
                 // A request the script did not expect is answered the way GitHub answers something
                 // that is not there, and the recorded request is what the scenario's assertion fails on.
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)
+                return new HttpResponseMessage(HttpStatusCode.NotFound)
                 {
                     Content = new StringContent(
                         """{"message":"Not Found","documentation_url":"https://docs.github.com"}""",
                         Encoding.UTF8,
                         "application/json"),
-                });
+                };
             }
 
             var response = new HttpResponseMessage(rule.Status)
@@ -321,11 +369,12 @@ public sealed class FakeGitHubHandler : HttpMessageHandler
                 response.Headers.TryAddWithoutValidation(header.Key, header.Value);
             }
 
-            return Task.FromResult(response);
+            return response;
         }
     }
 
     private sealed record Rule(
+        string Method,
         string PathSuffix,
         HttpStatusCode Status,
         string Body,
@@ -340,6 +389,7 @@ public sealed class FakeGitHubHandler : HttpMessageHandler
     /// <param name="UserAgent">The user agent the client sent.</param>
     /// <param name="Accept">The Accept values the client sent.</param>
     /// <param name="ApiVersion">The API version header, or <c>null</c>.</param>
+    /// <param name="Body">The request body, or <c>null</c>. The App token mint is the only POST, so it is the only request with one.</param>
     public sealed record RecordedRequest(
         string Method,
         string Url,
@@ -348,5 +398,6 @@ public sealed class FakeGitHubHandler : HttpMessageHandler
         string? Authorization,
         string UserAgent,
         IReadOnlyList<string> Accept,
-        string? ApiVersion);
+        string? ApiVersion,
+        string? Body = null);
 }

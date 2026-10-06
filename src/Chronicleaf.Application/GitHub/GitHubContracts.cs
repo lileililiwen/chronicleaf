@@ -94,6 +94,20 @@ public interface IGitHubConnectionStore
     /// same one the owner has been looking at.
     /// </summary>
     Task<GitHubConnection> UpsertAsync(GitHubConnection connection, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deletes the connection of one project in a scope. Used when an App installation is
+    /// disconnected: a token connection that no longer has an installation behind it must not
+    /// survive as a row a job could still collect from.
+    /// </summary>
+    Task DeleteAsync(Guid scopeId, Guid projectId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deletes every connection bound to one installation in a scope. Used when GitHub reports the
+    /// installation removed: revocation is immediate, and a queued job finds no connection rather
+    /// than a token it could still read with.
+    /// </summary>
+    Task DeleteByInstallationAsync(Guid scopeId, long installationId, CancellationToken cancellationToken = default);
 }
 
 /// <summary>The run-log side of storage: one row per collection run.</summary>

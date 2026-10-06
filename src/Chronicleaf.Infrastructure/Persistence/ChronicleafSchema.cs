@@ -254,6 +254,14 @@ public static class ChronicleafSchema
     /// so by name rather than answering 200 and failing on the first request.
     /// </summary>
     public const string HostedArchiveOperationsMigrationId = "20261006051619_AddHostedArchiveOperations";
+    /// <summary>
+    /// The forward migration that adds the <c>github_app_installations</c> table and the
+    /// installation authentication columns on <c>github_connections</c>
+    /// (GITHUB-APP-CONNECTION-001/002). A database that has never applied it has nowhere to bind
+    /// a verified installation, so its App routes would fail against missing tables; readiness says
+    /// so by name rather than answering 200 and failing on the first request.
+    /// </summary>
+    public const string GitHubAppConnectionMigrationId = "20261017090000_AddGitHubAppConnection";
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
         InitialMigrationId,
@@ -283,6 +291,7 @@ public static class ChronicleafSchema
         CloudObjectStorageMigrationId,
         ScheduledProjectSyncMigrationId,
         HostedArchiveOperationsMigrationId,
+        GitHubAppConnectionMigrationId,
     ];
 
     /// <summary>
@@ -290,7 +299,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = HostedArchiveOperationsMigrationId;
+    public const string ExpectedMigrationId = GitHubAppConnectionMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

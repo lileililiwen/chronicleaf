@@ -340,6 +340,17 @@ else
   # GitHub API was called, that a real repository was resolved, or that any specific GitHub response
   # shape is supported beyond what the transport's own pinned version documents.
   step "github evidence tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~GithubEvidenceTests"
+  # GITHUB-APP-CONNECTION-001/002. That a valid single-use callback for an allowed repository
+  # creates the scoped installation connection, and that another tenant's installation id is
+  # refused while a replayed or expired state creates nothing; that an expiring token is renewed
+  # for the selected repository with a concurrent refresh minting once, and that the mint names
+  # exactly one repository id with no permission and no write scope; that a removed installation
+  # ends new and queued reads without publishing or leaking a token; and that the Community token
+  # path collects unchanged beside the App - all proven against the same real disposable
+  # PostgreSQL, the real operator key file and the real API host, with the real vault sealing the
+  # App PEM and webhook secret and only the bytes on the wire scripted. No stage here may be read
+  # as evidence that GitHub works, that an installation is real, or that a token mint is accepted.
+  step "github app connection tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~GithubAppConnectionTests"
   # GITHUB-GRAPHQL-ENRICHMENT-001/002. That readable associated pull requests are appended with
   # their ids, observed states and source URLs while the REST evidence stays intact; that errored
   # GraphQL fields become unavailable items carrying the package's own reason vocabulary and never

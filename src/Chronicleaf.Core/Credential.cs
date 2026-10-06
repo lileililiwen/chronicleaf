@@ -170,11 +170,22 @@ public static class CredentialProviders
     /// isolation between tenants is by the <c>scopes/{scope}/</c> key prefix, not by per-tenant
     /// keys, so one slot per scope is the whole vocabulary this package needs.
     /// </para>
+    /// <para>
+    /// <b><c>github-app</c> and <c>github-app-webhook</c> are the App slots
+    /// (GITHUB-APP-CONNECTION-001).</b> The first holds the server App's PEM private key, the
+    /// second the App webhook secret. Both are the server's own credentials, stored by the
+    /// operator and resolved by reference with no owner-scope comparison, because no owner scope
+    /// owns them. Neither is interchangeable with the <c>github</c> token slot: the PEM signs App
+    /// JWTs and the webhook secret authenticates GitHub's deliveries, and reusing one slot would
+    /// mean saving one overwrote the other.
+    /// </para>
     /// </remarks>
     public static readonly IReadOnlyList<string> All =
     [
         "github",
         "github-webhook",
+        "github-app",
+        "github-app-webhook",
         "openai",
         "gemini",
         "anthropic",

@@ -5,6 +5,7 @@ using Chronicleaf.Application.Access;
 using Chronicleaf.Application.Common;
 using Chronicleaf.Application.Content;
 using Chronicleaf.Application.LinkedIn;
+using Chronicleaf.Application.Medium;
 using Chronicleaf.Application.Milestones;
 
 namespace Chronicleaf.Api.Content;
@@ -175,6 +176,7 @@ public static class ContentReviewEndpoints
         HttpContext context,
         IContentReviewService reviews,
         ILinkedInCopyService copies,
+        IMediumImportService imports,
         IOwnerAccessService access,
         CancellationToken cancellationToken)
     {
@@ -199,6 +201,17 @@ public static class ContentReviewEndpoints
         if (string.Equals((format ?? "markdown").Trim(), "linkedin", StringComparison.OrdinalIgnoreCase))
         {
             return await ExportLinkedInAsync(assetId, revisionText, context, copies, access, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        // MEDIUM-IMPORT-PACKAGE-001/002. The Medium package is the same approval in a manual
+        // import shape: article.html, article.md, the approval-covered pictures, their manifest
+        // and the hand-carry instructions, served by its own use case under the same bindings
+        // the Markdown export re-checks. Preview and approval stay the review package's own
+        // routes; this branch only serves what they authorized.
+        if (string.Equals((format ?? "markdown").Trim(), "medium", StringComparison.OrdinalIgnoreCase))
+        {
+            return await ExportMediumAsync(assetId, revisionText, context, imports, access, cancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -296,6 +309,41 @@ public static class ContentReviewEndpoints
 
         // The approved copy as a package the owner chose to download: copy.txt, the selected
         // pictures and their manifest. Never a public page and never an upstream call, under
+        // the same approval the Markdown export re-checks.
+        return Results.File(export.Bytes, export.ContentType, export.FileName);
+    }
+
+    private static async Task<IResult> ExportMediumAsync(
+        Guid assetId,
+        string? revisionText,
+        HttpContext context,
+        IMediumImportService imports,
+        IOwnerAccessService access,
+        CancellationToken cancellationToken)
+    {
+        var owner = await OwnerScopeAsync(context, access, cancellationToken).ConfigureAwait(false);
+
+        long? revision = null;
+        if (revisionText is not null)
+        {
+            if (!long.TryParse(revisionText, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed) ||
+                parsed < 1)
+            {
+                throw new ValidationFailedException(
+                    "revision",
+                    "A revision is a stored version number, from 1.");
+            }
+
+            revision = parsed;
+        }
+
+        var export = await imports
+            .ExportAsync(owner, assetId, revision, cancellationToken)
+            .ConfigureAwait(false);
+
+        // The approved article as a manual import package the owner chose to download:
+        // article.html, article.md, the approval-covered pictures, their manifest and the
+        // hand-carry instructions. Never a public page and never an upstream call, under
         // the same approval the Markdown export re-checks.
         return Results.File(export.Bytes, export.ContentType, export.FileName);
     }

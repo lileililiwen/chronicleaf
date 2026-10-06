@@ -54,6 +54,7 @@ using Chronicleaf.Infrastructure.GitHubCandidates;
 using Chronicleaf.Infrastructure.Journey;
 using Chronicleaf.Infrastructure.LinkedIn;
 using Chronicleaf.Infrastructure.Media;
+using Chronicleaf.Infrastructure.Medium;
 using Chronicleaf.Infrastructure.Media.S3;
 using Chronicleaf.Infrastructure.Narrative;
 using Chronicleaf.Infrastructure.Operations;
@@ -357,6 +358,15 @@ builder.Services.AddContentAssetVariants();
 // without the LinkedIn-copy migration reports schema_mismatch at /api/ready.
 builder.Services.AddLinkedInCopy();
 
+// MEDIUM-IMPORT-PACKAGE-001/002. The Medium manual-import service: the approved article's
+// exact bytes re-served through the review package's own Markdown and HTML exports, packed
+// with the approval-covered pictures, their manifest and the hand-carry instructions. It
+// registers no provider, no credential and no transport: approval stays the review package's
+// table, and the publish route is a refusal rather than a call. The package stores nothing,
+// so there is no migration behind this registration; disabling it is unregistering this one
+// service.
+builder.Services.AddMediumImport();
+
 // SCREENSHOT-EVOLUTION-IMAGES-001/002. The evolution store and service that render selected
 // screenshots into a derived comparison PNG with a re-derivable manifest, and approve the exact
 // selection and artifact hashes for export. It registers no provider, no browser and no
@@ -574,6 +584,13 @@ app.MapContentVariantEndpoints();
 // approval row, and the publish route refuses with publisher_unsupported instead of calling
 // anything. Preview, edit, approval and the LinkedIn export shape stay the review package's.
 app.MapLinkedInCopyEndpoints();
+
+// MEDIUM-IMPORT-PACKAGE-001: the private Medium publish refusal route. Not marked public, so
+// the access package's default-deny boundary already covers it. There is no generation here,
+// no approval and no transport: the publish route refuses with publisher_unsupported instead
+// of calling anything. Preview, edit, approval and the Medium export shape stay the review
+// package's.
+app.MapMediumImportEndpoints();
 
 // NARRATIVE-MEMORY-001/002: the private narrative read, create, edit and refresh routes. None of
 // them is marked public, so the access package's default-deny boundary already covers every one

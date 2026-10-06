@@ -532,6 +532,21 @@ else
   # capture job behind the delivered browser seam. Adapting itself calls no provider and
   # nothing here reaches any LinkedIn endpoint.
   step "linkedin copy package tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~LinkedinCopyPackageTests"
+  # MEDIUM-IMPORT-PACKAGE-001/002. That an approved story exports as a manual import package
+  # holding article.html, article.md, the approval-covered pictures, their checksum manifest
+  # and the hand-carry instructions with the material attributed to its asset, revision and
+  # body hash; that a text-only story packs no invented pictures; that native publication is
+  # refused as publisher_unsupported with no operation, no audit row and no outbound request
+  # while a foreign id stays 404; that no entry fabricates a remote Medium URL or a
+  # successful post and the same revision packs identically twice; that an unedited source
+  # exports its approved snapshot while a never-approved source exports nothing and a
+  # title/body edit ends the approval; and that a missing picture is media_unavailable rather
+  # than a silently picture-less archive - all proven against the same real disposable
+  # PostgreSQL through the real API host, with the approved story produced by a real
+  # generation job behind the delivered provider seam and the selected picture by a real
+  # capture job behind the delivered browser seam. Packaging itself calls no provider and
+  # nothing here reaches any Medium endpoint.
+  step "medium import package tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~MediumImportPackageTests"
   # SCREENSHOT-EVOLUTION-IMAGES-001/002. That a same-viewport comparison preserves source
   # pixels, order and provenance in a re-derivable manifest; that a milestone without a
   # selected screenshot is an unavailable gap rather than a fabrication, and a candidate is

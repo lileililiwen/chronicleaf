@@ -616,6 +616,20 @@ else
   # second create - all proven against the same real disposable PostgreSQL and the real API
   # host, with only the far end of the wire scripted. No stage here reaches real Ghost.
   step "publisher ghost adapter tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~PublisherGhostAdapterTests"
+  # PUBLISHER-WORDPRESS-ADAPTER-001/002. That a confirmed draft preview creates one REST post as
+  # draft and a confirmed publish creates one published post - the approved title verbatim, the
+  # shared HTML export's sanitized article body, the operator's slug and taxonomy, status by
+  # the authorized mode, one Basic pair from the configured user and the leased spaced
+  # application password, and the receipt carrying the remote post id, the link the provider
+  # named, and the exact body hash; that a refused password, a rejected body, a forbidden role
+  # and a conflict each fail with a redacted code, no secret and no moved approval while a
+  # post-preview origin or taxonomy change stales the confirmation before any call; that a
+  # redirect is refused without a second hop; that a lost create answer becomes unknown with a
+  # manual hint the target cannot reconcile; and that an identical resubmit returns the receipt
+  # with no second create - all proven against the same real disposable PostgreSQL and the
+  # real API host, with only the far end of the wire scripted. No stage here reaches real
+  # WordPress.
+  step "publisher wordpress adapter tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~PublisherWordpressAdapterTests"
   # SCREENSHOT-EVOLUTION-IMAGES-001/002. That a same-viewport comparison preserves source
   # pixels, order and provenance in a re-derivable manifest; that a milestone without a
   # selected screenshot is an unavailable gap rather than a fabrication, and a candidate is

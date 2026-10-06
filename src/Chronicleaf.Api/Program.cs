@@ -62,6 +62,7 @@ using Chronicleaf.Publishers.DevTo;
 using Chronicleaf.Publishers.Ghost;
 using Chronicleaf.Publishers.Hashnode;
 using Chronicleaf.Publishers.GitHubPages;using Chronicleaf.Infrastructure.Operations;
+using Chronicleaf.Publishers.WordPress;
 using Chronicleaf.Infrastructure.Persistence;
 using Chronicleaf.Infrastructure.Projects;
 using Chronicleaf.Infrastructure.Publishing;
@@ -448,9 +449,22 @@ builder.Services.AddHashnodePublisher(builder.Configuration);
 // publisher_unknown_target, exactly as the contract says an unclaimed target does. The
 // transport owns its own client with no base address - the origin is the per-call target -
 // with redirects refused, so no bare-handler registration here can rewire a sibling
-// transport. The remaining slots (wordpress, custom-blog) are still separate roadmap
-// packages and stay unclaimed.
+// transport. The remaining slot (custom-blog) is still a separate roadmap
+// package and stays unclaimed.
 builder.Services.AddGhostPublisher(builder.Configuration);
+
+// PUBLISHER-WORDPRESS-ADAPTER-001/002. The fifth transport behind the publisher contract: one
+// IPublisherAdapter for the `wordpress` slot, creating one REST post per confirmed publish -
+// status draft or publish by the authorized mode - under the operator's explicit origin and
+// user, rendering the approved bytes through the shared HTML export's sanitizing adapter and
+// sending one Basic credential per call from the scope's leased application password. The
+// target is demand-gated: without an explicit Chronicleaf:WordPress section this registers
+// nothing and the slot answers publisher_unknown_target, exactly as the contract says an
+// unclaimed target does. The transport owns its own client with no base address - the origin
+// is the per-call target - with redirects refused, so no bare-handler registration here can
+// rewire a sibling transport. The remaining slot (custom-blog) is still a separate roadmap
+// package and stays unclaimed.
+builder.Services.AddWordPressPublisher(builder.Configuration);
 
 // The rotation guard is applied once at start-up, so an access token that was changed since the
 // last run revokes every existing session before this process serves anything.

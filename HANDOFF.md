@@ -1,6 +1,6 @@
 # Chronicleaf handoff
 
-current_spec: publisher-github-pages-adapter
+current_spec: publisher-devto-adapter
 
 ## Current state — 2026-10-05
 
@@ -1424,3 +1424,42 @@ exists) and no claim is made about any remote side. Deployment stays `deployable
 there is no remote, no push and no publication.
 Next: `current_spec` is `publisher-github-pages-adapter`, the next package in drain order
 after `publisher-contract`.
+`publisher-github-pages-adapter` is archived
+(`6a4fb12`, canonical spec `openspec/specs/publisher-github-pages-adapter/spec.md`): the
+first real transport behind the publisher contract, pushing the approved snapshot's
+rendered files to the operator's explicit repository, branch and subdirectory through the
+Git Data API. A new BCL-shaped leaf project `src/Chronicleaf.Publishers` (contract plus
+`RepoRef` only, no vault/store/domain reach) holds the `github-pages` adapter, its
+pinned-host transport, its explicit target options and its six redacted failure codes;
+registration is demand-gated (absent `Chronicleaf:GitHubPages` section registers nothing
+and the slot answers `publisher_unknown_target`, present-but-invalid fails startup) and
+is the whole rollback lever. The preview is pure and binds the target line into its
+warnings - which the contract hashes - so a post-preview reconfiguration is refused as
+`publisher_preview_stale` before any job exists; the push is repository read, base read,
+blobs, tree, commit and one `force=false` ref move, with the leased credential as the one
+bearer header against the pinned host (owner/name segments, never a URL). Only the ref
+move publishes: earlier transport failures are definitive `failed` receipts, and only a
+lost ref-move answer becomes `unknown` carrying the content-addressed planned commit SHA,
+which the credential-less reconciler resolves by asking the branch what it holds (a
+private branch stays `unknown` rather than becoming a credentialed read). Draft mode is
+unserved (`publisher_mode_unsupported`), a moved branch is `github_pages_upstream_moved`
+with no retry, and no per-target table was added so no migration was needed (schema
+unchanged). Read that package's own boundary before extending it, and note the two defects
+verification found, both test-expectation corrections rather than product changes: the
+commit-POST timeout was first asserted `unknown`, but dangling objects without a ref are
+unreachable so it is definitively `failed` (ambiguity starts at the ref write, where the
+planned SHA is persisted); and the picture push was asserted as three blobs, but one
+picture plus one document is two. Evidence, all run by the implementer rather than taken
+on report: `bash scripts/verify.sh` exit 0 (`GATE_EXIT=0`, `set -o pipefail`) with the
+platform-feed stage and the new `publisher github pages adapter tests` stage (12/12)
+alongside all existing stages, `npm ci`, `tsc` + `vite build`, `dotnet build
+--nologo --no-incremental` 0 errors with the same 12 pre-existing warning grep lines at
+HEAD (zero added), name preflight exit 0, and `openspec validate --all --strict
+--no-interactive` 54/54 before and after the archive, which used no `--skip-specs`. No
+Web UI was shipped: no publisher UI exists to extend, the scenarios are API-observable,
+and no new browser suite was added. The opt-in real-GitHub run was not performed: only
+the far end of the wire is scripted and no claim is made about any real repository, any
+Pages build, or any live-site readiness. Deployment stays `deployable: false`; there is
+no remote, no push and no publication.
+Next: `current_spec` is `publisher-devto-adapter`, the next package in drain order after
+`publisher-github-pages-adapter`.

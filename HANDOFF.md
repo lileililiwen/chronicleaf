@@ -2205,3 +2205,55 @@ loopback); `git diff --check` clean; name preflight exit 0; `openspec validate -
 --no-interactive` 59/59 before and after the archive, which used no `--skip-specs`. No
 `current_spec` remains: the two owner-BLOCKED changes stay deferred to ROADMAP. Deployment
 stays `deployable: false`; there is no remote, no push and no publication.
+
+`agency-area-ui` is archived
+(`6c49fdf`, canonical spec `openspec/specs/agency-area-ui/spec.md`): the first agency Web UI
+in the product, over the delivered `agency-client-projects` and `agency-weekly-reports`
+backends with no backend change (no route, contract, migration or envelope edit). New
+`src/Chronicleaf.Web/src/features/agency-area/` (`api.ts`, `types.ts`, `ClientsArea.tsx`,
+`ClientDetail.tsx`, `WeeklyReportPanel.tsx`) plus a `Clients` top-nav entry in `App.tsx` and
+`/clients`, `/clients/{id}` routes in `ProjectArea.tsx`; every mutation carries a fresh
+antiforgery value and the read revision in `If-Match`, and every refusal renders the server's
+`{code, message}` verbatim. Client list/create/edit/archive, project assign plus explicit-null
+clear-to-personal, in-client multi-select, week-start (default current Monday) plus IANA
+time-zone (default `UTC`) generate, per-project source preview parsed from `sourceRefs`,
+revision/body/attribution-bound approval, Markdown/HTML downloads as opaque bytes, regeneration
+appending a revision that starts unapproved, and an archived-client read-only state with
+assignment disabled and the reason shown. No portal, invoicing or email control exists
+anywhere in the area. Per-entity CRUD: client Create=POST /api/clients / Read=GET list+one /
+Update=PATCH+If-Match / Delete=DELETE archive+If-Match (archived stays readable; no unarchive
+route → named future package `agency-client-recovery`); project-client assignment
+Create/Update=PATCH /api/projects/{id}/client+project If-Match (explicit null clears) /
+Read=GET client projects+project.read clientId / Delete=same-route null clear by design;
+weekly report Create=POST generate (regeneration=new row, revision latest+1) / Read=GET report /
+Update=regenerate only (rows immutable) / Delete=no route → named future package
+`agency-report-history` (also covers per-client/week listing and approval revocation, for
+which no routes exist); report revision Create=generate / Read=GET / Update,Delete=immutable
+by design; approval Create=POST approve+If-Match / Read=GET approved flag+approval response /
+Update=idempotent re-approve of unchanged state / Delete=no unapprove route → same future
+package; exported report Create/Read/Update=GET export re-checked per call / Delete=N/A
+(bytes never stored). No other out-of-scope hole was silently dropped. Read that package's
+own boundary before extending it, and note the four defects verification found: the e2e seed's
+assign curl used `--data` without `--request PATCH` (sent POST at the assign path → shell 404,
+fixed in `scripts/e2e.sh`); the suite's edit locator scoped `client-edit` inside the card
+button while the control renders beside it (added an exact-name `clientRow` helper); the drift
+helper appended evidence at revision 0 after the seed left bundle revision 1 (reads the head
+first now); and the regeneration assertions assumed absolute revisions while all three tests
+share one installation's series (assert `revision+1` from each generate response). Also note
+the one environment flake recorded rather than hidden: the first full `bash scripts/e2e.sh`
+run failed suite 9 `screenshot-curation` 3/4 on 15s status polls while suites 1–8 passed, and
+the identical published build passes that suite 4/4 in isolation (3.2s) — this change touches
+no backend and no curation file, so it is recorded as gate-load flake, and the re-run below is
+fully green. Evidence, all run by the implementer rather than taken on report: `npm ci`,
+`tsc --noEmit`, `vite build`, all green; `bash scripts/e2e.sh` exit 0 with 119/119 Playwright
+across all 26 database-isolated browser suites (suite 26 is the new `agency-area-ui` 3/3 on
+its own PostgreSQL at port 5106 — CRUD → assign → DST-week generate → per-project preview →
+approve → byte-equal Markdown+HTML downloads → regenerate; verbatim `client_archived`,
+`weekly_report_project_outside_client`, `approval_required`, `approval_stale`,
+`revision_conflict`, `not_found`; readable archived client; drift-ends-approval with
+regeneration as remedy; honest empty states; armed POST/no-remote counters); `git diff --check`
+clean except the OpenSpec-generated trailing blank line that every canonical spec carries;
+name preflight exit 0; `openspec validate --all --strict --no-interactive` 60/60 before and
+after the archive, which used no `--skip-specs`. No `current_spec` remains: the two
+owner-BLOCKED changes stay deferred to ROADMAP. Deployment stays `deployable: false`; there
+is no remote, no push and no publication.

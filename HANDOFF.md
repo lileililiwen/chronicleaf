@@ -1,8 +1,8 @@
 # Chronicleaf handoff
 
-## Current state — 2026-10-05
+## Current state — 2026-10-07
 
-Fifty-two changes implemented, verified and archived, each with exactly two commits (implementation/
+Fifty-three changes implemented, verified and archived, each with exactly two commits (implementation/
 tests/archive, then this HANDOFF-only pointer). No `current_spec` remains: every drainable change is
 archived and the two owner-BLOCKED changes are deferred to ROADMAP for later
 (`semantic-narrative-retrieval`: demand plus embedding model/provider/dimension and consent policy;
@@ -63,6 +63,7 @@ packages parked intact in `openspec/deferred/`, nothing active remains).
 | 50 | `xiaohongshu-content-package` | `75a8fba` | `openspec/specs/xiaohongshu-content-package/spec.md` |
 | 51 | `video-story-scripts` | `cfaacc1` | `openspec/specs/video-story-scripts/spec.md` |
 | 52 | `agency-weekly-reports` | `6457c2b` | `openspec/specs/agency-weekly-reports/spec.md` |
+| 53 | `project-area-ia` | `66d041b` | `openspec/specs/project-area-ia/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -1982,5 +1983,56 @@ credentials link only). No capture bears a credential, token, PAT, UUID or sessi
 — the settings capture shows the actor label only — and the opt-in real-provider or
 real-capture runs were not performed: no claim is made beyond the empty-state renders.
 Deployment stays `deployable: false`; there is no remote, no push and no publication.
-No `current_spec` remains: the line is removed entirely (no further active changes; the
-two deferred packages stay parked).
+`project-area-ia` is archived
+(`66d041b`, canonical spec `openspec/specs/project-area-ia/spec.md`): six routed project
+sub-views with sub-navigation, a NEW per-project Automations view, and Publish + Automations
+two-step deep-links, with Community behavior byte-identical and no backend change. The
+project page (`ProjectDetail`) splits into header + sub-nav + area switch; `ProjectArea` routes
+`/projects/{id}`, `/evidence`, `/content`, `/publish`, `/evolution`, `/automations` with bare
+`/projects/{id}` rendering Overview at the same URL and an unknown area rendering "Nothing
+here" with the sub-nav intact. All 20 existing panels move exactly once per the move map
+(Overview 2, Evidence 7, Content 6, Publish 2, Evolution 3, Automations 0 moved) — none deleted,
+none duplicated. The Automations view reads the delivered connection, candidates-sync,
+sync-schedule, webhook-subscription and operations routes and shows what the server answers
+(statuses, revisions, instants, redacted codes); the Sync-now trigger answers 202 with a
+watched operation; the schedule form creates/edits through the delivered PUT; publish history
+for the project is captioned as scope-wide with the missing per-project route named (no
+invention). Dashboard and projects list carry per-project Publish and Automations deep-links
+landing directly on those areas with the sub-nav active; every area is one sub-nav step from
+every other area; missing/foreign projects render the delivered project-missing view. No-connection
+empty states (Automations and the candidate panel) name candidate sync plus scheduled sync as
+the payoff, beside the unchanged connection form; non-missing refusals surface the server's
+own code verbatim; archived projects show read-only statuses with triggers absent/disabled.
+`product-shell-ux` tokens and conventions are kept with no rebrand; new CSS classes
+(`.nav--sub`, `.section`, `.card__areas`, `.form__check`, `.jobs`) bind to existing token
+roles. Fourteen pre-existing browser suites migrated in-package (each clicks the relevant
+`project-area-{area}` selector before its moved assertion, named per design §BFS, no
+assertion weakened, no suite deleted to make the gate pass). Evidence, all run by the
+implementer rather than taken on report: `node scripts/check-openspec-change-names.mjs` exit 0;
+`openspec validate --all --strict --no-interactive` 55/55 before and after the archive, which
+used no `--skip-specs`; `npm ci`, `tsc` + `vite build` clean (`tsc --noEmit` clean too);
+`scripts/e2e.sh` exit 0 across 21 database-isolated browser suites with 97/97 Playwright
+(suite 1: 29 = 4 shell + 5 jobs + 5 access + 7 projects + 8 product-shell-ux; suite 2: 3
+evidence; suite 3: 6 vault; suite 4: 4 voice; suite 5: 4 providers; suite 6: 3 GitHub; suite
+7: 3 capture; suite 8: 4 grounded drafts; suite 9: 4 curation; suite 10: 3 timeline; suite
+11: 2 review-export; suite 12: 5 release candidates; suite 13: 3 narrative; suite 14: 2
+content variants; suite 15: 3 team; suite 16: 3 tenancy; suite 17: 2 evolution images;
+suite 18: 2 evolution GIFs; suite 19: 3 publications; suite 20: 3 journey; suite 21: 6
+project-area-ia — the last on its own disposable PostgreSQL at port 5101 with its own access
+token `access-token-area`, because a shared database would leave suite 1 seeing the project
+suite 21 creates and the dashboard-empty assertion would race); `git diff --check` clean; no
+C# code touched (build artifact count unchanged). Suite 6 (`github-evidence`) exposed a
+URL-parsing defect in `projectIdFromUrl` that took the last segment (`evidence`) as the
+project id — the URL is now `/projects/{id}/{area}`, so the second segment is correct, and
+all other suites that use the same pattern already used `segments[1]`; the fix was one-line
+plus comment. DELTA captures per new view (`/tmp/opencode/delta-shots/`, empty/generic
+states, never committed) diffed against the closest 2026-10-07 archived capture: sub-nav
+captures (`/projects/{id}`, `/evidence`, `/content`, `/publish`, `/evolution`,
+`/automations`) all show the new six-entry sub-navigation with `aria-current` on the active
+area and the project header above; the Automations empty state shows the payoff copy naming
+candidate sync and scheduled sync beside the unchanged connection form, with no data; no
+capture bears a credential, token, PAT, Actor UUID, or session value. Deployment stays
+`deployable: false`; there is no remote, no push and no publication.
+No `current_spec` remains: the line is removed entirely. The two owner-BLOCKED packages
+(`semantic-narrative-retrieval`, `hosted-managed-ai`) stay parked in `openspec/deferred/`
+with their material decisions unresolved.

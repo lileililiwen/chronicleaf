@@ -1755,7 +1755,47 @@ frame), and no new browser suite was added - the reduced-motion browser assertio
 run on this host, where real capture stays `capture_sandbox_unavailable` behind the
 delivered seam. Deployment stays `deployable: false`; there is no remote, no push and no
 publication.
-Three further DEMAND-GATED changes (`agency-weekly-reports`, `video-story-scripts`,
-`xiaohongshu-content-package`) await recorded demand before activation.
+`xiaohongshu-content-package` is archived
+(`75a8fba`, canonical spec `openspec/specs/xiaohongshu-content-package/spec.md`): reviewed
+hand-posted Xiaohongshu note pack over the delivered evidence, voice, asset, review, media
+and curation contracts, with Community behavior unchanged. One `xiaohongshu-pack` asset per
+milestone with draft revisions rendered deterministically (`xiaohongshu-pack/1`) from the
+approved story's accepted summary plus the owner's chosen title (exactly one of 1..5 derived
+candidates, retitle appends a revision), tags (0..10), cover line, call to action and image
+order; one `xiaohongshu_pack_media` row per picture carrying the zero-based position, so the
+export serves the owner's arrangement. `POST /api/assets/{id}/adaptations/xiaohongshu`
+adapts (unapproved source `approval_required`, moved evidence/voice heads 409, unknown
+picture `media_unavailable`, title/tags/cover/CTA/selection violations 422 with nothing
+stored); `GET /api/assets/{id}/export?format=xiaohongshu` serves the approved revision as a
+deterministic ZIP (`copy.txt` exact bytes, `package.json` pack metadata, `images/` in stored
+order, `manifest.json` with SHA-256 per picture; draft `approval_required`, edited
+`approval_stale`, missing bytes `media_unavailable`); `POST .../publish` refuses
+`publisher_unsupported` 422 with no operation, no audit row and no outbound request - no
+account, no login, no cookie, no browser automation and no transport exist behind it. Source
+approval never approves the derivative; a later voice edit cannot reach the stored snapshot;
+owner free-text figures are refused per field when the evidence never stated them. Read that
+package's own boundary before extending it, and note the three defects verification found:
+the second select in the two-picture fixture re-selected the already-selected candidate (a
+no-op appending no bundle revision), so the fixture now picks the not-yet-selected
+candidate; the scaffolded EF timestamp sorted before existing migrations, so the migration
+is `20261021090000` by hand; and the regenerated model snapshot also carries the
+`evolution_gifs` entity the prior commit's hand-written Designer left out of it. Evidence,
+all run by the implementer rather than taken on report: `bash scripts/verify.sh` exit 0
+(`GATE_EXIT=0`, `set -o pipefail`) with the platform-feed stage and the new `xiaohongshu
+content package tests` stage (12/12) alongside all existing stages, `npm ci`, `tsc` + `vite
+build`, `dotnet build --nologo --no-incremental` 0 errors with the same 12 pre-existing
+warning grep lines at HEAD (zero added, baseline confirmed before changes), name preflight
+exit 0, and `openspec validate --all --strict --no-interactive` 54/54 before and after the
+archive, which used no `--skip-specs`. Three gate runs were needed: two hit the recorded
+environment flakes on untouched stages (a Testcontainers class-cleanup
+`TaskCanceledException` with every test passed, then a Ryuk-startup socket failure while a
+stale Ryuk from the aborted run was still up - the stage passes 23/23 in isolation), the
+third run was fully green after removing the stale testcontainers leftovers. No Web UI was
+shipped: the design's React preview is satisfied API-observable (adapt answers the
+candidates, preview/edit/approval stay the review package's routes), and no new browser
+suite was added. Deployment stays `deployable: false`; there is no remote, no push and no
+publication.
+Two further DEMAND-GATED changes (`agency-weekly-reports`, `video-story-scripts`) await
+recorded demand before activation.
 
-current_spec: xiaohongshu-content-package
+current_spec: video-story-scripts

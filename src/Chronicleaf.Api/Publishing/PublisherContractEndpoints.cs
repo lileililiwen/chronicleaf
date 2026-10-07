@@ -13,12 +13,12 @@ namespace Chronicleaf.Api.Publishing;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Four routes, all private: the public allow-list is untouched and every route carries
+/// Five routes, all private: the public allow-list is untouched and every route carries
 /// <c>RequireOwnerSession()</c>, so <c>/api/health</c> and <c>/api/ready</c> remain the only public
 /// surface. A receipt is readable only by the owner it belongs to and by nobody else, and no
 /// route here serves a body, a picture or a credential: the receipt names what was sent where
-/// and what the remote side answered, and the content itself stays behind the review package's
-/// own export.
+/// and what the remote side answered, the target list names what each target id means, and the
+/// content itself stays behind the review package's own export.
 /// </para>
 /// <para>
 /// <b>A preview authorizes nothing; a publish sends only what the stored rows still
@@ -50,6 +50,10 @@ public static class PublisherContractEndpoints
         ArgumentNullException.ThrowIfNull(endpoints);
 
         endpoints
+            .MapGet("/api/publisher-targets", ListTargetsAsync)
+            .RequireOwnerSession();
+
+        endpoints
             .MapPost("/api/assets/{assetId:guid}/publish-preview", PreviewAsync)
             .RequireOwnerSession();
 
@@ -66,6 +70,23 @@ public static class PublisherContractEndpoints
             .RequireOwnerSession();
 
         return endpoints;
+    }
+
+    private static Task<IResult> ListTargetsAsync(IPublisherRegistry registry)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+
+        // Classification, not transport: what each target id means, in registration order. It
+        // serves the registry field for field - no credential, no adapter, no content - so
+        // reading it can never send anything, and an installation with nothing stored and no
+        // credential saved still reads the full classification.
+        return Task.FromResult<IResult>(Results.Json(new PublisherTargetListResponse(
+            [.. registry.Targets.Select(descriptor => new PublisherTargetResponse(
+                descriptor.TargetId,
+                descriptor.SupportsDraft,
+                descriptor.SupportsPublish,
+                descriptor.SupportsReconcile,
+                descriptor.ExportOnly))])));
     }
 
     private static async Task<IResult> PreviewAsync(
@@ -271,6 +292,23 @@ public static class PublisherContractEndpoints
 
         return new OwnerScope(identity.InstallationId, session.ActorId);
     }
+
+    /// <summary>Every classified publisher target, in registration order.</summary>
+    /// <param name="Targets">One entry per descriptor the registry holds.</param>
+    public sealed record PublisherTargetListResponse(IReadOnlyList<PublisherTargetResponse> Targets);
+
+    /// <summary>One classified target, as the target list answers it.</summary>
+    /// <param name="TargetId">The id publishes name.</param>
+    /// <param name="SupportsDraft">Whether the target can hold the material as a remote draft.</param>
+    /// <param name="SupportsPublish">Whether the target can publish the material.</param>
+    /// <param name="SupportsReconcile">Whether an ambiguous write can be resolved by remote id.</param>
+    /// <param name="ExportOnly">True when material leaves through the target's export package, carried by hand.</param>
+    public sealed record PublisherTargetResponse(
+        string TargetId,
+        bool SupportsDraft,
+        bool SupportsPublish,
+        bool SupportsReconcile,
+        bool ExportOnly);
 
     /// <summary>What the preview route reads: the target and the mode, nothing else.</summary>
     /// <param name="TargetId">The registry id the preview is for.</param>

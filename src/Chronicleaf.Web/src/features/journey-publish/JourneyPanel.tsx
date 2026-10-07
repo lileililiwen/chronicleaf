@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
 
+import { listMilestones } from '../projects-and-milestones/api';
+import type { Milestone } from '../projects-and-milestones/types';
+import { readDraft } from '../grounded-markdown-drafts/api';
+import { listVariants } from '../content-asset-variants/api';
 import { previewJourney, publishJourney, readJourney } from './api';
 import { JourneyApiError, type JourneyPreview, type JourneyState } from './types';
 
@@ -19,7 +23,10 @@ import { JourneyApiError, type JourneyPreview, type JourneyState } from './types
  */
 export function JourneyPanel({ projectId }: { readonly projectId: string }) {
   const [stored, setStored] = useState<JourneyState | null>(null);
-  const [assetIds, setAssetIds] = useState('');
+  const [milestones, setMilestones] = useState<readonly Milestone[] | null>(null);
+  const [milestoneId, setMilestoneId] = useState('');
+  const [options, setOptions] = useState<readonly JourneyAssetOption[] | null>(null);
+  const [selected, setSelected] = useState<readonly string[]>([]);
   const [preview, setPreview] = useState<JourneyPreview | null>(null);
   const [slug, setSlug] = useState('');
   const [revision, setRevision] = useState('');
@@ -66,6 +73,75 @@ export function JourneyPanel({ projectId }: { readonly projectId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+
+    listMilestones(projectId, 'all', controller.signal)
+      .then((page) => {
+        if (active) {
+          setMilestones(page.items);
+          setMilestoneId(page.items[0]?.id ?? '');
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setMilestones([]);
+        }
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [projectId]);
+
+  useEffect(() => {
+    if (milestoneId === '') {
+      setOptions([]);
+      setSelected([]);
+      return;
+    }
+
+    let active = true;
+    const controller = new AbortController();
+
+    Promise.all([readDraft(milestoneId, controller.signal), listVariants(milestoneId, controller.signal)])
+      .then(([draft, variants]) => {
+        if (!active) {
+          return;
+        }
+
+        const built: JourneyAssetOption[] = [];
+
+        if (draft !== null && draft.assetId !== null && draft.currentRevision !== null) {
+          built.push({ assetId: draft.assetId, label: `story (revision ${draft.currentRevision})` });
+        }
+
+        for (const variant of variants) {
+          built.push({
+            assetId: variant.assetId,
+            label: `${variant.type} (revision ${variant.currentRevision})`,
+          });
+        }
+
+        setOptions(built);
+        // A selection names assets, and assets belong to one milestone: switching the
+        // milestone clears the selection rather than carrying ids across it.
+        setSelected([]);
+      })
+      .catch(() => {
+        if (active) {
+          setOptions([]);
+        }
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [milestoneId]);
+
   const run = async (work: () => Promise<string | null>) => {
     setBusy(true);
     setFailure(null);
@@ -82,11 +158,14 @@ export function JourneyPanel({ projectId }: { readonly projectId: string }) {
     }
   };
 
-  const ids = () =>
-    assetIds
-      .split(',')
-      .map((entry) => entry.trim())
-      .filter((entry) => entry.length > 0);
+  const ids = () => [...selected];
+
+  const toggle = (assetId: string) =>
+    setSelected((current) =>
+      current.includes(assetId)
+        ? current.filter((entry) => entry !== assetId)
+        : [...current, assetId],
+    );
 
   const previewSelection = () =>
     run(async () => {
@@ -169,16 +248,54 @@ export function JourneyPanel({ projectId }: { readonly projectId: string }) {
       ) : null}
 
       <h4 className="view__heading">Preview a selection</h4>
-      <label className="form__label">
-        Approved asset ids, comma separated
-        <input
-          type="text"
-          className="form__input"
-          value={assetIds}
-          onChange={(event) => setAssetIds(event.target.value)}
-          data-testid="journey-assets-input"
-        />
-      </label>
+      {milestones === null ? (
+        <p className="view__state" data-testid="journey-milestones-loading">
+          Reading milestones…
+        </p>
+      ) : milestones.length === 0 ? (
+        <p className="view__state" data-testid="journey-milestones-empty">
+          No milestone recorded yet, so there is nothing to select.
+        </p>
+      ) : (
+        <label className="form__label">
+          Milestone
+          <select
+            className="form__input"
+            value={milestoneId}
+            onChange={(event) => setMilestoneId(event.target.value)}
+            data-testid="journey-milestone-picker"
+          >
+            {milestones.map((milestone) => (
+              <option key={milestone.id} value={milestone.id}>
+                {milestone.title}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {options === null ? null : options.length === 0 ? (
+        <p className="view__state" data-testid="journey-assets-empty">
+          This milestone holds no draft and no derived format, so there is nothing to
+          select from it.
+        </p>
+      ) : (
+        <fieldset data-testid="journey-asset-options">
+          <legend>Approved assets in this milestone</legend>
+          {options.map((option) => (
+            <label className="form__label" key={option.assetId}>
+              <input
+                type="checkbox"
+                checked={selected.includes(option.assetId)}
+                onChange={() => toggle(option.assetId)}
+                data-testid="journey-asset-option"
+                value={option.assetId}
+              />
+              {option.label}
+            </label>
+          ))}
+        </fieldset>
+      )}
       <div className="view__actions">
         <button
           type="button"
@@ -253,6 +370,11 @@ export function JourneyPanel({ projectId }: { readonly projectId: string }) {
 
 function asFailure(thrown: unknown): JourneyApiError | null {
   return thrown instanceof JourneyApiError ? thrown : null;
+}
+
+interface JourneyAssetOption {
+  readonly assetId: string;
+  readonly label: string;
 }
 
 function isAbort(thrown: unknown): boolean {

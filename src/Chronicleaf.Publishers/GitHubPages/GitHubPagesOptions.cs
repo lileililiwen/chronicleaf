@@ -34,6 +34,19 @@ public sealed partial record GitHubPagesOptions(
     string Branch,
     string Subdirectory)
 {
+    /// <summary>
+    /// The binder's construction: the composition root binds the configured section through
+    /// <c>Configure</c>, which builds options through a parameterless constructor. Without
+    /// this, a configured section registers the target and then answers every preview and
+    /// publish against it with a 500, because the options factory cannot build the record.
+    /// Values still validate on every call through <c>Create</c>, so a bound-but-invalid
+    /// section is refused rather than served.
+    /// </summary>
+    public GitHubPagesOptions()
+        : this(string.Empty, string.Empty, string.Empty, string.Empty)
+    {
+    }
+
     /// <summary>The configuration section this target binds from.</summary>
     public const string SectionName = "Chronicleaf:GitHubPages";
 

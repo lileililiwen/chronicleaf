@@ -89,6 +89,7 @@ gif_base_url="${CHRONICLEAF_GIF_BASE_URL:-http://127.0.0.1:5098}"
 publication_base_url="${CHRONICLEAF_PUBLICATION_BASE_URL:-http://127.0.0.1:5099}"
 journey_base_url="${CHRONICLEAF_JOURNEY_BASE_URL:-http://127.0.0.1:5100}"
 area_base_url="${CHRONICLEAF_AREA_BASE_URL:-http://127.0.0.1:5101}"
+publish_variant_base_url="${CHRONICLEAF_PUBLISH_VARIANT_BASE_URL:-http://127.0.0.1:5102}"
 log_file="$repo_root/$publish_dir/server.log"
 evidence_log_file="$repo_root/$publish_dir/server-evidence.log"
 credentials_log_file="$repo_root/$publish_dir/server-credentials.log"
@@ -110,6 +111,7 @@ gif_log_file="$repo_root/$publish_dir/server-gif.log"
 publication_log_file="$repo_root/$publish_dir/server-publication.log"
 journey_log_file="$repo_root/$publish_dir/server-journey.log"
 area_log_file="$repo_root/$publish_dir/server-area.log"
+publish_variant_log_file="$repo_root/$publish_dir/server-publish-variant.log"
 key_file=""
 
 # The operator key for this run: 32 random bytes in a temporary file outside the repository and
@@ -146,7 +148,8 @@ cleanup() {
     "$repo_root/$publish_dir/access-token-review" "$repo_root/$publish_dir/access-token-team" \
     "$repo_root/$publish_dir/access-token-tenancy" "$repo_root/$publish_dir/access-token-evolution" \
     "$repo_root/$publish_dir/access-token-gif" "$repo_root/$publish_dir/access-token-publication" \
-    "$repo_root/$publish_dir/access-token-journey" "$repo_root/$publish_dir/access-token-area"
+    "$repo_root/$publish_dir/access-token-journey" "$repo_root/$publish_dir/access-token-area" \
+    "$repo_root/$publish_dir/access-token-publish-variant"
   # So is the encryption key: it is removed whether the run passed or failed.
   remove_key_file
   exit "$exit_status"
@@ -178,7 +181,12 @@ stop_suite() {
   fi
 }
 
-# start_suite <suffix> <origin> <log> <token file>
+# start_suite <suffix> <origin> <log> <token file> [extra server env]
+#
+# The optional fifth argument is space-separated KEY=value pairs (values carry no spaces)
+# appended to the server's environment. It exists for the suite whose installation needs a
+# transport registered and a dispatch loop silenced; every other suite passes nothing and the
+# server starts exactly as before.
 #
 # Brings up a disposable PostgreSQL, applies the committed migrations, provisions the single
 # installation, and starts the published application against it with a real access token hash and
@@ -189,6 +197,7 @@ start_suite() {
   local origin="$2"
   local log="$3"
   local token_path="$4"
+  local extra_env="${5:-}"
   local database_name="chronicleaf_e2e_${suffix}"
   local container="chronicleaf-e2e-postgres-${suffix}-$$"
   local port=""
@@ -249,6 +258,9 @@ start_suite() {
 
   # exec replaces the subshell, so $! is the server process itself and the trap below
   # actually stops it instead of orphaning it on the port.
+  #
+  # shellcheck disable=SC2086: extra_env is space-separated KEY=value pairs by contract, and an
+  # empty expansion vanishes rather than arriving as an empty argument.
   (
     cd "$repo_root/$publish_dir" && exec env \
       ASPNETCORE_URLS="$origin" \
@@ -257,6 +269,7 @@ start_suite() {
       Chronicleaf__AccessTokenHash="$access_token_hash" \
       Chronicleaf__PublicOrigin="$origin" \
       Chronicleaf__EncryptionKeyFile="$key_file" \
+      ${extra_env} \
       dotnet Chronicleaf.Api.dll >"$log" 2>&1
   ) &
   server_pid=$!
@@ -879,6 +892,253 @@ SQL
 
   if [ "$live" != "1" ]; then
     echo "the variants seed stored '${live}' live approvals, which is not the one the panel derives from" >&2
+    return 1
+  fi
+}
+
+# ---------------------------------------------------------------------------------------------
+# Suite 22 seed: one project, one confirmed milestone, one evidence bundle, one approved
+# Markdown story, and one sealed `publisher` credential. The story and its approval are
+# inserted the way the variants suite inserts its rows - directly, with the rows read back
+# and refused when they are not there - because a story is produced by a provider and this
+# host calls none. The credential is stored through the running server's own vault route
+# with a fake test value (never a real secret) and read back through the describe route,
+# because the publish route refuses before a job exists when no credential is configured.
+#
+# What the seed claims, and what it does not. The browser derives a variant from the
+# approved story through the shipped panel, approves it, and publishes it through the
+# shared confirm flow: a pass is evidence that pick variant → pick target → preview →
+# confirm reaches the delivered routes and the receipt names the server's answer. The
+# dispatch loop is silenced for this installation (see the suite block), so the receipt
+# stays at the acceptance the request committed; the run half - dispatch, remote write,
+# terminal receipt - is the .NET suite's claim, not this one's, and no byte leaves this
+# host for a remote side here.
+# ---------------------------------------------------------------------------------------------
+seed_publish_variant() {
+  local origin="$1"
+  local token="$2"
+  local cookie_jar
+  cookie_jar="$(mktemp -d)/cookies.txt"
+
+  local antiforgery
+  antiforgery="$(curl --silent --show-error --cookie-jar "$cookie_jar" --cookie "$cookie_jar" \
+    --data "{\"accessToken\":\"${token}\"}" \
+    -H 'Content-Type: application/json' \
+    "${origin}/api/session" >/dev/null && \
+    curl --silent --show-error --cookie-jar "$cookie_jar" --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/session/antiforgery" | jq -r '.token')"
+
+  if [ -z "$antiforgery" ] || [ "$antiforgery" = "null" ]; then
+    echo "the publish-variant seed could not read an antiforgery value from ${origin}" >&2
+    return 1
+  fi
+
+  local project_id
+  project_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"name":"Dispatches","description":"Reviewed publishing by clicking."}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/projects" | jq -r '.id')"
+
+  if [ -z "$project_id" ] || [ "$project_id" = "null" ]; then
+    echo "the publish-variant seed could not create its project" >&2
+    return 1
+  fi
+
+  # The seeded body is English, so the voice a derivation and an approval are judged under
+  # must be too: the default profile declares Chinese and would report language findings on
+  # every field, which would leave the browser with nothing it can approve. The stored
+  # language is read back, because a PUT that did not take would leave the same
+  # un-approvable fixture behind.
+  local voice_language
+  voice_language="$(curl --silent --show-error --request PUT --cookie "$cookie_jar" \
+    --data '{"presetId":"technical-blog","overrides":{"language":"en"}}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 0' \
+    "${origin}/api/projects/${project_id}/voice-profile" | jq -r '.effectiveValues.language')"
+
+  if [ "$voice_language" != "en" ]; then
+    echo "the publish-variant seed could not set the project's voice" >&2
+    return 1
+  fi
+
+  local milestone_id
+  milestone_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"title":"Dispatch source story","version":"0.1.0","occurredAt":"2026-10-01T09:00:00Z","type":"feature","notes":"Recorded by the e2e seed.","knownLimitations":[],"nextSteps":[]}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/projects/${project_id}/milestones" | jq -r '.id')"
+
+  if [ -z "$milestone_id" ] || [ "$milestone_id" = "null" ]; then
+    echo "the publish-variant seed could not create its milestone" >&2
+    return 1
+  fi
+
+  curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"notes":"The pipeline now reproduces from a clean checkout.","expectedRevision":0}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 0' \
+    "${origin}/api/milestones/${milestone_id}/evidence/manual" >/dev/null
+
+  local bundle_id
+  bundle_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/milestones/${milestone_id}/evidence" \
+    | jq -r '.items[0].id')"
+
+  local evidence_item_id
+  evidence_item_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/milestones/${milestone_id}/evidence" \
+    | jq -r '.items[0].items[0].id')"
+
+  if [ -z "$evidence_item_id" ] || [ "$evidence_item_id" = "null" ]; then
+    echo "the publish-variant seed could not read the evidence bundle the product created" >&2
+    return 1
+  fi
+
+  # The credential the contract leases, stored through the delivered vault route with a fake
+  # test value. The 201 is asserted and the configured flag read back: a publish without it
+  # is refused before a job exists, which would test the wrong thing here.
+  local saved
+  saved="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+    --request PUT --cookie "$cookie_jar" \
+    --data '{"value":"e2e-publisher-key-never-a-secret"}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 0' \
+    "${origin}/api/settings/credentials/publisher")"
+
+  if [ "$saved" != "201" ]; then
+    echo "the publish-variant seed stored its credential with status ${saved}, not 201" >&2
+    return 1
+  fi
+
+  local configured
+  configured="$(curl --silent --show-error --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/settings/credentials/publisher" \
+    | jq -r '.configured')"
+
+  if [ "$configured" != "true" ]; then
+    echo "the publish-variant seed reads its credential as unconfigured" >&2
+    return 1
+  fi
+
+  seed_publish_variant_rows "$postgres_container" "chronicleaf_e2e_publish_variant" \
+    "$project_id" "$milestone_id" "$bundle_id" "$evidence_item_id"
+}
+
+seed_publish_variant_rows() {
+  local container="$1"
+  local database_name="$2"
+  local project_id="$3"
+  local milestone_id="$4"
+  local bundle_id="$5"
+  local evidence_item_id="$6"
+
+  local body summary voice_snapshot body_hash voice_hash media_hash fingerprint now
+  now="$(date -u +%Y-%m-%dT%H:%M:%S.000000Z)"
+
+  # The body, digit-free on purpose: the numeral rule refuses a figure that appears in no
+  # evidence item, and a fixture that violated it would be testing the wrong thing - the
+  # variant derivation re-checks the same rule before it stores anything.
+  body=$'# Dispatch source story\n\nThe pipeline now reproduces from a clean checkout.[^c1]\n\n## What changed\n\n- The pipeline runs from a clean checkout.[^c1]\n\n## Problems solved\n\n- A release could not be rebuilt from its source.[^c2]\n\n## Known limitations\n\nOnly Linux is covered.[^c3]\n\n## Next steps\n\nCover the other platform.[^c4]\n\n[^c1]: The pipeline runs from a clean checkout.\n[^c2]: A release could not be rebuilt from its source.\n[^c3]: Only Linux is covered.\n[^c4]: Cover the other platform.\n'
+
+  body_hash="$(printf '%s' "$body" | sha256sum | cut -d' ' -f1)"
+
+  # The delivered hasher's canonical form over the English values this body is judged under: the
+  # resolved values joined by U+001F, in the order VoiceSnapshotHasher writes them. The read
+  # route recomputes the fingerprint rather than trusting the stored one - so a default that ever
+  # changes makes this suite fail rather than make the panel show a voice it did not check.
+  fingerprint="$(printf 'en\037restrained\037true\03760\037high\037low\037true\037革命性\037震撼\037game-changing\037exciting news' \
+    | sha256sum | cut -d' ' -f1)"
+
+  voice_snapshot="{\"presetId\":\"technical-blog\",\"profileRevision\":0,\"capturedAt\":\"${now}\",\"language\":\"en\",\"tone\":\"restrained\",\"emoji\":true,\"titleMaxChars\":60,\"technicalDetail\":\"high\",\"marketing\":\"low\",\"firstPerson\":true,\"forbiddenTerms\":[\"革命性\",\"震撼\",\"game-changing\",\"exciting news\"],\"fingerprint\":\"${fingerprint}\"}"
+
+  voice_hash="$(printf '%s' "$voice_snapshot" | sha256sum | cut -d' ' -f1)"
+
+  # No picture is selected on this bundle, so the approval binds the empty selection: the hash
+  # of the empty string, which is a defined value rather than an absence.
+  media_hash="$(printf '' | sha256sum | cut -d' ' -f1)"
+
+  summary=$(jq -cn --arg e "$evidence_item_id" '{
+    milestoneTitle: "Dispatch source story",
+    summary: "The pipeline now reproduces from a clean checkout.",
+    changes: [
+      { text: "The pipeline runs from a clean checkout.", evidenceIds: [$e] }
+    ],
+    problemsSolved: [
+      { text: "A release could not be rebuilt from its source.", evidenceIds: [$e] }
+    ],
+    knownLimitations: [
+      { text: "Only Linux is covered.", evidenceIds: [$e] }
+    ],
+    nextSteps: [
+      { text: "Cover the other platform.", evidenceIds: [$e] }
+    ]
+  }')
+
+  local asset_id revision_id approval_id scope_id
+  asset_id="$(cat /proc/sys/kernel/random/uuid)"
+  revision_id="$(cat /proc/sys/kernel/random/uuid)"
+  approval_id="$(cat /proc/sys/kernel/random/uuid)"
+  scope_id="$(docker exec "$container" psql --username=chronicleaf --dbname="$database_name" --quiet --tuples-only --no-align \
+    --command 'SELECT id FROM installation LIMIT 1')"
+
+  # One statement per table, in dependency order: the story, its revision, then the live approval
+  # binding the head revision, the body hash and the evidence head - exactly what a press records.
+  # The triggers on content_revisions refuse UPDATE and DELETE, which is the append-only contract,
+  # and an INSERT is what a completed generation would do.
+  #
+  # `-i` is load-bearing: `docker exec` only forwards this heredoc to psql's stdin when it is asked to,
+  # and without it psql reads an empty script and exits 0 having inserted nothing. The rows are read
+  # back below and the seed refuses to continue if they are not there.
+  #
+  # The long values travel as psql variables and are interpolated with `:'name'`, which is psql's
+  # own quoting. A body interpolated into the SQL text by the shell would have to be escaped by the
+  # shell, and the two languages disagree about what a quote is.
+  docker exec -i "$container" psql --username=chronicleaf --dbname="$database_name" --quiet \
+    --set=ON_ERROR_STOP=1 --set=body="$body" --set=summary="$summary" --set=voice_snapshot="$voice_snapshot" \
+    <<SQL >/dev/null
+INSERT INTO content_assets
+  (id, scope_id, project_id, milestone_id, type, status, current_revision, created_at, updated_at)
+VALUES
+  ('${asset_id}', '${scope_id}', '${project_id}', '${milestone_id}', 'markdown-story', 'draft', 1, '${now}', '${now}');
+
+INSERT INTO content_revisions
+  (id, asset_id, scope_id, revision, evidence_bundle_id, evidence_revision, voice_revision,
+   voice_snapshot, summary, body_markdown, body_hash, provider_id, model, prompt_version, schema_version, created_at)
+VALUES
+  ('${revision_id}', '${asset_id}', '${scope_id}', 1, '${bundle_id}', 1, 0,
+   :'voice_snapshot'::jsonb, :'summary'::jsonb, :'body', '${body_hash}',
+   'openai', 'seeded-not-called', 'grounded-markdown/1', 'grounded-summary/1', '${now}');
+
+INSERT INTO content_approvals
+  (id, scope_id, asset_id, content_revision, actor_id, payload_kind, body_hash,
+   evidence_revision, voice_snapshot_hash, media_selection_hash, artifact_hash,
+   approved_at, invalidated_at, reason)
+VALUES
+  ('${approval_id}', '${scope_id}', '${asset_id}', 1, NULL, 'text', '${body_hash}',
+   1, '${voice_hash}', '${media_hash}', NULL, '${now}', NULL, NULL);
+SQL
+
+  # Read back what the database actually holds, and compare the stored digest with the one computed
+  # above. psql exiting zero is not evidence that a statement ran: the approval binds that hash,
+  # and a stored body whose hash is not its own would be a fixture proving nothing.
+  local stored
+  stored="$(docker exec "$container" psql --username=chronicleaf --dbname="$database_name" \
+    --quiet --tuples-only --no-align \
+    --command "SELECT count(*) || ' ' || coalesce(max(body_hash), '') FROM content_revisions WHERE asset_id = '${asset_id}'")"
+
+  if [ "$stored" != "1 ${body_hash}" ]; then
+    echo "the publish-variant seed stored '${stored}', which is not the one revision hashed as ${body_hash}" >&2
+    return 1
+  fi
+
+  local live
+  live="$(docker exec "$container" psql --username=chronicleaf --dbname="$database_name" \
+    --quiet --tuples-only --no-align \
+    --command "SELECT count(*) FROM content_approvals WHERE asset_id = '${asset_id}' AND invalidated_at IS NULL")"
+
+  if [ "$live" != "1" ]; then
+    echo "the publish-variant seed stored '${live}' live approvals, which is not the one the panel derives from" >&2
     return 1
   fi
 }
@@ -1815,4 +2075,34 @@ start_suite area "$area_base_url" "$area_log_file" "$repo_root/$publish_dir/acce
 echo "==> npm run test:e2e (real browser against $area_base_url)"
 run_suite "$area_base_url" "$area_log_file" "$repo_root/$publish_dir/access-token-area" \
   tests/project-area-ia.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 22: publish from variant. It needs a project with an approved story, a sealed
+# `publisher` credential and a registered transport - and a publish, once accepted, can
+# never be un-accepted - so its own installation, its own database and its own published
+# instance, for the same reason suites 2 to 21 each have one.
+#
+# Two deployment facts are configured for this installation only. The GitHub Pages
+# transport registers solely because an explicit repository names it, and its preview
+# renders the site files locally - CPU only, no credential lease, no row, no remote
+# call - so previewing proves the picker aims at a real classification. The dispatch
+# loop is silenced, so the receipt the suite reads stays at the acceptance the request
+# committed: what a pass establishes is that pick variant → pick target → preview →
+# confirm reaches the delivered routes and the receipt names the server's answer. It is
+# NOT evidence that anything was sent anywhere: no run executes here (the configured
+# repository is a name, not a destination), and the dispatch-to-terminal half is the
+# .NET suite's claim, not this one's.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a twenty-second disposable PostgreSQL and published application at $publish_variant_base_url"
+start_suite publish_variant "$publish_variant_base_url" "$publish_variant_log_file" \
+  "$repo_root/$publish_dir/access-token-publish-variant" \
+  "Chronicleaf__Operations__Enabled=false Chronicleaf__GitHubPages__RepositoryOwner=e2e-owner Chronicleaf__GitHubPages__RepositoryName=e2e-docs Chronicleaf__GitHubPages__Branch=main"
+
+echo "==> seeding one approved story and one sealed publisher credential"
+seed_publish_variant "$publish_variant_base_url" "$(cat "$repo_root/$publish_dir/access-token-publish-variant")"
+
+echo "==> npm run test:e2e (real browser against $publish_variant_base_url)"
+run_suite "$publish_variant_base_url" "$publish_variant_log_file" "$repo_root/$publish_dir/access-token-publish-variant" \
+  tests/publish-from-variant.spec.ts
 stop_suite

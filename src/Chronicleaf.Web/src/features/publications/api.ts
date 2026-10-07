@@ -5,6 +5,7 @@ import {
   type PublishAccepted,
   type PublishPreview,
   type PublishRequest,
+  type PublisherTargetList,
 } from './types';
 
 /**
@@ -22,6 +23,11 @@ import {
  * the run sends. Publishing is therefore always an explicit owner act with a separate,
  * explicit confirmation - never a side effect of rendering.
  */
+
+/** Lists the classified publisher targets, in registry order. A read, never a send. */
+export async function listTargets(signal?: AbortSignal): Promise<PublisherTargetList> {
+  return read<PublisherTargetList>(`/api/publisher-targets`, { method: 'GET', signal });
+}
 
 /** Answers what a send would do, without sending anything. */
 export async function previewPublish(

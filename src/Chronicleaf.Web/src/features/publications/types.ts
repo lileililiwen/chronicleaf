@@ -71,3 +71,23 @@ export interface PublishRequest {
   readonly idempotencyKey: string;
   readonly confirm: boolean;
 }
+
+/**
+ * One classified publisher target, as the target list answers it.
+ *
+ * Classification, not transport: what the target id means. An export-only
+ * target names material that leaves through its export package, carried by
+ * hand - the pickers show it disabled and the server refuses it.
+ */
+export interface PublisherTarget {
+  readonly targetId: string;
+  readonly supportsDraft: boolean;
+  readonly supportsPublish: boolean;
+  readonly supportsReconcile: boolean;
+  readonly exportOnly: boolean;
+}
+
+/** Every classified publisher target, in registry order. */
+export interface PublisherTargetList {
+  readonly targets: readonly PublisherTarget[];
+}

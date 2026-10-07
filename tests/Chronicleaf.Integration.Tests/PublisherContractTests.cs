@@ -611,6 +611,91 @@ public sealed class PublisherContractTests(ChronicleafPostgresFixture postgres)
     }
 
     // ==============================================================================================
+    // PUBLISH-FROM-VARIANT-001 Success: the registry classification is served verbatim.
+    // ==============================================================================================
+
+    [Fact]
+    public async Task TargetList_001_Success_owner_reads_registry_classification()
+    {
+        await using var fixture = await ArrangeAsync("pc_targets_list");
+        await using var host = PublisherContractApiHost.StartProduction(
+            fixture.Database, new FixedTimeProvider(Clock), fixture.KeyFile.FilePath);
+        using var owner = await OwnerClient.CreateAsync(host);
+
+        using var response = await owner.GetAsync("/api/publisher-targets");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var targets = body.RootElement.GetProperty("targets").EnumerateArray().ToList();
+
+        // No transport is configured in this host, so the registry holds exactly the two
+        // export-only descriptors this package registers. A configured transport appends its
+        // own descriptor beside its adapter; the route serves whatever the registry holds,
+        // which is what makes the pickers unable to drift from the server.
+        Assert.Equal(2, targets.Count);
+
+        foreach (var target in targets)
+        {
+            var names = target.EnumerateObject().Select(property => property.Name).Order().ToList();
+            Assert.Equal(
+                ["exportOnly", "supportsDraft", "supportsPublish", "supportsReconcile", "targetId"],
+                names);
+            Assert.True(target.GetProperty("exportOnly").GetBoolean());
+            Assert.False(target.GetProperty("supportsDraft").GetBoolean());
+            Assert.False(target.GetProperty("supportsPublish").GetBoolean());
+            Assert.False(target.GetProperty("supportsReconcile").GetBoolean());
+        }
+
+        Assert.Equal(
+            ["linkedin", "medium"],
+            targets.Select(target => target.GetProperty("targetId").GetString()).Order().ToList());
+    }
+
+    // ==============================================================================================
+    // PUBLISH-FROM-VARIANT-001 Failure: no session, no classification.
+    // ==============================================================================================
+
+    [Fact]
+    public async Task TargetList_001_Failure_anonymous_read_is_refused()
+    {
+        await using var fixture = await ArrangeAsync("pc_targets_anonymous");
+        await using var host = PublisherContractApiHost.StartProduction(
+            fixture.Database, new FixedTimeProvider(Clock), fixture.KeyFile.FilePath);
+        using var anonymous = host.CreateClient();
+
+        using var response = await anonymous.GetAsync("/api/publisher-targets");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    // ==============================================================================================
+    // PUBLISH-FROM-VARIANT-001 Boundary: an adapter with no contributed descriptor is served by
+    // preview resolution but never listed - the list is the registry, not the adapters.
+    // ==============================================================================================
+
+    [Fact]
+    public async Task TargetList_001_Boundary_adapter_without_descriptor_is_not_listed()
+    {
+        await using var fixture = await ArrangeAsync("pc_targets_unlisted");
+        var adapter = new TestPublisherAdapter();
+        await using var host = PublisherContractApiHost.Start(
+            fixture.Database, new FixedTimeProvider(Clock), fixture.KeyFile.FilePath, adapter);
+        using var owner = await OwnerClient.CreateAsync(host);
+
+        using var response = await owner.GetAsync("/api/publisher-targets");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var ids = body.RootElement
+            .GetProperty("targets")
+            .EnumerateArray()
+            .Select(target => target.GetProperty("targetId").GetString())
+            .ToList();
+
+        Assert.DoesNotContain(TestPublisherAdapter.FakeTarget, ids);
+        Assert.Equal(2, ids.Count);
+    }
+
+    // ==============================================================================================
     // PUBLISHER-CONTRACT-002 Failure: an ambiguous timeout becomes unknown, never retried.
     // ==============================================================================================
 

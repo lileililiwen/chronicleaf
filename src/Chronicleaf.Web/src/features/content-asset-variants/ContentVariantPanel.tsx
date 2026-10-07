@@ -8,6 +8,7 @@ import { ReviewApiError, type ContentReview } from '../markdown-review-export/ty
 import { renderSafeMarkdown } from '../markdown-review-export/sanitize';
 import { deriveVariant, listVariants, readVariant } from './api';
 import { VARIANT_TYPES, VariantApiError, type VariantSummary } from './types';
+import { VariantPublishSection } from './VariantPublishSection';
 
 /**
  * Reusable content formats derived from an approved story (CONTENT-ASSET-VARIANTS-001/002).
@@ -226,6 +227,13 @@ export function ContentVariantPanel({
                   >
                     {variant.type} (revision {variant.currentRevision})
                   </button>
+                  <button
+                    type="button"
+                    data-testid={`variant-publish-${variant.type}`}
+                    onClick={() => void select(variant.assetId)}
+                  >
+                    Publish {variant.type}
+                  </button>
                 </li>
               ))}
             </ul>
@@ -260,6 +268,18 @@ export function ContentVariantPanel({
                     </p>
                   ) : null}
                 </div>
+              )}
+              {archived || selected.assetId === null ? null : review?.reviewStatus === 'approved' &&
+                review.approval !== null ? (
+                <VariantPublishSection
+                  assetId={selected.assetId}
+                  approvalId={review.approval.approvalId}
+                />
+              ) : (
+                <p data-testid="variant-publish-unavailable">
+                  Publishing needs a live approval for this format. Approve it first, then
+                  pick a target and confirm the send.
+                </p>
               )}
             </article>
           ) : null}

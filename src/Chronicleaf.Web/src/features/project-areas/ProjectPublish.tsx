@@ -19,7 +19,7 @@ export function ProjectPublish({ projectId }: { readonly projectId: string }) {
         asset through a named target: the preview authorizes nothing, and the publish carries
         a separate explicit confirmation. Nothing is published by rendering.
       */}
-      <PublicationPanel />
+      <PublicationPanel projectId={projectId} />
 
       {/*
         FEATURE-TRIGGER-PANELS-006. The explicit public projection of this project: preview

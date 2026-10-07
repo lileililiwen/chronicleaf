@@ -1,7 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import { previewPublish, publishAsset, readReceipt, reconcileReceipt } from './api';
-import { PublicationApiError, type PublicationReceipt, type PublishPreview } from './types';
+import { listMilestones } from '../projects-and-milestones/api';
+import type { Milestone } from '../projects-and-milestones/types';
+import { readDraft } from '../grounded-markdown-drafts/api';
+import { listVariants } from '../content-asset-variants/api';
+import { readReview } from '../markdown-review-export/api';
+import { PublishForm } from './PublishForm';
+import { readReceipt, reconcileReceipt } from './api';
+import { PublicationApiError, type PublicationReceipt } from './types';
 
 /**
  * The publication status and reconcile triggers (FEATURE-TRIGGER-PANELS-005).
@@ -12,22 +18,132 @@ import { PublicationApiError, type PublicationReceipt, type PublishPreview } fro
  * rendering: the preview authorizes nothing, and the publish carries a
  * separate, explicit confirmation behind its own control.
  *
- * Nothing here fires on render: every route call below is behind an explicit
- * owner act, and the attempt and asset ids are typed by the owner.
+ * The send half hosts the one shared publish form under pickers: the owner
+ * picks a milestone, then one of its assets, then the form's own target
+ * picker names where it goes. Nothing here fires on render except the
+ * reads that fill the pickers; the attempt id for a past receipt is still
+ * named by the owner, because no list route serves attempts.
  */
-export function PublicationPanel() {
+export function PublicationPanel({ projectId }: { readonly projectId: string }) {
   const [attemptId, setAttemptId] = useState('');
   const [receipt, setReceipt] = useState<PublicationReceipt | null>(null);
+  const [milestones, setMilestones] = useState<readonly Milestone[] | null>(null);
+  const [milestoneId, setMilestoneId] = useState('');
+  const [options, setOptions] = useState<readonly AssetOption[] | null>(null);
   const [assetId, setAssetId] = useState('');
-  const [targetId, setTargetId] = useState('');
-  const [mode, setMode] = useState('draft');
   const [approvalId, setApprovalId] = useState('');
-  const [idempotencyKey, setIdempotencyKey] = useState('');
-  const [confirmed, setConfirmed] = useState(false);
-  const [preview, setPreview] = useState<PublishPreview | null>(null);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<PublicationApiError | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+
+    listMilestones(projectId, 'all', controller.signal)
+      .then((page) => {
+        if (!active) {
+          return;
+        }
+
+        setMilestones(page.items);
+        setMilestoneId((current) =>
+          current !== '' && page.items.some((milestone) => milestone.id === current)
+            ? current
+            : (page.items[0]?.id ?? ''),
+        );
+      })
+      .catch(() => {
+        if (active) {
+          setMilestones([]);
+        }
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [projectId]);
+
+  useEffect(() => {
+    if (milestoneId === '') {
+      setOptions([]);
+      setAssetId('');
+      setApprovalId('');
+      return;
+    }
+
+    let active = true;
+    const controller = new AbortController();
+
+    Promise.all([readDraft(milestoneId, controller.signal), listVariants(milestoneId, controller.signal)])
+      .then(async ([draft, variants]) => {
+        if (!active) {
+          return;
+        }
+
+        const built: AssetOption[] = [];
+
+        if (draft !== null && draft.assetId !== null && draft.currentRevision !== null) {
+          built.push({ assetId: draft.assetId, label: `story (revision ${draft.currentRevision})` });
+        }
+
+        for (const variant of variants) {
+          built.push({
+            assetId: variant.assetId,
+            label: `${variant.type} (revision ${variant.currentRevision})`,
+          });
+        }
+
+        if (!active) {
+          return;
+        }
+
+        setOptions(built);
+        setAssetId((current) =>
+          current !== '' && built.some((option) => option.assetId === current)
+            ? current
+            : (built[0]?.assetId ?? ''),
+        );
+      })
+      .catch(() => {
+        if (active) {
+          setOptions([]);
+        }
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [milestoneId]);
+
+  useEffect(() => {
+    if (assetId === '') {
+      setApprovalId('');
+      return;
+    }
+
+    let active = true;
+    const controller = new AbortController();
+
+    readReview(assetId, controller.signal)
+      .then((state) => {
+        if (active) {
+          setApprovalId(state.approval?.approvalId ?? '');
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setApprovalId('');
+        }
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [assetId]);
 
   const run = async (work: () => Promise<string | null>) => {
     setBusy(true);
@@ -53,42 +169,6 @@ export function PublicationPanel() {
     run(async () => {
       setReceipt(await reconcileReceipt(attemptId.trim()));
       return 'The receipt is reconciled against what the target reports.';
-    });
-
-  const previewSend = () =>
-    run(async () => {
-      setPreview(await previewPublish(assetId.trim(), targetId.trim(), mode));
-      return null;
-    });
-
-  const publish = () =>
-    run(async () => {
-      if (preview === null) {
-        throw new PublicationApiError(
-          {
-            code: 'preview_required',
-            message: 'A publish confirms the preview it was read against. Preview first.',
-            traceId: '',
-          },
-          400,
-        );
-      }
-
-      const answered = await publishAsset(assetId.trim(), {
-        targetId: targetId.trim(),
-        mode,
-        previewHash: preview.previewHash,
-        approvalId: approvalId.trim(),
-        idempotencyKey: idempotencyKey.trim(),
-        confirm: confirmed,
-      });
-
-      if ('operationId' in answered) {
-        return `The publish is accepted as operation ${answered.operationId}.`;
-      }
-
-      setReceipt(answered);
-      return 'An identical request had already created this publish; its receipt is shown.';
     });
 
   return (
@@ -174,103 +254,63 @@ export function PublicationPanel() {
       )}
 
       <h4 className="view__heading">Publish an asset</h4>
-      <label className="form__label">
-        Asset id
-        <input
-          type="text"
-          className="form__input"
-          value={assetId}
-          onChange={(event) => setAssetId(event.target.value)}
-          data-testid="publication-asset-input"
-        />
-      </label>
-      <label className="form__label">
-        Target id
-        <input
-          type="text"
-          className="form__input"
-          value={targetId}
-          onChange={(event) => setTargetId(event.target.value)}
-          data-testid="publication-target-input"
-        />
-      </label>
-      <label className="form__label">
-        Mode
-        <select
-          className="form__input"
-          value={mode}
-          onChange={(event) => setMode(event.target.value)}
-          data-testid="publication-mode-input"
-        >
-          <option value="draft">draft</option>
-          <option value="publish">publish</option>
-        </select>
-      </label>
-      <div className="view__actions">
-        <button
-          type="button"
-          className="action"
-          onClick={() => void previewSend()}
-          disabled={busy}
-          data-testid="publication-preview"
-        >
-          Preview what a send would do
-        </button>
-      </div>
+      {milestones === null ? (
+        <p className="view__state" data-testid="publication-milestones-loading">
+          Reading milestones…
+        </p>
+      ) : milestones.length === 0 ? (
+        <p className="view__state" data-testid="publication-milestones-empty">
+          No milestone recorded yet, so there is nothing to publish.
+        </p>
+      ) : (
+        <label className="form__label">
+          Milestone
+          <select
+            className="form__input"
+            value={milestoneId}
+            onChange={(event) => setMilestoneId(event.target.value)}
+            data-testid="publication-milestone-picker"
+          >
+            {milestones.map((milestone) => (
+              <option key={milestone.id} value={milestone.id}>
+                {milestone.title}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
-      {preview ? (
-        <dl className="session__facts" data-testid="publication-preview-result">
-          <dt>Preview hash</dt>
-          <dd data-testid="publication-preview-hash">{preview.previewHash}</dd>
-          <dt>Content revision</dt>
-          <dd data-testid="publication-preview-revision">{preview.contentRevision}</dd>
-          <dt>Warnings</dt>
-          <dd data-testid="publication-preview-warnings">
-            {preview.warnings.length === 0 ? 'None.' : preview.warnings.join(' ')}
-          </dd>
-        </dl>
-      ) : null}
+      {options === null ? null : options.length === 0 ? (
+        <p className="view__state" data-testid="publication-assets-empty">
+          This milestone holds no draft and no derived format, so there is nothing to
+          publish from it.
+        </p>
+      ) : (
+        <label className="form__label">
+          Asset
+          <select
+            className="form__input"
+            value={assetId}
+            onChange={(event) => setAssetId(event.target.value)}
+            data-testid="publication-asset-picker"
+          >
+            {options.map((option) => (
+              <option key={option.assetId} value={option.assetId}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
-      <label className="form__label">
-        Approval id the request was read against
-        <input
-          type="text"
-          className="form__input"
-          value={approvalId}
-          onChange={(event) => setApprovalId(event.target.value)}
-          data-testid="publication-approval-input"
-        />
-      </label>
-      <label className="form__label">
-        Idempotency key
-        <input
-          type="text"
-          className="form__input"
-          value={idempotencyKey}
-          onChange={(event) => setIdempotencyKey(event.target.value)}
-          data-testid="publication-idempotency-input"
-        />
-      </label>
-      <label className="form__label">
-        <input
-          type="checkbox"
-          checked={confirmed}
-          onChange={(event) => setConfirmed(event.target.checked)}
-          data-testid="publication-confirm"
-        />
-        I confirm this send to the named target
-      </label>
-      <div className="view__actions">
-        <button
-          type="button"
-          className="action action--primary"
-          onClick={() => void publish()}
-          disabled={busy}
-          data-testid="publication-publish"
-        >
-          Publish
-        </button>
-      </div>
+      {assetId === '' ? null : (
+        <PublishForm key={assetId} assetId={assetId} approvalId={approvalId} namespace="publication" />
+      )}
     </section>
   );
+}
+
+interface AssetOption {
+  readonly assetId: string;
+  readonly label: string;
 }

@@ -88,23 +88,84 @@ sibling and is the only place a sibling path may appear.
 
 ## Running it
 
+A full operator run, in order. The web client must be built first (it is not produced by
+`dotnet run`), the access token must be kept by the operator (the README shows the exact
+command that loses it), and the singleton `installation` row must be inserted before
+`/api/ready` returns 200.
+
 ```sh
-docker run -d --name chronicleaf-db -e POSTGRES_PASSWORD=… -e POSTGRES_DB=chronicleaf -p 5432:5432 postgres:17.6-alpine
-export ConnectionStrings__Chronicleaf='Host=127.0.0.1;Port=5432;Database=chronicleaf;Username=postgres;Password=…'
-export Chronicleaf__AccessTokenHash="$(printf '%s' "$(openssl rand -base64 48)" | sha256sum | cut -d' ' -f1)"
+# 1. The web client. This is the build the API publishes into wwwroot, so it must be done
+#    before the API is published; `dotnet run` alone serves a 503 web_assets_unavailable.
+(cd src/Chronicleaf.Web && npm ci && npm run build)
+
+# 2. PostgreSQL. The single database the application uses; the `chronicleaf` role is created
+#    by the image when POSTGRES_USER is set.
+docker run -d --name chronicleaf-db \
+  -e POSTGRES_USER=chronicleaf \
+  -e POSTGRES_PASSWORD=change-me \
+  -e POSTGRES_DB=chronicleaf \
+  -p 5432:5432 postgres:17.6-alpine
+
+# 3. Operator values. The access token is generated once, the plaintext is saved to a
+#    file the operator keeps, and only the SHA-256 hex reaches the API. A token whose
+#    plaintext is lost cannot sign in; the hash alone is not a credential.
+umask 177
+ACCESS_TOKEN="$(openssl rand -base64 48)"
+printf '%s' "$ACCESS_TOKEN" > ~/.chronicleaf-access-token
+chmod 600 ~/.chronicleaf-access-token
+export Chronicleaf__AccessTokenHash="$(printf '%s' "$ACCESS_TOKEN" | sha256sum | cut -d' ' -f1)"
+unset ACCESS_TOKEN
+
+export ConnectionStrings__Chronicleaf='Host=127.0.0.1;Port=5432;Database=chronicleaf;Username=chronicleaf;Password=change-me'
 export Chronicleaf__PublicOrigin='http://127.0.0.1:5080'
+
 # 32 bytes, outside the repository and outside any image:
-umask 177 && openssl rand -out /run/chronicleaf-encryption.key 32
+openssl rand -out /run/chronicleaf-encryption.key 32
+chmod 600 /run/chronicleaf-encryption.key
 export Chronicleaf__EncryptionKeyFile=/run/chronicleaf-encryption.key
+
+# 4. Migrate, then provision the singleton installation row. The row is operator state,
+#    never self-claimed by a visitor; without it, /api/ready reports database_unavailable
+#    while /api/health stays 200.
 dotnet tool restore
 dotnet ef database update --project src/Chronicleaf.Infrastructure --startup-project src/Chronicleaf.Api
-dotnet run --project src/Chronicleaf.Api --urls http://127.0.0.1:5080
+docker exec -i chronicleaf-db psql -U chronicleaf -d chronicleaf -c \
+  "INSERT INTO installation (id, schema_version, created_at) VALUES (gen_random_uuid(), 1, now()) ON CONFLICT (id) DO NOTHING;"
+
+# 5. Publish the API with the web client in place, then run it. scripts/publish.sh does
+#    the web build, the dotnet publish, and the wwwroot copy in one step; the resulting
+#    binary is the one to run.
+bash scripts/publish.sh dist/run
+ConnectionStrings__Chronicleaf="$ConnectionStrings__Chronicleaf" \
+Chronicleaf__AccessTokenHash="$Chronicleaf__AccessTokenHash" \
+Chronicleaf__PublicOrigin="$Chronicleaf__PublicOrigin" \
+Chronicleaf__EncryptionKeyFile="$Chronicleaf__EncryptionKeyFile" \
+  dotnet dist/run/Chronicleaf.Api.dll --urls http://127.0.0.1:5080
 ```
 
-The access token itself is never stored: `Chronicleaf__AccessTokenHash` is the SHA-256 hex of a
-token you keep. A missing hash prevents a non-Development start; a database that is unreachable makes
-`/api/ready` 503 while `/api/health` stays 200. Migrations are applied by the operator, never on HTTP
-startup. Schema is `hangfire` plus the EF-managed tables in the same database.
+Open `http://127.0.0.1:5080/` in a browser; the sign-in page asks for the token whose
+plaintext is in `~/.chronicleaf-access-token`. `curl` callers use
+`POST /api/session` with body `{"accessToken":"<the plaintext>"}` and the
+`Origin: http://127.0.0.1:5080` header; the response is `204 No Content` and the session
+cookie is set in the same call. A wrong token is one generic `invalid_credentials` (the
+code never distinguishes wrong, malformed or rotated), five wrong tries inside fifteen
+minutes from one client key turns into `too_many_requests` until the window expires
+(durable, so a restart is not a fresh allowance). A database that is unreachable makes
+`/api/ready` 503 while `/api/health` stays 200. Migrations are applied by the operator,
+never on HTTP startup. Schema is `hangfire` plus the EF-managed tables in the same
+database. A missing access-token-hash prevents a non-Development start; in Development the
+process starts but no login can ever succeed because there is no token to match.
+
+`scripts/verify.sh` is the configured gate for the change-authoring workflow
+(`.project.json` `verification.command`); it builds, runs the .NET stages against a real
+disposable PostgreSQL 17.6 container, then runs `npm ci` and the web build. Every filtered
+stage asserts it selected at least one test, because `dotnet test --filter` exits 0 when a
+pattern matches nothing — a mistyped filter would otherwise be a silent green no-op. The
+browser stage is opt-in because it downloads Playwright browsers, and the screenshot
+sandbox is refused with `capture_sandbox_unavailable` on a host without the kernel
+isolation that production confinement needs (Docker with `--cap-add=NET_ADMIN`, a
+user-namespace mapping, and an outbound proxy on the loopback); the panel names the code
+and draws no candidate.
 
 See [requirements](requirement.md), the [complete package/dependency map](ROADMAP.md),
 [handoff](HANDOFF.md), and [agent workflow](AGENTS.md). Optional semantic retrieval and Hosted

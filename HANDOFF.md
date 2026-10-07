@@ -1923,3 +1923,64 @@ publication.
 No `current_spec` remains: the line is removed, not pointed elsewhere. `product-shell-ux`
 is taste-blocked (four owner taste answers outstanding before it can start) and is not
 selected.
+`product-shell-ux` is archived
+(`fc1d997`, canonical spec `openspec/specs/product-shell-ux/spec.md`): one coherent app
+shell over the delivered contracts, with Community behavior the only behavior. One shell with
+top-level navigation in core-journey order (Projects, Timeline, Operations, Credentials,
+Settings; `aria-current` on the active entry, brand mark linking home), one h1 per view
+(top-level view headings promoted `h2`/`h3` → `h1`; the shell brand is a nav button, never
+a repeated heading), session internals (actor label without raw UUID dump, idle timeout,
+lifetime) visible only under `/settings` beside the credentials link and nothing else, and
+the `later-packages`/`setup-pending` block deleted. `/timeline` is a project picker over
+the existing project list plus the existing `ProjectTimeline` reused, not forked; the
+single route reader is owned by the shell and handed to `ProjectArea`, so nav and view
+cannot disagree. Tokens are the only visual source of truth (`tokens.css`: color roles,
+type scale, spacing/shape/layout — the near-black/gold theme kept and systematized, no
+rebrand, no light default, no new accent); `styles.css` re-binds its `--shell-*` roles as
+token aliases with zero non-token hex remaining, adds shell/nav/page/section/timeline
+rules, and drops the `.later` block. The credentials label/input collision is resolved in
+the shared `form__` primitive (the panel used unstyled `.field*` classes); the previously
+rule-less `timeline__*` classes and six bare headings are classed onto tokens. A new
+`check-web-scaffolding.sh` lint stage fails the gate before test stages on sources and
+again after the frontend build on the bundle. Read that package's own boundary before
+extending it, and note the four owner-decided taste answers recorded verbatim in the
+change's design ledger (keep near-black/gold into tokens; `/timeline` picker reusing
+`ProjectTimeline`; settings carries internals + credentials link only; the
+`later-packages` block is dead — implementation verdict: not load-bearing, no importer
+remains and the release story is untouched), plus the two defects verification found, none
+worked around in a test: the shell first owned a second route reader beside `ProjectArea`'s
+(now one reader, handed down), and five editor/detail headings kept their old closing tags
+after the `h1` promotion (tsc caught each). Evidence, all run by the implementer rather
+than taken on report: `node scripts/check-openspec-change-names.mjs` exit 0;
+`CHRONICLEAF_E2E=1 bash scripts/verify.sh` exit 0 (`GATE_EXIT=0`, `set -o pipefail`) in
+FOREGROUND twice, with the platform-feed stage, the new `web scaffolding lint` stage
+(proven to FAIL on the stale pre-restyle bundle with 2 violations and PASS on the clean
+tree and fresh bundle) alongside every existing filtered stage each asserted to select at
+least one test, `npm ci`, `tsc --noEmit` + `vite build`, the bundle lint again, then
+91/91 Playwright across twenty database-isolated browser suites (suite 1: 29 = 4 shell +
+5 jobs + 5 access + 7 projects + 8 product-shell-ux, the last including the DELTA
+captures); `dotnet build` 0 errors with the same 2 pre-existing warnings at HEAD (CS0649,
+CS0618); name preflight exit 0; `git diff --check` clean; `openspec validate --all
+--strict --no-interactive` 54/54 before and after the archive, which used no
+`--skip-specs`. Two suites migrated in-package with named migrations and nothing
+silently weakened: `e2e/shell.spec.ts` (brand-h1 kept for the signed-out shell;
+setup-pending assertions became absence assertions) and `tests/community-access.spec.ts`
+(the DOM UUID-format assertion became a `GET /api/session` proof plus a settings-label
+assertion — the stable-UUID property still asserted, the page no longer dumps it). DELTA
+justifications, each new capture (`/tmp/opencode/delta-shots/`, empty/generic states,
+never committed) diffed against the closest 2026-10-07 archived capture: nav-projects vs
+01-home (narrow centered column → 72rem surface; repeated brand h1 + session facts →
+brand button + 5-entry nav + h1 Dashboard + journey strip + compact sign-out bar;
+scaffolding footer gone); project-new vs 02-project-new (same fields full-width on
+tokens, h1, shell chrome present); nav-operations vs 03-operations (settled empty state
+with filters, footer gone — the gate capture additionally shows the 4 seeded generic
+`test.*` rows suite 1 plants, fixture state rather than product data); nav-credentials
+vs 04-credentials (label/input collision gone through the shared primitive, rows and
+badges otherwise identical); nav-timeline and nav-settings have no archived counterpart
+(new views; timeline reuses the delivered component, settings holds internals plus the
+credentials link only). No capture bears a credential, token, PAT, UUID or session value
+— the settings capture shows the actor label only — and the opt-in real-provider or
+real-capture runs were not performed: no claim is made beyond the empty-state renders.
+Deployment stays `deployable: false`; there is no remote, no push and no publication.
+No `current_spec` remains: the line is removed entirely (no further active changes; the
+two deferred packages stay parked).

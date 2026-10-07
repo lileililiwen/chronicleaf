@@ -424,6 +424,54 @@ public sealed class VideoStoryService(
     }
 
     /// <inheritdoc />
+    public async Task<VideoStorySummary> ReadForMilestoneAsync(
+        OwnerScope owner,
+        Guid milestoneId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+
+        if (milestoneId == Guid.Empty)
+        {
+            throw new ValidationFailedException("milestoneId", "A video story belongs to a milestone, so name one.");
+        }
+
+        // The milestone is read first and scoped, so a milestone in another installation is a 404
+        // rather than an empty script that happens to look like "nothing scripted yet".
+        _ = await milestones.FindAsync(owner.ScopeId, milestoneId, cancellationToken).ConfigureAwait(false)
+            ?? throw new ResourceNotFoundException("milestone");
+
+        var asset = await assets
+            .FindForMilestoneAsync(owner.ScopeId, milestoneId, ContentAssetTypes.VideoStory, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (asset is null || asset.CurrentRevision < 1)
+        {
+            return new VideoStorySummary(
+                null, 0, string.Empty, 0, 0, 0, 0, clock.GetUtcNow());
+        }
+
+        var revision = await assets
+            .FindRevisionAsync(owner.ScopeId, asset.Id, asset.CurrentRevision, cancellationToken)
+            .ConfigureAwait(false);
+
+        // The discovery read names what the row holds without interpreting it: a row this build
+        // cannot parse is still a stored script, and its body stays previewable through the
+        // asset read rather than hidden here.
+        var document = VideoStoryBoard.FromCanonicalJson(revision?.BodyMarkdown);
+
+        return new VideoStorySummary(
+            asset.Id,
+            asset.CurrentRevision,
+            revision?.BodyHash ?? string.Empty,
+            document?.DurationSeconds ?? 0,
+            document?.Shots.Count ?? 0,
+            revision?.EvidenceRevision ?? 0,
+            revision?.VoiceRevision ?? 0,
+            asset.UpdatedAt);
+    }
+
+    /// <inheritdoc />
     public async Task<VideoStoryExport> ExportAsync(
         OwnerScope owner,
         Guid assetId,

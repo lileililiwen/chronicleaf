@@ -140,6 +140,18 @@ public sealed class ContentReviewService(
                 var asset = await assets.FindAsync(owner.ScopeId, assetId, token).ConfigureAwait(false)
                     ?? throw new ResourceNotFoundException("content asset");
 
+                // VIDEO-STORY-PANEL-004. A storyboard body is canonical JSON the video-story
+                // package owns: shots are immutable and re-scripting through the generate route
+                // is the update path. A hand edit would store bytes the export answers 500 for,
+                // so it is refused naming the field with the remedy, before anything is written.
+                if (string.Equals(asset.Type, ContentAssetTypes.VideoStory, StringComparison.Ordinal))
+                {
+                    throw new ValidationFailedException(
+                        "bodyMarkdown",
+                        "A video story is re-scripted, not edited: generate a new revision from "
+                        + "the shot list instead of editing these bytes.");
+                }
+
                 if (asset.CurrentRevision != request.ExpectedRevision)
                 {
                     throw new RevisionConflictException(asset.CurrentRevision);

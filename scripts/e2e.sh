@@ -94,6 +94,7 @@ static_blog_export_base_url="${CHRONICLEAF_STATIC_BLOG_EXPORT_BASE_URL:-http://1
 adapter_panels_base_url="${CHRONICLEAF_ADAPTER_PANELS_BASE_URL:-http://127.0.0.1:5104}"
 content_pack_base_url="${CHRONICLEAF_CONTENT_PACK_BASE_URL:-http://127.0.0.1:5105}"
 agency_base_url="${CHRONICLEAF_AGENCY_BASE_URL:-http://127.0.0.1:5106}"
+video_story_base_url="${CHRONICLEAF_VIDEO_STORY_BASE_URL:-http://127.0.0.1:5107}"
 log_file="$repo_root/$publish_dir/server.log"
 evidence_log_file="$repo_root/$publish_dir/server-evidence.log"
 credentials_log_file="$repo_root/$publish_dir/server-credentials.log"
@@ -120,6 +121,7 @@ static_blog_export_log_file="$repo_root/$publish_dir/server-static-blog-export.l
 adapter_panels_log_file="$repo_root/$publish_dir/server-adapter-panels.log"
 content_pack_log_file="$repo_root/$publish_dir/server-content-pack.log"
 agency_log_file="$repo_root/$publish_dir/server-agency.log"
+video_story_log_file="$repo_root/$publish_dir/server-video-story.log"
 key_file=""
 
 # The operator key for this run: 32 random bytes in a temporary file outside the repository and
@@ -161,7 +163,8 @@ cleanup() {
     "$repo_root/$publish_dir/access-token-static-blog-export" \
     "$repo_root/$publish_dir/access-token-adapter-panels" \
     "$repo_root/$publish_dir/access-token-content-pack" \
-    "$repo_root/$publish_dir/access-token-agency"
+    "$repo_root/$publish_dir/access-token-agency" \
+    "$repo_root/$publish_dir/access-token-video-story"
   # So is the encryption key: it is removed whether the run passed or failed.
   remove_key_file
   exit "$exit_status"
@@ -1297,6 +1300,10 @@ seed_static_blog_export_rows() {
   local evidence_item_id="$6"
   local title="$7"
   local approve="$8"
+  # The evidence head the stored revision and its approval bind. Every older
+  # caller stores against the first revision; a caller whose milestone moved
+  # (a curation select appends a revision) names the head instead.
+  local evidence_revision="${9:-1}"
 
   local body summary voice_snapshot body_hash voice_hash media_hash fingerprint now
   now="$(date -u +%Y-%m-%dT%H:%M:%S.000000Z)"
@@ -1312,7 +1319,15 @@ seed_static_blog_export_rows() {
 
   voice_hash="$(printf '%s' "$voice_snapshot" | sha256sum | cut -d' ' -f1)"
 
-  media_hash="$(printf '' | sha256sum | cut -d' ' -f1)"
+  # The media selection the stored approval binds. Every older caller stores against a head
+  # with no selected picture, which is the empty hash; a caller whose milestone selected
+  # pictures first names the delivered `mediaId|caption` hash instead, or the approval
+  # reads back invalidated and the panel under test has nothing it can derive from.
+  if [ -n "${10:-}" ]; then
+    media_hash="${10}"
+  else
+    media_hash="$(printf '' | sha256sum | cut -d' ' -f1)"
+  fi
 
   summary=$(jq -cn --arg e "$evidence_item_id" --arg t "$title" '{
     milestoneTitle: $t,
@@ -1350,7 +1365,7 @@ INSERT INTO content_revisions
   (id, asset_id, scope_id, revision, evidence_bundle_id, evidence_revision, voice_revision,
    voice_snapshot, summary, body_markdown, body_hash, provider_id, model, prompt_version, schema_version, created_at)
 VALUES
-  ('${revision_id}', '${asset_id}', '${scope_id}', 1, '${bundle_id}', 1, 0,
+  ('${revision_id}', '${asset_id}', '${scope_id}', 1, '${bundle_id}', '${evidence_revision}', 0,
    :'voice_snapshot'::jsonb, :'summary'::jsonb, :'body', '${body_hash}',
    'openai', 'seeded-not-called', 'grounded-markdown/1', 'grounded-summary/1', '${now}');
 SQL
@@ -1364,7 +1379,7 @@ INSERT INTO content_approvals
    approved_at, invalidated_at, reason)
 VALUES
   ('${approval_id}', '${scope_id}', '${asset_id}', 1, NULL, 'text', '${body_hash}',
-   1, '${voice_hash}', '${media_hash}', NULL, '${now}', NULL, NULL);
+   '${evidence_revision}', '${voice_hash}', '${media_hash}', NULL, '${now}', NULL, NULL);
 SQL
   fi
 
@@ -1505,6 +1520,226 @@ seed_content_pack_panels() {
 
   if [ -z "$bare_id" ] || [ "$bare_id" = "null" ]; then
     echo "the content-pack seed could not create its bare milestone" >&2
+    return 1
+  fi
+}
+
+# ---------------------------------------------------------------------------------------------
+# Suite 27 seed: one project, one confirmed milestone with an approved story and one
+# selected screenshot, plus one bare milestone with no story at all.
+#
+# Everything above the content tables is made through the running server's own routes with
+# the real access token and a real antiforgery value, so the project, the milestone, its
+# manual evidence, the uploaded picture and its selection are records the product itself
+# created. The approved story rows are inserted directly with the same technique and the
+# same read-back refusal as seed_static_blog_export_rows — a story is produced by a
+# provider call, and this installation has an adapter with an empty model allowlist, so
+# there is nothing that could produce one honestly here. No credential is stored: no
+# video-story contract leases one. Every script generation and every script approval
+# below goes through the shipped panel and the published server.
+#
+# Order matters: the screenshot is selected through the delivered curation route before
+# the story rows are stored, because the selection appends the second bundle revision
+# and the story's approval must bind the head the script will be grounded in. All
+# seeded and typed prose is digit-free English under an English voice, for the same
+# reason the drafts suite's own note is: the numeral rule refuses a figure that appears
+# in no evidence item.
+# ---------------------------------------------------------------------------------------------
+seed_video_story_panel() {
+  local origin="$1"
+  local token="$2"
+  local cookie_jar
+  cookie_jar="$(mktemp -d)/cookies.txt"
+
+  local antiforgery
+  antiforgery="$(curl --silent --show-error --cookie-jar "$cookie_jar" --cookie "$cookie_jar" \
+    --data "{\"accessToken\":\"${token}\"}" \
+    -H 'Content-Type: application/json' \
+    "${origin}/api/session" >/dev/null && \
+    curl --silent --show-error --cookie-jar "$cookie_jar" --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/session/antiforgery" | jq -r '.token')"
+
+  if [ -z "$antiforgery" ] || [ "$antiforgery" = "null" ]; then
+    echo "the video-story seed could not read an antiforgery value from ${origin}" >&2
+    return 1
+  fi
+
+  local project_id
+  project_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"name":"Video story","description":"Storyboard read and export panel."}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/projects" | jq -r '.id')"
+
+  if [ -z "$project_id" ] || [ "$project_id" = "null" ]; then
+    echo "the video-story seed could not create its project" >&2
+    return 1
+  fi
+
+  # The seeded body is English, so the voice a script and an approval are judged under
+  # must be too: the default profile declares Chinese and would report language findings
+  # on every field, which would leave the browser with nothing it can approve. The stored
+  # language is read back, because a PUT that did not take would leave the same
+  # un-approvable fixture behind.
+  local voice_language
+  voice_language="$(curl --silent --show-error --request PUT --cookie "$cookie_jar" \
+    --data '{"presetId":"technical-blog","overrides":{"language":"en"}}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 0' \
+    "${origin}/api/projects/${project_id}/voice-profile" | jq -r '.effectiveValues.language')"
+
+  if [ "$voice_language" != "en" ]; then
+    echo "the video-story seed could not set the project's voice" >&2
+    return 1
+  fi
+
+  local milestone_id
+  milestone_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"title":"Storyboard source","version":"0.1.0","occurredAt":"2026-10-01T09:00:00Z","type":"feature","notes":"Recorded by the e2e seed.","knownLimitations":[],"nextSteps":[]}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/projects/${project_id}/milestones" | jq -r '.id')"
+
+  if [ -z "$milestone_id" ] || [ "$milestone_id" = "null" ]; then
+    echo "the video-story seed could not create its milestone" >&2
+    return 1
+  fi
+
+  # A manual milestone is confirmed by the act of saving it, so no confirm call is needed here.
+  curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"notes":"The pipeline now reproduces from a clean checkout.","expectedRevision":0}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 0' \
+    "${origin}/api/milestones/${milestone_id}/evidence/manual" >/dev/null
+
+  # One real capture request, so the candidate row below names a job this installation asked
+  # for. The job will refuse with capture_sandbox_unavailable on a host that cannot confine
+  # a browser, and it writes no candidate — which the seed asserts no part of: the candidate
+  # is the row below, and the job is its provenance.
+  local operation_id
+  operation_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"url":"https://example.com/pipeline","viewports":["desktop"],"expectedBundleRevision":1,"idempotencyKey":"e2e-video-story-pipeline"}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 1' \
+    "${origin}/api/milestones/${milestone_id}/captures" | jq -r '.operationId')"
+
+  if [ -z "$operation_id" ] || [ "$operation_id" = "null" ]; then
+    echo "the video-story seed could not request its capture job" >&2
+    return 1
+  fi
+
+  # One real PNG through the real media route. It is a 1x1 fixture, decoded and verified by
+  # the delivered store — and what the browser suite draws from it is the served bytes,
+  # never a claim that a page was photographed.
+  local png_file
+  png_file="$(mktemp -d)/pixel.png"
+  printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' \
+    | base64 --decode >"$png_file"
+
+  local media_id
+  media_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data-binary "@${png_file}" \
+    -H 'Content-Type: image/png' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/media?projectId=${project_id}" | jq -r '.id')"
+  rm -f "$png_file"
+
+  if [ -z "$media_id" ] || [ "$media_id" = "null" ]; then
+    echo "the video-story seed could not upload its fixture image" >&2
+    return 1
+  fi
+
+  local candidate_id
+  candidate_id="$(cat /proc/sys/kernel/random/uuid)"
+  local now
+  now="$(date -u +%Y-%m-%dT%H:%M:%S.000000Z)"
+  local scope_id
+  scope_id="$(docker exec "$postgres_container" psql --username=chronicleaf --dbname=chronicleaf_e2e_video_story --quiet --tuples-only --no-align \
+    --command 'SELECT id FROM installation LIMIT 1')"
+
+  # `-i` is load-bearing: without it the heredoc never reaches psql, psql exits 0 having
+  # inserted nothing, and the suite would run against an empty choice it mistakes for an
+  # offered one. The row is read back below.
+  docker exec -i "$postgres_container" psql --username=chronicleaf --dbname=chronicleaf_e2e_video_story --quiet \
+    --set=ON_ERROR_STOP=1 \
+    <<SQL >/dev/null
+INSERT INTO screenshot_candidates
+  (id, scope_id, project_id, milestone_id, media_id, operation_id, source_url, final_url,
+   viewport, captured_at, status, caption, is_primary, display_order, revision, created_at)
+VALUES
+  ('${candidate_id}', '${scope_id}', '${project_id}', '${milestone_id}', '${media_id}', '${operation_id}',
+   'https://example.com/pipeline', 'https://example.com/pipeline',
+   '{"name":"desktop","width":1440,"height":900}', '${now}', 'candidate', '', false, 0, 1, '${now}');
+SQL
+
+  local stored
+  stored="$(docker exec "$postgres_container" psql --username=chronicleaf --dbname=chronicleaf_e2e_video_story \
+    --quiet --tuples-only --no-align \
+    --command "SELECT count(*) FROM screenshot_candidates WHERE milestone_id = '${milestone_id}' AND status = 'candidate'")"
+
+  if [ "$stored" != "1" ]; then
+    echo "the video-story seed stored '${stored}' candidates, which is not the one offered row" >&2
+    return 1
+  fi
+
+  # Selected through the delivered route, not by editing the row: the selection publishes
+  # the picture into the evidence head in the same server transaction, which is the
+  # second bundle revision the story approval below must bind.
+  local bundle_revision
+  bundle_revision="$(curl --silent --show-error --request PATCH --cookie "$cookie_jar" \
+    --data '{"status":"selected","caption":"The pipeline digest view.","isPrimary":null,"expectedRevision":1,"expectedBundleRevision":1}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 1' \
+    "${origin}/api/screenshots/${candidate_id}" | jq -r '.bundleRevision')"
+
+  if [ "$bundle_revision" != "2" ]; then
+    echo "the video-story seed selected '${bundle_revision}', which is not the second bundle revision" >&2
+    return 1
+  fi
+
+  local bundle_id manual_item_id
+  bundle_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/milestones/${milestone_id}/evidence" \
+    | jq -r '.items[0].id')"
+  manual_item_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/milestones/${milestone_id}/evidence" \
+    | jq -r '.items[0].items[] | select(.kind == "manual") | .id' | head -n 1)"
+
+  if [ -z "$manual_item_id" ] || [ "$manual_item_id" = "null" ]; then
+    echo "the video-story seed could not read the carried manual item the story cites" >&2
+    return 1
+  fi
+
+  # The story is stored against the second bundle revision: the selection above carried
+  # every fact to new ids, so the summary cites the head's ids rather than the first
+  # revision's, and the approval binds the head the script will be grounded in — including
+  # the selected picture, or the approval reads back invalidated.
+  story_media_hash="$(printf '%s|%s' "$media_id" 'The pipeline digest view.' | sha256sum | cut -d' ' -f1)"
+  seed_static_blog_export_rows "$postgres_container" "chronicleaf_e2e_video_story" \
+    "$project_id" "$milestone_id" "$bundle_id" "$manual_item_id" \
+    "Storyboard source" "yes" 2 "$story_media_hash"
+
+  local bound
+  bound="$(docker exec "$postgres_container" psql --username=chronicleaf --dbname=chronicleaf_e2e_video_story \
+    --quiet --tuples-only --no-align \
+    --command "SELECT count(*) FROM content_approvals WHERE asset_id IN (SELECT id FROM content_assets WHERE milestone_id = '${milestone_id}' AND type = 'markdown-story') AND evidence_revision = 2 AND invalidated_at IS NULL")"
+
+  if [ "$bound" != "1" ]; then
+    echo "the video-story seed bound '${bound}' live approvals to the second revision, which is not one" >&2
+    return 1
+  fi
+
+  # The bare milestone carries no evidence and no story: the panel on its row
+  # proves the empty states rather than a second script.
+  local bare_id
+  bare_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"title":"Bare storyboard milestone","version":"0.1.0","occurredAt":"2026-10-02T09:00:00Z","type":"feature","notes":"Recorded by the e2e seed.","knownLimitations":[],"nextSteps":[]}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/projects/${project_id}/milestones" | jq -r '.id')"
+
+  if [ -z "$bare_id" ] || [ "$bare_id" = "null" ]; then
+    echo "the video-story seed could not create its bare milestone" >&2
     return 1
   fi
 }
@@ -2729,4 +2964,39 @@ seed_agency_area "$agency_base_url" "$(cat "$repo_root/$publish_dir/access-token
 echo "==> npm run test:e2e (real browser against $agency_base_url)"
 run_suite "$agency_base_url" "$agency_log_file" "$repo_root/$publish_dir/access-token-agency" \
   tests/agency-area-ui.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 27: the video storyboard. It needs a project with a confirmed milestone
+# carrying an approved story and one selected screenshot - and neither a story
+# nor an approval can be produced through the UI without a provider, while a
+# script, once generated, cannot be removed at all - so its own installation,
+# its own database and its own published instance, for the same reason suites
+# 2 to 26 each have one.
+#
+# Jobs stay enabled for this installation (the default start_suite path),
+# although no video-story route enqueues one: generation answers 201
+# synchronously and every export serves stored bytes. What a pass establishes
+# is that pick duration + source material → Generate → shot-order preview →
+# approve → download serves bytes byte-equal to the delivered export route;
+# that the pre-approval download and the post-regenerate download are refused
+# in the server's own `approval_required`/`approval_stale` words; that the
+# native-publish attempt is refused in the server's own `publisher_unsupported`
+# words with no account action; that a bare milestone states every empty case
+# honestly; and that nothing fires before its explicit control and no request
+# ever aims at a video host. It is NOT evidence that any video was
+# synthesized, any footage was rendered, or anything was published: no
+# renderer, encoder or transport exists, and the suite asserts no request
+# ever aims at one.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a twenty-seventh disposable PostgreSQL and published application at $video_story_base_url"
+start_suite video_story "$video_story_base_url" "$video_story_log_file" \
+  "$repo_root/$publish_dir/access-token-video-story"
+
+echo "==> seeding one approved story with one selected screenshot, plus one bare milestone"
+seed_video_story_panel "$video_story_base_url" "$(cat "$repo_root/$publish_dir/access-token-video-story")"
+
+echo "==> npm run test:e2e (real browser against $video_story_base_url)"
+run_suite "$video_story_base_url" "$video_story_log_file" "$repo_root/$publish_dir/access-token-video-story" \
+  tests/video-story-panel.spec.ts
 stop_suite

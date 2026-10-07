@@ -49,6 +49,10 @@ public static class VideoStoryEndpoints
             .MapPost("/api/assets/{assetId:guid}/video-story/publish", PublishAsync)
             .RequireOwnerSession();
 
+        endpoints
+            .MapGet("/api/milestones/{milestoneId:guid}/video-story", ReadForMilestoneAsync)
+            .RequireOwnerSession();
+
         return endpoints;
     }
 
@@ -96,6 +100,35 @@ public static class VideoStoryEndpoints
                 generated.VoiceRevision,
                 [.. generated.ImageOrder.Select(id => id.ToString("D"))]),
             statusCode: StatusCodes.Status201Created);
+    }
+
+    private static async Task<IResult> ReadForMilestoneAsync(
+        Guid milestoneId,
+        HttpContext context,
+        IVideoStoryService stories,
+        IOwnerAccessService access,
+        CancellationToken cancellationToken)
+    {
+        var owner = await OwnerScopeAsync(context, access, cancellationToken).ConfigureAwait(false);
+
+        // "This milestone has no script yet" is a normal state on a fresh installation, not a
+        // missing resource, so the route answers 200 with a null asset rather than a 404. The
+        // milestone itself is still read and still 404s when it is absent or in another scope,
+        // so the empty answer cannot be used to probe for another owner's milestones.
+        var summary = await stories
+            .ReadForMilestoneAsync(owner, milestoneId, cancellationToken)
+            .ConfigureAwait(false);
+
+        return Results.Json(
+            new VideoStorySummaryResponse(
+                summary.AssetId,
+                summary.Revision,
+                summary.BodyHash,
+                summary.DurationSeconds,
+                summary.ShotCount,
+                summary.EvidenceRevision,
+                summary.VoiceRevision,
+                summary.UpdatedAt));
     }
 
     private static async Task<IResult> PublishAsync(
@@ -258,3 +291,18 @@ internal sealed record GeneratedVideoStoryResponse(
     long EvidenceRevision,
     long VoiceRevision,
     IReadOnlyList<string> ImageOrder);
+
+/// <summary>One milestone's video-story asset, as the discovery read answers it.</summary>
+/// <remarks>
+/// <c>AssetId</c> is null when the milestone holds no script yet — a normal empty state, never
+/// a 404. Every other member is the stored head's, or zero/empty when absent.
+/// </remarks>
+internal sealed record VideoStorySummaryResponse(
+    Guid? AssetId,
+    long Revision,
+    string BodyHash,
+    int DurationSeconds,
+    int ShotCount,
+    long EvidenceRevision,
+    long VoiceRevision,
+    DateTimeOffset UpdatedAt);

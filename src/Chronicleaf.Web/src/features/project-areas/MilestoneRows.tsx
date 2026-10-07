@@ -18,6 +18,7 @@ import { MediumPackPanel } from '../content-pack-panels/MediumPackPanel';
 import { XiaohongshuPackPanel } from '../content-pack-panels/XiaohongshuPackPanel';
 import { ScreenshotCapturePanel } from '../screenshot-capture/ScreenshotCapturePanel';
 import { ScreenshotPicker } from '../screenshot-curation/ScreenshotPicker';
+import { VideoStoryPanel } from '../video-story-panel/VideoStoryPanel';
 import {
   milestoneTypeLabel,
   type Milestone,
@@ -399,6 +400,20 @@ function MilestoneRow({
             milestoneId={milestone.id}
             milestoneTitle={milestone.title}
             archived={archived}
+          />
+
+          {/* VIDEO-STORY-PANEL-001/002. The reviewed shot list for that milestone's approved
+              story and selected screenshots: duration and source-material pickers over
+              delivered routes, an inert shot-order preview, a press-only approval and an
+              approval-gated exact-byte download. It sits under the capture panel because it
+              depicts the pictures curation selected below it in the evidence area - scripts
+              only, no synthesis, no footage, no publication. */}
+          <VideoStoryPanel
+            projectId={milestone.projectId}
+            milestoneId={milestone.id}
+            milestoneTitle={milestone.title}
+            archived={archived}
+            confirmed={milestone.status === 'confirmed'}
           />
         </>
       ) : null}

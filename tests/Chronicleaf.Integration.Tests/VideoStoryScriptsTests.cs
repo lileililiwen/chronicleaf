@@ -617,6 +617,115 @@ public sealed class VideoStoryScriptsTests(ChronicleafPostgresFixture postgres)
     }
 
     // ==============================================================================================
+    // VIDEO-STORY-PANEL-003: the discovery read names the milestone's script, or a null asset.
+    // ==============================================================================================
+
+    [Fact]
+    public async Task VideoStory_Panel_Discovery_empty_milestone_reads_null_asset_not_404()
+    {
+        await using var fixture = await ArrangeAsync("vs_panel_empty");
+
+        using var discovered = await fixture.Owner.GetAsync(
+            $"/api/milestones/{fixture.MilestoneId:D}/video-story");
+
+        Assert.Equal(HttpStatusCode.OK, discovered.StatusCode);
+        var answer = JsonDocument.Parse(await discovered.Content.ReadAsStringAsync());
+        Assert.Equal(
+            JsonValueKind.Null,
+            answer.RootElement.GetProperty("assetId").ValueKind);
+        Assert.Equal(0, answer.RootElement.GetProperty("revision").GetInt64());
+
+        // An absent milestone is still the delivered 404, so the empty answer cannot be used
+        // to probe for another owner's milestones.
+        using var absent = await fixture.Owner.GetAsync(
+            $"/api/milestones/{Guid.NewGuid():D}/video-story");
+        Assert.Equal(HttpStatusCode.NotFound, absent.StatusCode);
+
+        // And a sessionless read is still 401 before any scope is consulted.
+        using var anonymous = fixture.Host.CreateClient();
+        using var noSession = await anonymous.GetAsync(
+            $"/api/milestones/{fixture.MilestoneId:D}/video-story");
+        Assert.Equal(HttpStatusCode.Unauthorized, noSession.StatusCode);
+    }
+
+    [Fact]
+    public async Task VideoStory_Panel_Discovery_names_the_generated_script()
+    {
+        await using var fixture = await ArrangeAsync("vs_panel_named");
+
+        var scripted = await GenerateAsync(fixture, 30, ThirtySecondShots(fixture));
+
+        using var discovered = await fixture.Owner.GetAsync(
+            $"/api/milestones/{fixture.MilestoneId:D}/video-story");
+
+        Assert.Equal(HttpStatusCode.OK, discovered.StatusCode);
+        var answer = JsonDocument.Parse(await discovered.Content.ReadAsStringAsync());
+        Assert.Equal(scripted, answer.RootElement.GetProperty("assetId").GetGuid());
+        Assert.Equal(1, answer.RootElement.GetProperty("revision").GetInt64());
+        Assert.Equal(30, answer.RootElement.GetProperty("durationSeconds").GetInt32());
+        Assert.Equal(3, answer.RootElement.GetProperty("shotCount").GetInt32());
+        Assert.Equal(
+            fixture.BundleRevision,
+            answer.RootElement.GetProperty("evidenceRevision").GetInt64());
+        Assert.Equal(
+            fixture.VoiceRevision,
+            answer.RootElement.GetProperty("voiceRevision").GetInt64());
+        Assert.False(string.IsNullOrWhiteSpace(
+            answer.RootElement.GetProperty("bodyHash").GetString()));
+    }
+
+    // ==============================================================================================
+    // VIDEO-STORY-PANEL-004: a raw edit of a script body is refused and the export is untouched.
+    // ==============================================================================================
+
+    [Fact]
+    public async Task VideoStory_Panel_Edit_is_refused_and_the_approved_export_still_serves()
+    {
+        await using var fixture = await ArrangeAsync("vs_panel_edit");
+
+        var scripted = await GenerateAsync(fixture, 15, FifteenSecondShots(fixture));
+        await ApproveAsync(fixture.Owner, scripted, 1, fixture.BundleRevision);
+
+        using var before = await fixture.Owner.GetAsync(
+            $"/api/assets/{scripted:D}/export?format=video-story");
+        Assert.Equal(HttpStatusCode.OK, before.StatusCode);
+        var beforeBytes = await before.Content.ReadAsByteArrayAsync();
+
+        // Shots are immutable and re-scripting is the update path: a hand edit would store bytes
+        // the export answers 500 for, so it is refused naming the field with the remedy.
+        using var refused = await fixture.Owner.SendAsync(
+            await fixture.Owner.Patch(
+                $"/api/assets/{scripted:D}",
+                1,
+                new
+                {
+                    expectedRevision = 1,
+                    bodyMarkdown = "Edited storyboard text that is not canonical JSON.",
+                    title = (string?)null,
+                }));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
+        var failure = JsonDocument.Parse(await refused.Content.ReadAsStringAsync());
+        Assert.Equal("validation_failed", failure.RootElement.GetProperty("code").GetString());
+        Assert.True(
+            failure.RootElement.GetProperty("fieldErrors").TryGetProperty("bodyMarkdown", out _),
+            $"the refusal names bodyMarkdown: {await refused.Content.ReadAsStringAsync()}");
+
+        // Nothing was stored: the head is still revision 1 and the approved export serves the
+        // identical bytes it served before the refused write.
+        using var reread = await fixture.Owner.GetAsync($"/api/assets/{scripted:D}");
+        Assert.Equal(
+            1,
+            JsonDocument.Parse(await reread.Content.ReadAsStringAsync())
+                .RootElement.GetProperty("currentRevision").GetInt64());
+
+        using var after = await fixture.Owner.GetAsync(
+            $"/api/assets/{scripted:D}/export?format=video-story");
+        Assert.Equal(HttpStatusCode.OK, after.StatusCode);
+        Assert.Equal(beforeBytes, await after.Content.ReadAsByteArrayAsync());
+    }
+
+    // ==============================================================================================
     // Shot builders.
     // ==============================================================================================
 

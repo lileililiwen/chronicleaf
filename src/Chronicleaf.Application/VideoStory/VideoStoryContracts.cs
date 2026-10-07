@@ -77,6 +77,25 @@ public sealed record VideoStoryExport(
     Guid AssetId,
     long Revision);
 
+/// <summary>One milestone's video-story asset, as the discovery read answers it (VIDEO-STORY-PANEL-003).</summary>
+/// <param name="AssetId">The story asset, or <c>null</c> when the milestone holds no script yet.</param>
+/// <param name="Revision">The head revision, or 0 when there is no script.</param>
+/// <param name="BodyHash">Lowercase SHA-256 hex over the stored storyboard bytes, or empty when absent.</param>
+/// <param name="DurationSeconds">The runtime the stored shots cover, or 0 when absent.</param>
+/// <param name="ShotCount">How many shots the stored script holds, or 0 when absent.</param>
+/// <param name="EvidenceRevision">The evidence head the stored revision is grounded in, or 0 when absent.</param>
+/// <param name="VoiceRevision">The voice profile revision the stored revision carries, or 0 when absent.</param>
+/// <param name="UpdatedAt">When the asset last changed.</param>
+public sealed record VideoStorySummary(
+    Guid? AssetId,
+    long Revision,
+    string BodyHash,
+    int DurationSeconds,
+    int ShotCount,
+    long EvidenceRevision,
+    long VoiceRevision,
+    DateTimeOffset UpdatedAt);
+
 /// <summary>
 /// The video-story use cases (VIDEO-STORY-SCRIPTS-001/002).
 /// </summary>
@@ -104,6 +123,20 @@ public interface IVideoStoryService
         OwnerScope owner,
         Guid milestoneId,
         GenerateVideoStoryRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads the milestone's video-story asset for discovery (VIDEO-STORY-PANEL-003).
+    /// </summary>
+    /// <remarks>
+    /// A milestone with no script is a normal empty state, not a missing resource: the answer
+    /// carries a null asset rather than a 404. The milestone itself is read and scoped first,
+    /// so an absent or foreign milestone is still the delivered 404.
+    /// </remarks>
+    /// <exception cref="Common.ResourceNotFoundException">The milestone is absent or in another scope (404).</exception>
+    Task<VideoStorySummary> ReadForMilestoneAsync(
+        OwnerScope owner,
+        Guid milestoneId,
         CancellationToken cancellationToken = default);
 
     /// <summary>

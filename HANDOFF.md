@@ -2,7 +2,7 @@
 
 ## Current state — 2026-10-07
 
-Fifty-six changes implemented, verified and archived, each with exactly two commits (implementation/
+Fifty-seven changes implemented, verified and archived, each with exactly two commits (implementation/
 tests/archive, then this HANDOFF-only pointer). No `current_spec` remains: every drainable change is
 archived and the two owner-BLOCKED changes are deferred to ROADMAP for later
 (`semantic-narrative-retrieval`: demand plus embedding model/provider/dimension and consent policy;
@@ -67,6 +67,7 @@ packages parked intact in `openspec/deferred/`, nothing active remains).
 | 54 | `publish-from-variant` | `eb58a43` | `openspec/specs/publish-from-variant/spec.md` |
 | 55 | `static-blog-export-ui` | `39b5b9f` | `openspec/specs/static-blog-export-ui/spec.md` |
 | 56 | `publisher-adapter-panels` | `13b2cb8` | `openspec/specs/publisher-adapter-panels/spec.md` |
+| 57 | `content-pack-panels` | `b7d1dd7` | `openspec/specs/content-pack-panels/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -2162,3 +2163,45 @@ clicks); name preflight exit 0; `openspec validate --all --strict
 `--skip-specs`. No `current_spec` remains: the two owner-BLOCKED changes stay
 deferred to ROADMAP. Deployment stays `deployable: false`; there is no remote,
 no push and no publication.
+`content-pack-panels` is archived
+(`b7d1dd7`, canonical spec `openspec/specs/content-pack-panels/spec.md`): read/export Web UI
+for the three delivered content-pack backends, with no sending and no auto-post. One Web
+feature `content-pack-panels` mounted in the Content area under the variant panel: LinkedIn
+derive/select over `?kinds=packs`, inert copy preview with owned media and voice attribution,
+exact-byte download behind a live approval, and the native-publish attempt refused verbatim as
+`publisher_unsupported` 422; Medium approved-article picker with HTML/Markdown preview plus
+manifest note, ZIP download and the same verbatim refusal with no upstream call; Xiaohongshu
+derive under the milestone-title first candidate with editable title/tags/cover/CTA, edit-after-
+approval ending the download until re-approval, and the no-login/no-post boundary stated on
+screen. Archived milestones offer preview and download only. The one backend addition the UI
+contract genuinely needed is `CONTENT-PACK-PANELS-004`: `GET /api/milestones/{id}/assets`
+serves the two pack kinds only under `?kinds=packs` (default read byte-identical for every
+older caller, unknown kinds 422), with one list fact per pack suite. Per-entity CRUD: pack
+derivation Create=POST adapt / Read=GET asset + `?kinds=packs` list / Update=PATCH edit /
+Delete=no route → named future package `content-asset-retirement`; pack revision Create=PATCH
+/ Read=GET asset+review / Update=conditional PATCH / Delete=immutable by trigger (by design);
+approval Create=POST approve / Read=GET review / Update=re-approve head / Delete=POST unapprove
+(history kept); export artifact Create/Read/Update=GET export re-checked per call /
+Delete=N/A (bytes never stored). Out-of-scope holes named, none silent:
+`content-asset-retirement`, plus upstream `publication-history`. Read that package's own
+boundary before extending it, and note the two defects verification found: the milestone
+asset list served only the seven variant formats, so no pack picker could select over a
+delivered route (repaired additively with `?kinds=packs`, default proven unchanged by the same
+facts); and the new suite's first run failed its own POST-footprint assertion because full
+paths sort by asset id rather than by control (derive names the story, approval/refusal name
+the pack) — now compared by route suffix. Evidence, all run by the implementer rather than
+taken on report: `npm ci`, `tsc --noEmit`, `vite build` green; dotnet stages 10/10 variants,
+11/11 linkedin (incl. new `Linkedin_Panels_derived_copy_is_listed_for_select`, also proven
+1/1 alone), 13/13 xiaohongshu (incl. new `Xiaohongshu_Panels_derived_pack_is_listed_for_select`,
+also proven 1/1 alone), each stage asserted to select its tests; `bash scripts/e2e.sh` exit 0
+with 116/116 Playwright across all 25 database-isolated browser suites
+(29/3/6/4/4/3/3/4/4/3/2/5/3/2/3/3/2/2/3/3/6/5/3/7/4 in suite order; suite 25 is the new
+`content-pack-panels` 4/4 on its own PostgreSQL at port 5105 — LinkedIn derive → preview →
+approve → byte-equal download → verbatim `publisher_unsupported` 422 with the three-control
+POST footprint; Medium select → byte-equal ZIP download → verbatim refusal; Xiaohongshu derive
+→ edit ends download → re-approve → byte-equal download → verbatim refusal; honest empty
+states; armed counters proving no POST before its control and no request ever leaving
+loopback); `git diff --check` clean; name preflight exit 0; `openspec validate --all --strict
+--no-interactive` 59/59 before and after the archive, which used no `--skip-specs`. No
+`current_spec` remains: the two owner-BLOCKED changes stay deferred to ROADMAP. Deployment
+stays `deployable: false`; there is no remote, no push and no publication.

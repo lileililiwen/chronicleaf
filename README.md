@@ -88,14 +88,21 @@ sibling and is the only place a sibling path may appear.
 
 ## Running it
 
+Prerequisites: a running Docker daemon, .NET SDK 10 (`global.json` pins the
+10.0.1xx line; `dotnet tool restore` provides the `ef` tool), Node 24 with npm
+(the web build is also done inside Docker, but this path builds it locally),
+plus `openssl` and `curl`. If host ports `5432` or `5080` are already taken,
+pick free ones and change the `-p` mapping, the connection-string `Port`, the
+`--urls` port and `Chronicleaf__PublicOrigin` together — the four must agree.
+
 A full operator run, in order. The web client must be built first (it is not produced by
 `dotnet run`), the access token must be kept by the operator (the README shows the exact
 command that loses it), and the singleton `installation` row must be inserted before
 `/api/ready` returns 200.
 
 ```sh
-# 1. The web client. This is the build the API publishes into wwwroot, so it must be done
-#    before the API is published; `dotnet run` alone serves a 503 web_assets_unavailable.
+# 1. The web client. `scripts/publish.sh` in step 5 repeats this build, so skip this
+#    step when you publish through it; it is only needed for a `dotnet run` layout.
 (cd src/Chronicleaf.Web && npm ci && npm run build)
 
 # 2. PostgreSQL. The single database the application uses; the `chronicleaf` role is created
@@ -133,21 +140,35 @@ docker exec -i chronicleaf-db psql -U chronicleaf -d chronicleaf -c \
   "INSERT INTO installation (id, schema_version, created_at) VALUES (gen_random_uuid(), 1, now()) ON CONFLICT (id) DO NOTHING;"
 
 # 5. Publish the API with the web client in place, then run it. scripts/publish.sh does
-#    the web build, the dotnet publish, and the wwwroot copy in one step; the resulting
-#    binary is the one to run.
+#    the web build, the dotnet publish, and the wwwroot copy in one step. The dll must be
+#    started with the publish directory as the working directory: the web root resolves to
+#    `<cwd>/wwwroot`, so running it from anywhere else serves the page as 503
+#    web_assets_unavailable even though the build exists on disk. (The alternative is
+#    setting `Chronicleaf__WebRootPath` to the publish `wwwroot`.)
 bash scripts/publish.sh dist/run
+cd dist/run
 ConnectionStrings__Chronicleaf="$ConnectionStrings__Chronicleaf" \
 Chronicleaf__AccessTokenHash="$Chronicleaf__AccessTokenHash" \
 Chronicleaf__PublicOrigin="$Chronicleaf__PublicOrigin" \
 Chronicleaf__EncryptionKeyFile="$Chronicleaf__EncryptionKeyFile" \
-  dotnet dist/run/Chronicleaf.Api.dll --urls http://127.0.0.1:5080
+  dotnet Chronicleaf.Api.dll --urls http://127.0.0.1:5080
 ```
 
 Open `http://127.0.0.1:5080/` in a browser; the sign-in page asks for the token whose
 plaintext is in `~/.chronicleaf-access-token`. `curl` callers use
 `POST /api/session` with body `{"accessToken":"<the plaintext>"}` and the
 `Origin: http://127.0.0.1:5080` header; the response is `204 No Content` and the session
-cookie is set in the same call. A wrong token is one generic `invalid_credentials` (the
+cookie is set in the same call. Concretely, keeping cookies across calls:
+
+```sh
+printf '{"accessToken":"%s"}' "$(cat ~/.chronicleaf-access-token)" > /tmp/login.json
+curl -X POST http://127.0.0.1:5080/api/session \
+  -H 'Content-Type: application/json' -H 'Origin: http://127.0.0.1:5080' \
+  -c /tmp/cookies.txt -b /tmp/cookies.txt --data-binary @/tmp/login.json
+curl -b /tmp/cookies.txt http://127.0.0.1:5080/api/session  # {"authenticated":true,...}
+```
+
+A wrong token is one generic `invalid_credentials` (the
 code never distinguishes wrong, malformed or rotated), five wrong tries inside fifteen
 minutes from one client key turns into `too_many_requests` until the window expires
 (durable, so a restart is not a fresh allowance). A database that is unreachable makes

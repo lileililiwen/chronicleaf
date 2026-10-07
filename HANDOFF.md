@@ -1832,7 +1832,46 @@ UI was shipped: the design's React timeline is satisfied API-observable (generat
 the validated shot list, preview/edit/approval stay the review package's routes), and no
 new browser suite was added. Deployment stays `deployable: false`; there is no remote, no
 push and no publication.
-One further DEMAND-GATED change (`agency-weekly-reports`) awaits recorded demand before
-activation.
-
-current_spec: agency-weekly-reports
+`agency-weekly-reports` is archived
+(`6457c2b`, canonical spec `openspec/specs/agency-weekly-reports/spec.md`): deterministic
+evidence-based client weekly progress reports over the delivered agency, milestone, evidence,
+media and HTML-export contracts, with Community behavior unchanged. No provider, no model,
+no consent, no portal, no invoicing and no email sending anywhere: generation re-renders
+confirmed window milestones, complete screenshot items and the owner's own explicit notes
+through a fixed template. One `weekly_reports` row per generation carrying the client, the
+local week, the UTC window, the project set, the attribution hash, the canonical source
+refs, the inputs hash, the optional idempotency key, the body and its hash, plus the
+approval stamp (revision, body/attribution/source bindings); a regeneration appends the next
+revision, never rewrites one. `POST /api/clients/{id}/weekly-reports`
+{projectIds, weekStart YYYY-MM-DD, timeZone IANA, inProgressNotes, nextWeekNotes,
+idempotencyKey} bounds exactly seven local calendar dates converted per-bound to UTC (a
+project outside the client is `weekly_report_project_outside_client` 422 before any render,
+an unknown id the delivered 404, an archived client `client_archived` 409, a drifted key
+`weekly_report_idempotency_conflict` 409); the approval binds the revision/body/attribution/
+sources under If-Match (428 missing, 409 stale revision); `GET .../export?format=markdown|html`
+serves the approved bytes (never approved `approval_required`, moved attribution/evidence
+`approval_stale`), HTML through the shared sanitizing adapter with the approval-covered
+pictures (missing bytes `media_unavailable`). Migration `20261022090000` adds the table with
+hex/week/window/revision checks and the per-week plus keyed unique indexes; the store is raw
+SQL like the LinkedIn/Xiaohongshu selection stores, so the EF model is untouched. Read that
+package's own boundary before extending it, and note the one defect verification found: a
+`DateTimeOffset` formatted with `O` renders `+00:00`, not `Z`, so the window assertions pin
+the `+00:00` spelling. Evidence, all run by the implementer rather than taken on report:
+`bash scripts/verify.sh` exit 0 (`GATE_EXIT=0`, `set -o pipefail`) with the platform-feed
+stage and the new `agency weekly report tests` stage (11/11, filter asserted by the gate to
+select 11) alongside all existing stages, `npm ci`, `tsc` + `vite build`,
+`dotnet build --nologo --no-incremental` 0 errors with the same 12 pre-existing warning grep
+lines at HEAD (zero added, baseline confirmed before changes plus one new-nullable warning
+found and fixed back to baseline), name preflight exit 0, and `openspec validate --all
+--strict --no-interactive` 54/54 before and after the archive, which used no `--skip-specs`.
+No Web UI was shipped: the design's React editor is satisfied API-observable (report read
+serves the full body with per-project sections and source refs), and no new browser suite
+was added - the screenshots scenario runs on the capture package's own host with its
+declared recording provider. Deployment stays `deployable: false`; there is no remote, no
+push and no publication.
+No `current_spec` remains: this was the last drainable spec. Two changes stay ACTIVE in
+`openspec/changes` and are held, not named as current: `semantic-narrative-retrieval` is
+BLOCKED on owner decisions (demand, embedding model/provider/dimension and consent policy
+must be selected; owner Chronicleaf maintainer), and `hosted-managed-ai` is BLOCKED on
+owner decisions (Managed AI provider/model/quota/unit weights and financial settlement
+policy; owner Chronicleaf maintainer).

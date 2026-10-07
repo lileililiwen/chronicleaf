@@ -19,6 +19,7 @@ export const TAGLINE = 'Turn project milestones into publishable stories.';
  */
 export const NAV_ENTRIES = [
   { label: 'Projects', path: '/', testid: 'nav-projects' },
+  { label: 'Clients', path: '/clients', testid: 'nav-clients' },
   { label: 'Timeline', path: '/timeline', testid: 'nav-timeline' },
   { label: 'Operations', path: '/operations', testid: 'nav-operations' },
   { label: 'Credentials', path: '/settings/credentials', testid: 'nav-credentials' },

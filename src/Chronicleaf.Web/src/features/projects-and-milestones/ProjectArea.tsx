@@ -10,6 +10,8 @@ import { TimelinePage } from '../milestone-timeline/TimelinePage';
 import { SettingsPage } from '../community-access/Settings/SettingsPage';
 import { ProjectSubNav } from '../project-areas/ProjectSubNav';
 import { areaOfSegment } from '../project-areas/areas';
+import { ClientDetail } from '../agency-area/ClientDetail';
+import { ClientsArea } from '../agency-area/ClientsArea';
 import { getMilestone, getProject, listProjects } from './api';
 import { useMilestone, useProject, useProjects } from './useRecords';
 import { segmentsOf } from './useRoute';
@@ -46,6 +48,8 @@ import type { OwnerSessionState } from '../community-access/useOwnerSession';
  * - `/projects/{id}/milestones/new` recording a milestone
  * - `/projects/{id}/milestones/{milestoneId}` editing a milestone
  * - `/timeline` the project timeline picker (PRODUCT-SHELL-UX-001)
+ * - `/clients` the agency Clients area (AGENCY-AREA-UI-001/002/003)
+ * - `/clients/{id}` one agency client with its projects and weekly reports
  * - `/operations` the background jobs panel (BACKGROUND-JOBS-001/002)
  * - `/operations/{id}` one background job
  * - `/settings` session internals plus the credentials link (PRODUCT-SHELL-UX-001)
@@ -63,6 +67,16 @@ export function ProjectArea({ route, session }: { readonly route: Route; readonl
 
   if (segments[0] === 'timeline' && segments.length === 1) {
     return <TimelinePage onNavigate={navigate} />;
+  }
+
+  if (segments[0] === 'clients') {
+    if (segments.length === 1) {
+      return <ClientsArea onNavigate={navigate} />;
+    }
+
+    if (segments.length === 2) {
+      return <ClientDetail clientId={segments[1]} onNavigate={navigate} />;
+    }
   }
 
   if (segments[0] === 'operations') {

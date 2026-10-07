@@ -93,6 +93,7 @@ publish_variant_base_url="${CHRONICLEAF_PUBLISH_VARIANT_BASE_URL:-http://127.0.0
 static_blog_export_base_url="${CHRONICLEAF_STATIC_BLOG_EXPORT_BASE_URL:-http://127.0.0.1:5103}"
 adapter_panels_base_url="${CHRONICLEAF_ADAPTER_PANELS_BASE_URL:-http://127.0.0.1:5104}"
 content_pack_base_url="${CHRONICLEAF_CONTENT_PACK_BASE_URL:-http://127.0.0.1:5105}"
+agency_base_url="${CHRONICLEAF_AGENCY_BASE_URL:-http://127.0.0.1:5106}"
 log_file="$repo_root/$publish_dir/server.log"
 evidence_log_file="$repo_root/$publish_dir/server-evidence.log"
 credentials_log_file="$repo_root/$publish_dir/server-credentials.log"
@@ -118,6 +119,7 @@ publish_variant_log_file="$repo_root/$publish_dir/server-publish-variant.log"
 static_blog_export_log_file="$repo_root/$publish_dir/server-static-blog-export.log"
 adapter_panels_log_file="$repo_root/$publish_dir/server-adapter-panels.log"
 content_pack_log_file="$repo_root/$publish_dir/server-content-pack.log"
+agency_log_file="$repo_root/$publish_dir/server-agency.log"
 key_file=""
 
 # The operator key for this run: 32 random bytes in a temporary file outside the repository and
@@ -158,7 +160,8 @@ cleanup() {
     "$repo_root/$publish_dir/access-token-publish-variant" \
     "$repo_root/$publish_dir/access-token-static-blog-export" \
     "$repo_root/$publish_dir/access-token-adapter-panels" \
-    "$repo_root/$publish_dir/access-token-content-pack"
+    "$repo_root/$publish_dir/access-token-content-pack" \
+    "$repo_root/$publish_dir/access-token-agency"
   # So is the encryption key: it is removed whether the run passed or failed.
   remove_key_file
   exit "$exit_status"
@@ -1506,6 +1509,139 @@ seed_content_pack_panels() {
   fi
 }
 
+# ---------------------------------------------------------------------------------------------
+# The agency-area fixture: Client A with Agency Project 1 and Agency Project 2 (each with one
+# confirmed in-window milestone carrying manual evidence), Client B with Agency Project 3, and
+# one archived client — everything through the delivered routes with the real access token and
+# a real antiforgery value, so the clients, the milestones, their confirmations, their evidence
+# and their assignments are records the product itself created.
+#
+# What the seed deliberately does NOT create: no weekly-report row. A report is rendered by the
+# delivered deterministic template, so the browser's own generate calls produce every row the
+# suite asserts about — including the DST-week window, the empty week, the regeneration
+# revision and the drifted evidence. A seed that inserted a row would prove the panel can read
+# a fixture, not that it can drive the flow.
+#
+# The milestones fall in the DST week starting 2026-03-08 America/New_York (Mar 8 00:00 EST is
+# 05:00Z, Mar 15 00:00 EDT is 04:00Z), so the suite's window assertion is about a real
+# transition rather than a comment claiming one.
+# ---------------------------------------------------------------------------------------------
+seed_agency_area() {
+  local origin="$1"
+  local token="$2"
+  local cookie_jar
+  cookie_jar="$(mktemp -d)/cookies.txt"
+
+  local antiforgery
+  antiforgery="$(curl --silent --show-error --cookie-jar "$cookie_jar" --cookie "$cookie_jar" \
+    --data "{\"accessToken\":\"${token}\"}" \
+    -H 'Content-Type: application/json' \
+    "${origin}/api/session" >/dev/null && \
+    curl --silent --show-error --cookie-jar "$cookie_jar" --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/session/antiforgery" | jq -r '.token')"
+
+  if [ -z "$antiforgery" ] || [ "$antiforgery" = "null" ]; then
+    echo "the agency-area seed could not read an antiforgery value from ${origin}" >&2
+    return 1
+  fi
+
+  seed_agency_project() {
+    curl --silent --show-error --cookie "$cookie_jar" \
+      --data "{\"name\":\"$1\",\"description\":\"$2\"}" \
+      -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+      -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+      "${origin}/api/projects"
+  }
+
+  local project1 project1_revision project2 project2_revision project3 project3_revision
+  project1="$(seed_agency_project "Agency Project 1" "First project of Client A." | jq -r '.id')"
+  project2="$(seed_agency_project "Agency Project 2" "Second project of Client A." | jq -r '.id')"
+  project3="$(seed_agency_project "Agency Project 3" "Only project of Client B." | jq -r '.id')"
+
+  if [ -z "$project1" ] || [ "$project1" = "null" ] || [ -z "$project2" ] || [ "$project2" = "null" ] || [ -z "$project3" ] || [ "$project3" = "null" ]; then
+    echo "the agency-area seed could not create its projects" >&2
+    return 1
+  fi
+
+  seed_agency_milestone() {
+    local milestone
+    milestone="$(curl --silent --show-error --cookie "$cookie_jar" \
+      --data "{\"title\":\"$2\",\"version\":\"0.1.0\",\"occurredAt\":\"$3\",\"type\":\"feature\",\"notes\":\"Recorded by the e2e seed.\",\"knownLimitations\":[],\"nextSteps\":[]}" \
+      -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+      -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+      "${origin}/api/projects/$1/milestones" | jq -r '.id')"
+
+    if [ -z "$milestone" ] || [ "$milestone" = "null" ]; then
+      echo "the agency-area seed could not create milestone $2" >&2
+      return 1
+    fi
+
+    # A manual milestone is confirmed by the act of saving it, so no confirm call is needed;
+    # the manual note is the evidence the weekly template renders.
+    curl --silent --show-error --cookie "$cookie_jar" \
+      --data '{"notes":"Shipped behind the weekly-report seed.","expectedRevision":0}' \
+      -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+      -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 0' \
+      "${origin}/api/milestones/${milestone}/evidence/manual" >/dev/null
+  }
+
+  seed_agency_milestone "$project1" "Agency milestone one" "2026-03-10T12:00:00Z"
+  seed_agency_milestone "$project2" "Agency milestone two" "2026-03-11T12:00:00Z"
+  seed_agency_milestone "$project3" "Agency milestone three" "2026-03-12T12:00:00Z"
+
+  seed_agency_client() {
+    curl --silent --show-error --cookie "$cookie_jar" \
+      --data "{\"name\":\"$1\",\"notes\":\"$2\"}" \
+      -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+      -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+      "${origin}/api/clients"
+  }
+
+  local client_a client_b archived_client archived_revision
+  client_a="$(seed_agency_client "Client A" "Two projects, reported weekly." | jq -r '.id')"
+  client_b="$(seed_agency_client "Client B" "One project, reported weekly." | jq -r '.id')"
+  archived_client="$(seed_agency_client "Archived Client" "Reads stay, new work refuses." | jq -r '.id')"
+  archived_revision="$(curl --silent --show-error --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/clients/${archived_client}" | jq -r '.revision')"
+
+  if [ -z "$client_a" ] || [ "$client_a" = "null" ] || [ -z "$client_b" ] || [ "$client_b" = "null" ] || [ -z "$archived_client" ] || [ "$archived_client" = "null" ]; then
+    echo "the agency-area seed could not create its clients" >&2
+    return 1
+  fi
+
+  seed_agency_assign() {
+    local revision
+    revision="$(curl --silent --show-error --cookie "$cookie_jar" \
+      -H 'Accept: application/json' "${origin}/api/projects/$1" | jq -r '.revision')"
+
+    curl --silent --show-error --request PATCH --cookie "$cookie_jar" \
+      --data "{\"clientId\":\"$2\"}" \
+      -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+      -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H "If-Match: ${revision}" \
+      "${origin}/api/projects/$1/client" >/dev/null
+  }
+
+  seed_agency_assign "$project1" "$client_a"
+  seed_agency_assign "$project2" "$client_a"
+  seed_agency_assign "$project3" "$client_b"
+
+  curl --silent --show-error --request DELETE --cookie "$cookie_jar" \
+    -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H "If-Match: ${archived_revision}" \
+    "${origin}/api/clients/${archived_client}" >/dev/null
+
+  # The seed reads its own rows back and refuses to continue unless the
+  # hierarchy it built is the hierarchy that is stored.
+  local members
+  members="$(curl --silent --show-error --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/clients/${client_a}/projects" | jq -r '.items | length')"
+
+  if [ "$members" != "2" ]; then
+    echo "the agency-area seed grouped ${members} projects under Client A, expected 2" >&2
+    return 1
+  fi
+}
+
 seed_review_rows() {
   local container="$1"
   local database_name="$2"
@@ -2558,4 +2694,39 @@ seed_content_pack_panels "$content_pack_base_url" "$(cat "$repo_root/$publish_di
 echo "==> npm run test:e2e (real browser against $content_pack_base_url)"
 run_suite "$content_pack_base_url" "$content_pack_log_file" "$repo_root/$publish_dir/access-token-content-pack" \
   tests/content-pack-panels.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 26: agency area. It needs Client A with two in-window evidenced
+# milestones, Client B with one project, and one archived client — and neither
+# an assignment nor an archive can be undone through the UI (clearing moves a
+# project back to personal but never un-archives a client), while a weekly
+# report, once generated, cannot be removed at all — so its own installation,
+# its own database and its own published instance, for the same reason suites
+# 2 to 25 each have one.
+#
+# Jobs stay enabled for this installation (the default start_suite path),
+# although no agency route enqueues one: client CRUD, assignment, generation,
+# approval and export all answer synchronously. What a pass establishes is
+# that client CRUD → assign → generate (DST week) → per-project preview →
+# approve → Markdown/HTML downloads serve bytes byte-equal to the delivered
+# export route; that refusal codes are verbatim (`client_archived`,
+# `weekly_report_project_outside_client`, `approval_required`,
+# `approval_stale`, `revision_conflict`, `not_found`); that the archived
+# client stays readable with assignment disabled; that regeneration appends a
+# revision starting unapproved; that evidence drift ends the export until
+# re-approval; that empty states are honest; and that nothing posts before its
+# control and no request ever leaves loopback. It is NOT evidence of any
+# portal, invoicing or email behavior: no such route or control exists.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a twenty-sixth disposable PostgreSQL and published application at $agency_base_url"
+start_suite agency "$agency_base_url" "$agency_log_file" \
+  "$repo_root/$publish_dir/access-token-agency"
+
+echo "==> seeding Client A (two evidenced projects), Client B (one project), one archived client"
+seed_agency_area "$agency_base_url" "$(cat "$repo_root/$publish_dir/access-token-agency")"
+
+echo "==> npm run test:e2e (real browser against $agency_base_url)"
+run_suite "$agency_base_url" "$agency_log_file" "$repo_root/$publish_dir/access-token-agency" \
+  tests/agency-area-ui.spec.ts
 stop_suite

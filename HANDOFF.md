@@ -1797,5 +1797,42 @@ suite was added. Deployment stays `deployable: false`; there is no remote, no pu
 publication.
 Two further DEMAND-GATED changes (`agency-weekly-reports`, `video-story-scripts`) await
 recorded demand before activation.
+`video-story-scripts` is archived
+(`cfaacc1`, canonical spec `openspec/specs/video-story-scripts/spec.md`): reviewed
+evidence-based storyboard scripts for the 15, 30 and 60-second runtimes over the delivered
+evidence, voice, asset, review, media and curation contracts, with Community behavior
+unchanged. One `video-story` asset per milestone with draft revisions holding the canonical
+storyboard JSON (`format=video-story`, shots with millisecond intervals covering the runtime
+exactly, evidence citations, limitations); `POST /api/milestones/{id}/video-stories`
+validates contiguity from zero, minimum 500ms per shot, at most 30 shots, cut|fade handoffs,
+depicted pictures that are complete selected screenshots with readable bytes, cited evidence
+the frozen bundle holds, shot-level voice and figure grounding, and current evidence/voice
+heads (unapproved source `approval_required`, moved heads 409, anything else structural
+`invalid_story_schema` 422 with nothing stored); `GET /api/assets/{id}/export?format=video-story`
+serves the approved revision as a deterministic ZIP (`storyboard.json` exact approved bytes,
+`narration.md`, `caption.srt`, `images/` in first-appearance order, `manifest.json` with
+SHA-256 per file; draft `approval_required`, edited `approval_stale` - including a newer
+unapproved revision and an explicit old-revision request - missing bytes
+`media_unavailable`); `POST .../video-story/publish` refuses `publisher_unsupported` 422
+with no operation, no audit row and no outbound request - no renderer, no encoder, no screen
+recording and no transport exist behind it. Source approval never approves the derivative; a
+later voice edit cannot reach the stored snapshot; owner free-text figures are refused per
+shot when the evidence never stated them. Read that package's own boundary before extending
+it, and note the one defect verification found: the first select names
+`expectedBundleRevision: 1` (the manual bundle), not null - a null body value is 422, and the
+suite's first run failed seven times on exactly that. Evidence, all run by the implementer
+rather than taken on report: `bash scripts/verify.sh` exit 0 (`GATE_EXIT=0`,
+`set -o pipefail`, every filtered stage asserted to select at least one test) with the
+platform-feed stage and the new `video story scripts tests` stage (7/7) alongside all
+existing stages, `npm ci`, `tsc` + `vite build`, `dotnet build --nologo --no-incremental`
+0 errors with the same 12 pre-existing warning grep lines at HEAD (zero added, baseline
+confirmed before changes), name preflight exit 0, and `openspec validate --all --strict
+--no-interactive` 54/54 before and after the archive, which used no `--skip-specs`. No Web
+UI was shipped: the design's React timeline is satisfied API-observable (generate answers
+the validated shot list, preview/edit/approval stay the review package's routes), and no
+new browser suite was added. Deployment stays `deployable: false`; there is no remote, no
+push and no publication.
+One further DEMAND-GATED change (`agency-weekly-reports`) awaits recorded demand before
+activation.
 
-current_spec: video-story-scripts
+current_spec: agency-weekly-reports

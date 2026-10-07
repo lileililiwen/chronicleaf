@@ -1895,3 +1895,31 @@ BLOCKED on owner decisions (demand, embedding model/provider/dimension and conse
 must be selected; owner Chronicleaf maintainer), and `hosted-managed-ai` is BLOCKED on
 owner decisions (Managed AI provider/model/quota/unit weights and financial settlement
 policy; owner Chronicleaf maintainer).
+`feature-trigger-panels` is archived
+(`de36bc7`, canonical spec `openspec/specs/feature-trigger-panels/spec.md`): reachable Web
+trigger panels for the six delivered backends the 2026-10-07 trigger audit found unreachable
+(team invitations/members, hosted tenancy, evolution image approve/preview/download, evolution
+GIF approve/preview/download, publication status/reconcile plus asset publish entry, journey
+publish plus the anonymous public journey view at `/journey/:slug`). Web-only: no migration,
+no route, no envelope, no binding, no evidence rule; every panel calls only the delivered
+routes named in its design through the existing `api.ts` per-feature convention, surfaces the
+server's `{code,message,traceId,fieldErrors?}` envelope verbatim, and follows existing ad-hoc
+panel conventions with no taste changes. Read that package's own boundary before extending
+it, and note the one defect verification corrected during implementation: the journey PUT
+carries its revision in the body (`expectedRevision`), not in If-Match — the service reads no
+header there, and a journey that exists without one is the route's own 428. Evidence, all run
+by the implementer rather than taken on report: `CHRONICLEAF_E2E=1 bash scripts/verify.sh`
+exit 0 (`GATE_EXIT=0`, `set -o pipefail`) with the platform-feed stage and every existing
+filtered stage alongside `npm ci`, `tsc` + `vite build`, then 16/16 Playwright across the six
+new database-isolated browser suites (3/3 team, 3/3 tenancy, 2/2 evolution images, 2/2
+evolution GIFs, 3/3 publications, 3/3 journey) plus the full pre-existing browser set
+unmodified and green; name preflight exit 0; `git diff --check` clean; `openspec validate
+--all --strict --no-interactive` 54/54 before and after the archive, which used no
+`--skip-specs`. The suites assert empty/generic states only against the real API host with
+the real database (Community installation: Hosted routes answer the server's own
+`oidc_login_failed`, unknown receipts/journeys the delivered 404); no secret-bearing
+captures. Deployment stays `deployable: false`; there is no remote, no push and no
+publication.
+No `current_spec` remains: the line is removed, not pointed elsewhere. `product-shell-ux`
+is taste-blocked (four owner taste answers outstanding before it can start) and is not
+selected.

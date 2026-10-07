@@ -2,7 +2,7 @@
 
 ## Current state — 2026-10-07
 
-Fifty-three changes implemented, verified and archived, each with exactly two commits (implementation/
+Fifty-four changes implemented, verified and archived, each with exactly two commits (implementation/
 tests/archive, then this HANDOFF-only pointer). No `current_spec` remains: every drainable change is
 archived and the two owner-BLOCKED changes are deferred to ROADMAP for later
 (`semantic-narrative-retrieval`: demand plus embedding model/provider/dimension and consent policy;
@@ -64,6 +64,7 @@ packages parked intact in `openspec/deferred/`, nothing active remains).
 | 51 | `video-story-scripts` | `cfaacc1` | `openspec/specs/video-story-scripts/spec.md` |
 | 52 | `agency-weekly-reports` | `6457c2b` | `openspec/specs/agency-weekly-reports/spec.md` |
 | 53 | `project-area-ia` | `66d041b` | `openspec/specs/project-area-ia/spec.md` |
+| 54 | `publish-from-variant` | `eb58a43` | `openspec/specs/publish-from-variant/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -2036,3 +2037,42 @@ capture bears a credential, token, PAT, Actor UUID, or session value. Deployment
 No `current_spec` remains: the line is removed entirely. The two owner-BLOCKED packages
 (`semantic-narrative-retrieval`, `hosted-managed-ai`) stay parked in `openspec/deferred/`
 with their material decisions unresolved.
+
+`publish-from-variant` is archived
+(`eb58a43`, canonical spec `openspec/specs/publish-from-variant/spec.md`): the P0
+publishing dead-end is closed — a Publish action on each approved content-variant row
+opens a target picker over the new private `GET /api/publisher-targets` (registry
+descriptors served verbatim: target id, draft/publish support, reconcile support,
+export-only flag; anonymous 401), then preview → explicit confirm → receipt through
+the delivered publisher routes via one shared `PublishForm` also hosting the Publish
+area's send half. Hand-typed asset/target ids in `PublicationPanel` and asset ids in
+`JourneyPanel` are milestone/draft/variant/target pickers over delivered list routes;
+the attempt lookup stays hand-typed (no list route exists → future package
+`publication-history`); non-draft story assets beyond the per-milestone draft read have
+no list route (→ future package `asset-inventory`). Read that package's own boundary
+before extending it, and note the two defects verification found: a configured GitHub
+Pages section registered its target and then 500ed every preview/publish inside the
+options factory (positional record, no binder-visible constructor — repaired here with
+its own requirement and production-registration test; the five sibling adapters keep
+the defect → future package `publisher-options-binding`); and the delivered confirm
+flow told 202 from 200 by `'operationId' in answered` while both wire shapes carry
+`operationId`, so an identical resubmission read as a fresh acceptance (the shared
+form discriminates on `created`, repairing both hosts by construction). Evidence, all
+run by the implementer rather than taken on report: `CHRONICLEAF_E2E=1 bash
+scripts/verify.sh` green through every dotnet stage + `npm ci`, `tsc` + `vite build`,
+scaffolding lint and the browser stage on re-run (the first attempt failed once at
+suite-1 startup with its error truncated by the `tail -60` pipe — startup reproduced
+clean immediately after and the full re-run exited 0, so the failure is recorded as a
+transient, not hidden); new backend tests 4/4 (`TargetList_001` ×3 in
+`PublisherContractTests`, `Configured_section_registers_target_and_serves_preview` in
+`PublisherGithubPagesAdapterTests` — same existing stages, no gate change); `bash
+scripts/e2e.sh` exit 0 with 102/102 Playwright across all 22 database-isolated browser
+suites (29/3/6/4/4/3/3/4/4/3/2/5/3/2/3/3/2/2/3/3/6/5 in suite order; suite 22 is the new
+`publish-from-variant` 5/5 on its own PostgreSQL at port 5102 with token
+`access-token-publish-variant`, a name-only github-pages repository configured and the
+dispatch loop silenced, so the receipt stays at the committed acceptance and no byte
+leaves for a remote side); name preflight exit 0; `openspec validate --all --strict
+--no-interactive` 56/56 before and after the archive, which used no `--skip-specs`;
+`git diff --check` clean (the one trailing-blank-line note is the archiver's own
+output in the promoted spec, the same shape every canonical spec carries). Deployment
+stays `deployable: false`; there is no remote, no push and no publication.

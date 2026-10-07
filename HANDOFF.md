@@ -2,7 +2,7 @@
 
 ## Current state — 2026-10-07
 
-Fifty-four changes implemented, verified and archived, each with exactly two commits (implementation/
+Fifty-five changes implemented, verified and archived, each with exactly two commits (implementation/
 tests/archive, then this HANDOFF-only pointer). No `current_spec` remains: every drainable change is
 archived and the two owner-BLOCKED changes are deferred to ROADMAP for later
 (`semantic-narrative-retrieval`: demand plus embedding model/provider/dimension and consent policy;
@@ -65,6 +65,7 @@ packages parked intact in `openspec/deferred/`, nothing active remains).
 | 52 | `agency-weekly-reports` | `6457c2b` | `openspec/specs/agency-weekly-reports/spec.md` |
 | 53 | `project-area-ia` | `66d041b` | `openspec/specs/project-area-ia/spec.md` |
 | 54 | `publish-from-variant` | `eb58a43` | `openspec/specs/publish-from-variant/spec.md` |
+| 55 | `static-blog-export-ui` | `39b5b9f` | `openspec/specs/static-blog-export-ui/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -2076,3 +2077,39 @@ leaves for a remote side); name preflight exit 0; `openspec validate --all --str
 `git diff --check` clean (the one trailing-blank-line note is the archiver's own
 output in the promoted spec, the same shape every canonical spec carries). Deployment
 stays `deployable: false`; there is no remote, no push and no publication.
+`static-blog-export-ui` is archived
+(`39b5b9f`, canonical spec `openspec/specs/static-blog-export-ui/spec.md`): the
+archived design's never-built React ExportPreview now exists — an `ExportPanel`
+beside `PublicationPanel`/`JourneyPanel` in the Publish area that picks milestones
+over the delivered list route, checks draft-plus-variant assets labelled by kind
+and revision (never a bare id), splits the checked selection into included (live
+approval) versus excluded (the server's own status word) via per-asset review
+reads, and sends the export POST only from the explicit Export button with a fresh
+idempotency key and `expectedSelectionHash: null` (no route serves a hash to pin
+against, so a client-computed one would be invented). The panel polls the delivered
+status route to its terminal word with no invented progress and offers the ZIP
+download only on `succeeded`; every refusal renders `code: message` verbatim.
+No backend change: the three export routes stay byte-identical. Each export is
+watched by the operation id its own request answered (no list route serves past
+exports → future package `export-history`); the frozen bindings have no read route
+(server-internal by design); re-export is a new Create, never an Update; no Delete
+verb exists for jobs, bindings, manifests or bytes. Read that package's own
+boundary before extending it, and note the one defect verification found: the
+error notice first rendered the envelope message only, whose words never contain
+the code, so the refusal suite's `approval_required` assertion failed while the
+server and panel otherwise agreed — the notice now renders `code: message`
+verbatim. Evidence, all run by the implementer rather than taken on report: `npm
+ci`, `tsc --noEmit` clean, `vite build` green, `bash scripts/e2e.sh` exit 0 with
+105/105 Playwright across all 23 database-isolated browser suites
+(29/3/6/4/4/3/3/4/4/3/2/5/3/2/3/3/2/2/3/3/6/5/3 in suite order; suite 23 is the new
+`static-blog-export-ui` 3/3 on its own PostgreSQL at port 5103 with jobs enabled so
+the worker really builds — select → export → `succeeded` with the server's
+post/image/digest counts, offered download byte-equal to the delivered download
+route with `PK` magic, `approval_required` verbatim with no download offered,
+honest empty state, and an armed counter proving no export POST before the click);
+name preflight exit 0; `openspec validate --all --strict --no-interactive` 57/57
+before and after the archive, which used no `--skip-specs`. One stale-prose note
+left untouched by rule: `project-area-ia.spec.ts` still names its structural test
+"each of the 20 panels" while the Publish area now mounts 21 — prose only, no
+assertion counts panels. Deployment stays `deployable: false`; there is no remote,
+no push and no publication.

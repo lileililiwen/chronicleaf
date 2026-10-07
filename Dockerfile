@@ -98,6 +98,7 @@ COPY src/Chronicleaf.AI/Providers/Anthropic/Chronicleaf.AI.Anthropic.csproj src/
 COPY src/Chronicleaf.AI/Providers/OpenRouter/Chronicleaf.AI.OpenRouter.csproj src/Chronicleaf.AI/Providers/OpenRouter/
 COPY src/Chronicleaf.AI/Providers/Ollama/Chronicleaf.AI.Ollama.csproj src/Chronicleaf.AI/Providers/Ollama/
 COPY src/Chronicleaf.GitHub/Chronicleaf.GitHub.csproj src/Chronicleaf.GitHub/
+COPY src/Chronicleaf.Publishers/Chronicleaf.Publishers.csproj src/Chronicleaf.Publishers/
 COPY src/Chronicleaf.Capture/Chronicleaf.Capture.csproj src/Chronicleaf.Capture/
 COPY src/Chronicleaf.Application/Chronicleaf.Application.csproj src/Chronicleaf.Application/
 COPY src/Chronicleaf.Infrastructure/Chronicleaf.Infrastructure.csproj src/Chronicleaf.Infrastructure/
@@ -106,6 +107,7 @@ RUN dotnet restore src/Chronicleaf.Api/Chronicleaf.Api.csproj
 COPY src/Chronicleaf.Core/ src/Chronicleaf.Core/
 COPY src/Chronicleaf.AI/ src/Chronicleaf.AI/
 COPY src/Chronicleaf.GitHub/ src/Chronicleaf.GitHub/
+COPY src/Chronicleaf.Publishers/ src/Chronicleaf.Publishers/
 COPY src/Chronicleaf.Capture/ src/Chronicleaf.Capture/
 COPY src/Chronicleaf.Application/ src/Chronicleaf.Application/
 COPY src/Chronicleaf.Infrastructure/ src/Chronicleaf.Infrastructure/

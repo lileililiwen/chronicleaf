@@ -2,6 +2,7 @@ import { useOwnerSession } from './features/community-access/useOwnerSession';
 import type { OwnerSessionState } from './features/community-access/useOwnerSession';
 import { SessionGate } from './features/community-access/Settings/SessionGate';
 import { ProjectArea } from './features/projects-and-milestones/ProjectArea';
+import { PublicJourneyView } from './features/journey-publish/PublicJourneyView';
 
 /** Visible identity of the shell. Asserted by the browser fixtures in e2e/shell.spec.ts. */
 export const BRAND = 'Chronicleaf';
@@ -30,6 +31,44 @@ const LATER_ITEMS = [
 ];
 
 export function App() {
+  // The public journey view is anonymous and sessionless: it reads only the public
+  // projection route, so it renders before - and without - the session gate. The path is
+  // read statically because every arrival here is a full document load: the server answers
+  // every non-API path with this same document, and no in-app navigation pushes a
+  // /journey/* path.
+  const journeySlug = journeySlugOf(window.location.pathname);
+
+  if (journeySlug !== null) {
+    return (
+      <main className="shell" data-testid="app-shell">
+        <section className="shell__panel">
+          <h1 className="shell__brand" data-testid="brand">
+            {BRAND}
+          </h1>
+          <p className="shell__tagline" data-testid="tagline">
+            {TAGLINE}
+          </p>
+          <PublicJourneyView slug={journeySlug} />
+        </section>
+      </main>
+    );
+  }
+
+  return <SignedInApp />;
+}
+
+/** The slug of a public journey path, or null when this is not one. */
+function journeySlugOf(path: string): string | null {
+  const segments = path.split('/').filter((segment) => segment.length > 0);
+
+  if (segments.length === 2 && segments[0] === 'journey' && segments[1].length > 0) {
+    return segments[1];
+  }
+
+  return null;
+}
+
+function SignedInApp() {
   // The session is read once, here. One reader means one antiforgery value is ever in flight, so a
   // value this page issues for a mutation cannot be rotated away by another component asking for
   // its own at the same moment.

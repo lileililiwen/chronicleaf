@@ -82,6 +82,12 @@ review_base_url="${CHRONICLEAF_REVIEW_BASE_URL:-http://127.0.0.1:5091}"
 candidates_base_url="${CHRONICLEAF_CANDIDATES_BASE_URL:-http://127.0.0.1:5092}"
 narrative_base_url="${CHRONICLEAF_NARRATIVE_BASE_URL:-http://127.0.0.1:5093}"
 variants_base_url="${CHRONICLEAF_VARIANTS_BASE_URL:-http://127.0.0.1:5094}"
+team_base_url="${CHRONICLEAF_TEAM_BASE_URL:-http://127.0.0.1:5095}"
+tenancy_base_url="${CHRONICLEAF_TENANCY_BASE_URL:-http://127.0.0.1:5096}"
+evolution_base_url="${CHRONICLEAF_EVOLUTION_BASE_URL:-http://127.0.0.1:5097}"
+gif_base_url="${CHRONICLEAF_GIF_BASE_URL:-http://127.0.0.1:5098}"
+publication_base_url="${CHRONICLEAF_PUBLICATION_BASE_URL:-http://127.0.0.1:5099}"
+journey_base_url="${CHRONICLEAF_JOURNEY_BASE_URL:-http://127.0.0.1:5100}"
 log_file="$repo_root/$publish_dir/server.log"
 evidence_log_file="$repo_root/$publish_dir/server-evidence.log"
 credentials_log_file="$repo_root/$publish_dir/server-credentials.log"
@@ -96,6 +102,12 @@ review_log_file="$repo_root/$publish_dir/server-review.log"
 candidates_log_file="$repo_root/$publish_dir/server-candidates.log"
 narrative_log_file="$repo_root/$publish_dir/server-narrative.log"
 variants_log_file="$repo_root/$publish_dir/server-variants.log"
+team_log_file="$repo_root/$publish_dir/server-team.log"
+tenancy_log_file="$repo_root/$publish_dir/server-tenancy.log"
+evolution_log_file="$repo_root/$publish_dir/server-evolution.log"
+gif_log_file="$repo_root/$publish_dir/server-gif.log"
+publication_log_file="$repo_root/$publish_dir/server-publication.log"
+journey_log_file="$repo_root/$publish_dir/server-journey.log"
 key_file=""
 
 # The operator key for this run: 32 random bytes in a temporary file outside the repository and
@@ -129,7 +141,10 @@ cleanup() {
     "$repo_root/$publish_dir/access-token-generation" "$repo_root/$publish_dir/access-token-github" \
     "$repo_root/$publish_dir/access-token-capture" "$repo_root/$publish_dir/access-token-drafts" \
     "$repo_root/$publish_dir/access-token-curation" "$repo_root/$publish_dir/access-token-timeline" \
-    "$repo_root/$publish_dir/access-token-review"
+    "$repo_root/$publish_dir/access-token-review" "$repo_root/$publish_dir/access-token-team" \
+    "$repo_root/$publish_dir/access-token-tenancy" "$repo_root/$publish_dir/access-token-evolution" \
+    "$repo_root/$publish_dir/access-token-gif" "$repo_root/$publish_dir/access-token-publication" \
+    "$repo_root/$publish_dir/access-token-journey"
   # So is the encryption key: it is removed whether the run passed or failed.
   remove_key_file
   exit "$exit_status"
@@ -1662,4 +1677,125 @@ seed_variants "$variants_base_url" "$(cat "$repo_root/$publish_dir/access-token-
 echo "==> npm run test:e2e (real browser against $variants_base_url)"
 run_suite "$variants_base_url" "$variants_log_file" "$repo_root/$publish_dir/access-token-variants" \
   tests/content-asset-variants.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 15: team invitations and members. It needs a signed-in owner on an installation that
+# holds no invitation beyond what the suite itself attempts, and an invitation cannot be
+# un-issued through the UI - so its own installation, its own database and its own published
+# instance, for the same reason suites 1 to 14 each have one.
+#
+# Nothing here is seeded: the empty states are asserted before anything is attempted, and the
+# failures assert the server's own Community refusal verbatim with no row invented. What a
+# pass here establishes is that the triggers reach the delivered team routes and report what
+# the server says. It is NOT evidence that an invitation was issued, a role was changed or a
+# grant was stored on this host: this installation is Community single-tenant, and the .NET
+# suite is where the Hosted flows are proven.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a fifteenth disposable PostgreSQL and published application at $team_base_url"
+start_suite team "$team_base_url" "$team_log_file" "$repo_root/$publish_dir/access-token-team"
+
+echo "==> npm run test:e2e (real browser against $team_base_url)"
+run_suite "$team_base_url" "$team_log_file" "$repo_root/$publish_dir/access-token-team" \
+  tests/team-panels.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 16: hosted tenancy. It needs a signed-in caller whose tenants the views list, and a
+# tenant cannot be removed through the UI - so its own installation, its own database and its
+# own published instance, for the same reason suite 15 is its own.
+#
+# Nothing here is seeded: this installation is Community single-tenant, so the server
+# answers every tenancy route with its own generic refusal and the views show that answer
+# verbatim with no tenant invented. What a pass here establishes is that the views call
+# only the delivered tenancy routes and render whatever the server answers. It is NOT
+# evidence that a tenant was created, selected or imported on this host, and the .NET suite
+# is where the Hosted flows are proven.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a sixteenth disposable PostgreSQL and published application at $tenancy_base_url"
+start_suite tenancy "$tenancy_base_url" "$tenancy_log_file" "$repo_root/$publish_dir/access-token-tenancy"
+
+echo "==> npm run test:e2e (real browser against $tenancy_base_url)"
+run_suite "$tenancy_base_url" "$tenancy_log_file" "$repo_root/$publish_dir/access-token-tenancy" \
+  tests/tenancy-views.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 17: evolution images. It needs a project the browser records itself, and a project
+# cannot be removed once it exists - so its own installation, its own database and its own
+# published instance, for the same reason suites 10 to 16 each have one.
+#
+# Nothing here is seeded: the empty state is asserted before anything is rendered, and the
+# failure renders against an unknown milestone so the server refuses rather than draws.
+# What a pass here establishes is that the panel lists, renders, approves and links what
+# the server stores, with preview and download as route links rather than synthesised
+# pictures. It is NOT evidence that a comparison depicts real screenshots on this host: no
+# candidate exists here.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a seventeenth disposable PostgreSQL and published application at $evolution_base_url"
+start_suite evolution "$evolution_base_url" "$evolution_log_file" "$repo_root/$publish_dir/access-token-evolution"
+
+echo "==> npm run test:e2e (real browser against $evolution_base_url)"
+run_suite "$evolution_base_url" "$evolution_log_file" "$repo_root/$publish_dir/access-token-evolution" \
+  tests/evolution-images.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 18: evolution GIFs. It needs a project the browser records itself, and a project
+# cannot be removed once it exists - so its own installation, its own database and its own
+# published instance, for the same reason suite 17 is its own.
+#
+# Nothing here is seeded: the empty state is asserted before anything is rendered, and the
+# failure renders against an unknown milestone so the server refuses rather than draws.
+# What a pass here establishes is that the panel lists, renders, approves and links what
+# the server stores, with preview, first-frame and download as route links rather than any
+# client-side animation. It is NOT evidence that an animation depicts real screenshots on
+# this host: no candidate exists here.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting an eighteenth disposable PostgreSQL and published application at $gif_base_url"
+start_suite gif "$gif_base_url" "$gif_log_file" "$repo_root/$publish_dir/access-token-gif"
+
+echo "==> npm run test:e2e (real browser against $gif_base_url)"
+run_suite "$gif_base_url" "$gif_log_file" "$repo_root/$publish_dir/access-token-gif" \
+  tests/evolution-gifs.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 19: publications. It needs a project the browser records itself, and a project
+# cannot be removed once it exists - so its own installation, its own database and its own
+# published instance, for the same reason suites 17 and 18 each have one.
+#
+# Nothing here is seeded: the empty state is asserted before anything is named, and the
+# failures read and reconcile an unknown attempt so the server refuses in its own words.
+# What a pass here establishes is that the panel reads and reconciles what the server
+# stores and that a preview authorizes nothing. It is NOT evidence that anything was sent
+# anywhere: no publish is attempted here and no transport is contacted.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a nineteenth disposable PostgreSQL and published application at $publication_base_url"
+start_suite publication "$publication_base_url" "$publication_log_file" "$repo_root/$publish_dir/access-token-publication"
+
+echo "==> npm run test:e2e (real browser against $publication_base_url)"
+run_suite "$publication_base_url" "$publication_log_file" "$repo_root/$publish_dir/access-token-publication" \
+  tests/publications.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 20: journey publish and the public view. It needs a project the browser records
+# itself, and a project cannot be removed once it exists - so its own installation, its own
+# database and its own published instance, for the same reason suites 17 to 19 each have
+# one.
+#
+# Nothing here is seeded: the empty state is asserted before anything is previewed, the
+# preview refusal proves unapproved content cannot be published, and the unknown slug is
+# the route's own 404 page with no redirect and no guessed content. What a pass here
+# establishes is that the private triggers reach the delivered journey routes and the
+# public view shows only what the projection route returns. It is NOT evidence that a
+# journey was published on this host: nothing here is approved, so nothing can be.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a twentieth disposable PostgreSQL and published application at $journey_base_url"
+start_suite journey "$journey_base_url" "$journey_log_file" "$repo_root/$publish_dir/access-token-journey"
+
+echo "==> npm run test:e2e (real browser against $journey_base_url)"
+run_suite "$journey_base_url" "$journey_log_file" "$repo_root/$publish_dir/access-token-journey" \
+  tests/journey-publish.spec.ts
 stop_suite

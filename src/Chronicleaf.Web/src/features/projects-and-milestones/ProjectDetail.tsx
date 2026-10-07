@@ -16,6 +16,10 @@ import { LocalRepositoryPanel } from '../local-git-evidence/LocalRepositoryPanel
 import { GroundedMarkdownDraftPanel } from '../grounded-markdown-drafts/GroundedMarkdownDraftPanel';
 import { MarkdownReviewPanel } from '../markdown-review-export/MarkdownReviewPanel';
 import { ContentVariantPanel } from '../content-asset-variants/ContentVariantPanel';
+import { EvolutionImagePanel } from '../evolution-images/EvolutionImagePanel';
+import { EvolutionGifPanel } from '../evolution-gifs/EvolutionGifPanel';
+import { JourneyPanel } from '../journey-publish/JourneyPanel';
+import { PublicationPanel } from '../publications/PublicationPanel';
 import { NarrativeMemoryPanel } from '../narrative-memory/NarrativeMemoryPanel';
 import { MilestoneEvidencePanel } from '../milestone-evidence/MilestoneEvidencePanel';
 import { LlmProviderArea } from '../llm-provider-contract/LlmProviderArea';
@@ -308,6 +312,40 @@ export function ProjectDetail({
       {record !== null ? (
         <ProjectTimeline projectId={record.id} onEditMilestone={onEditMilestone} />
       ) : null}
+
+      {/*
+        FEATURE-TRIGGER-PANELS-003. Rendered version comparisons of this project's selected
+        screenshots. It sits beside the timeline because an evolution is about the project,
+        not about any one milestone: nothing in it can be confirmed from here, so there is
+        no milestone to scope it to. Candidates are never compared and nothing here promotes
+        one, because curation owns that.
+      */}
+      {record !== null ? <EvolutionImagePanel projectId={record.id} /> : null}
+
+      {/*
+        FEATURE-TRIGGER-PANELS-004. Rendered chronological animations of this project's
+        selected screenshots. It sits beside the image panel because it consumes the same
+        selection contract - selected screenshots in canvas order with the authorized
+        playback - and adds the one thing a still comparison has not: motion. No animation
+        is synthesised client-side.
+      */}
+      {record !== null ? <EvolutionGifPanel projectId={record.id} /> : null}
+
+      {/*
+        FEATURE-TRIGGER-PANELS-005. Publication status, reconcile and the publish entry from
+        an asset. It sits beside the content panels because a publish sends an approved
+        asset through a named target: the preview authorizes nothing, and the publish carries
+        a separate explicit confirmation. Nothing is published by rendering.
+      */}
+      {record !== null ? <PublicationPanel /> : null}
+
+      {/*
+        FEATURE-TRIGGER-PANELS-006. The explicit public projection of this project: preview
+        what a selection would publish, publish or revoke it, and follow the link to the
+        anonymous page. It sits last because a journey depicts approved entries other panels
+        already produced. Unpublished material never renders on the public page.
+      */}
+      {record !== null ? <JourneyPanel projectId={record.id} /> : null}
     </section>
   );
 }

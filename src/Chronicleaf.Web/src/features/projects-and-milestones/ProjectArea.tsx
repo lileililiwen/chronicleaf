@@ -4,6 +4,8 @@ import { ProjectDetail } from './ProjectDetail';
 import { ProjectEditor } from './ProjectEditor';
 import { OperationsArea } from '../background-jobs/OperationsArea';
 import { CredentialsArea } from '../credential-vault/CredentialsArea';
+import { TeamPanel } from '../team-panels/TeamPanel';
+import { TenancyPanel } from '../tenancy-views/TenancyPanel';
 import { getMilestone, getProject, listProjects } from './api';
 import { useMilestone, useProject, useProjects } from './useRecords';
 import { segmentsOf, useRoute } from './useRoute';
@@ -31,6 +33,8 @@ import { segmentsOf, useRoute } from './useRoute';
  * - `/operations` the background jobs panel (BACKGROUND-JOBS-001/002)
  * - `/operations/{id}` one background job
  * - `/settings/credentials` the credential settings surface (CREDENTIAL-VAULT-001/002)
+ * - `/settings/team` the team invitation and member triggers (FEATURE-TRIGGER-PANELS-001)
+ * - `/settings/tenancy` the hosted tenancy triggers (FEATURE-TRIGGER-PANELS-002)
  */
 export function ProjectArea() {
   const { path, navigate } = useRoute();
@@ -45,7 +49,7 @@ export function ProjectArea() {
   }
 
   if (segments[0] === 'settings') {
-    return <CredentialsArea path={segments.join('/')} onNavigate={navigate} />;
+    return <SettingsArea path={segments.join('/')} onNavigate={navigate} />;
   }
 
   if (segments[0] === 'projects') {
@@ -120,15 +124,69 @@ function DashboardRoute({ onNavigate }: { readonly onNavigate: (to: string) => v
   const projects = useProjects(listProjects);
 
   return (
-    <Dashboard
-      projects={projects.data}
-      loading={projects.loading}
-      onOpen={(projectId) => onNavigate(`/projects/${projectId}`)}
-      onCreate={() => onNavigate('/projects/new')}
-      onList={() => onNavigate('/projects')}
-      onCredentials={() => onNavigate('/settings/credentials')}
-    />
+    <>
+      <p className="view__crumbs" data-testid="settings-links">
+        <button type="button" className="link" onClick={() => onNavigate('/settings/team')} data-testid="settings-team-link">
+          Team
+        </button>{' '}
+        <button type="button" className="link" onClick={() => onNavigate('/settings/tenancy')} data-testid="settings-tenancy-link">
+          Tenancy
+        </button>
+      </p>
+      <Dashboard
+        projects={projects.data}
+        loading={projects.loading}
+        onOpen={(projectId) => onNavigate(`/projects/${projectId}`)}
+        onCreate={() => onNavigate('/projects/new')}
+        onList={() => onNavigate('/projects')}
+        onCredentials={() => onNavigate('/settings/credentials')}
+      />
+    </>
   );
+}
+
+/**
+ * The settings area: credentials, team invitations and hosted tenancy.
+ *
+ * One map for the three settings surfaces, beside the existing route map. Each surface
+ * keeps its own panel and its own routes; what this adds is the choice between them.
+ */
+function SettingsArea({
+  path,
+  onNavigate,
+}: {
+  readonly path: string;
+  readonly onNavigate: (to: string) => void;
+}) {
+  const segments = path.split('/').filter((segment) => segment.length > 0);
+
+  if (segments[1] === 'team' && segments.length === 2) {
+    return (
+      <>
+        <p className="view__crumbs">
+          <button type="button" className="link" onClick={() => onNavigate('/')} data-testid="settings-back">
+            ← Dashboard
+          </button>
+        </p>
+        <TeamPanel />
+      </>
+    );
+  }
+
+  if (segments[1] === 'tenancy' && segments.length === 2) {
+    return (
+      <>
+        <p className="view__crumbs">
+          <button type="button" className="link" onClick={() => onNavigate('/')} data-testid="settings-back">
+            ← Dashboard
+          </button>
+        </p>
+        <TenancyPanel />
+      </>
+    );
+  }
+
+  return <CredentialsArea path={path} onNavigate={onNavigate} />;
 }
 
 function ProjectsRoute({ onNavigate }: { readonly onNavigate: (to: string) => void }) {

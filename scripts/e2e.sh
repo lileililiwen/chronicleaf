@@ -90,6 +90,7 @@ publication_base_url="${CHRONICLEAF_PUBLICATION_BASE_URL:-http://127.0.0.1:5099}
 journey_base_url="${CHRONICLEAF_JOURNEY_BASE_URL:-http://127.0.0.1:5100}"
 area_base_url="${CHRONICLEAF_AREA_BASE_URL:-http://127.0.0.1:5101}"
 publish_variant_base_url="${CHRONICLEAF_PUBLISH_VARIANT_BASE_URL:-http://127.0.0.1:5102}"
+static_blog_export_base_url="${CHRONICLEAF_STATIC_BLOG_EXPORT_BASE_URL:-http://127.0.0.1:5103}"
 log_file="$repo_root/$publish_dir/server.log"
 evidence_log_file="$repo_root/$publish_dir/server-evidence.log"
 credentials_log_file="$repo_root/$publish_dir/server-credentials.log"
@@ -112,6 +113,7 @@ publication_log_file="$repo_root/$publish_dir/server-publication.log"
 journey_log_file="$repo_root/$publish_dir/server-journey.log"
 area_log_file="$repo_root/$publish_dir/server-area.log"
 publish_variant_log_file="$repo_root/$publish_dir/server-publish-variant.log"
+static_blog_export_log_file="$repo_root/$publish_dir/server-static-blog-export.log"
 key_file=""
 
 # The operator key for this run: 32 random bytes in a temporary file outside the repository and
@@ -149,7 +151,8 @@ cleanup() {
     "$repo_root/$publish_dir/access-token-tenancy" "$repo_root/$publish_dir/access-token-evolution" \
     "$repo_root/$publish_dir/access-token-gif" "$repo_root/$publish_dir/access-token-publication" \
     "$repo_root/$publish_dir/access-token-journey" "$repo_root/$publish_dir/access-token-area" \
-    "$repo_root/$publish_dir/access-token-publish-variant"
+    "$repo_root/$publish_dir/access-token-publish-variant" \
+    "$repo_root/$publish_dir/access-token-static-blog-export"
   # So is the encryption key: it is removed whether the run passed or failed.
   remove_key_file
   exit "$exit_status"
@@ -1143,6 +1146,243 @@ SQL
   fi
 }
 
+# ---------------------------------------------------------------------------------------------
+# Suite 23 seed: one project, two confirmed milestones, one evidence bundle each, one
+# approved story on the first and one never-approved story on the second.
+#
+# Everything above the content tables is made through the running server's own routes with
+# the real access token and a real antiforgery value, so the project, the milestones, their
+# confirmation and their evidence are records the product itself created. Only the content
+# rows are inserted directly, and that is the same technique seed_operations uses and for
+# the same reason: a story is produced by a provider call, and this installation has an
+# adapter with an empty model allowlist, so there is nothing that could produce one
+# honestly here. No credential is stored: the export contract leases none.
+#
+# What the inserted rows are careful about (same contract as seed_publish_variant_rows):
+#   - body_markdown is hashed with sha256sum and the digest stored, because the database's
+#     check constraint refuses a row whose hash is not a hash.
+#   - voice_snapshot is the delivered canonical form of the English technical-blog voice,
+#     with the fingerprint the delivered hasher computes over values joined by U+001F.
+#   - The approved story's approval binds the head revision, the body hash, the evidence
+#     head and the empty media selection hash; the second story carries no approval row at
+#     all, so the review read answers `draft` and the export refuses `approval_required`.
+#   - Bodies are digit-free on purpose: the numeral rule refuses a figure that appears in
+#     no evidence item, and a fixture that violated it would be testing the wrong thing.
+#
+# `-i` is load-bearing on the docker exec heredocs below (see seed_publish_variant_rows),
+# and the rows are read back with the seed refusing to continue otherwise.
+# ---------------------------------------------------------------------------------------------
+seed_static_blog_export() {
+  local origin="$1"
+  local token="$2"
+  local cookie_jar
+  cookie_jar="$(mktemp -d)/cookies.txt"
+
+  local antiforgery
+  antiforgery="$(curl --silent --show-error --cookie-jar "$cookie_jar" --cookie "$cookie_jar" \
+    --data "{\"accessToken\":\"${token}\"}" \
+    -H 'Content-Type: application/json' \
+    "${origin}/api/session" >/dev/null && \
+    curl --silent --show-error --cookie-jar "$cookie_jar" --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/session/antiforgery" | jq -r '.token')"
+
+  if [ -z "$antiforgery" ] || [ "$antiforgery" = "null" ]; then
+    echo "the static-blog-export seed could not read an antiforgery value from ${origin}" >&2
+    return 1
+  fi
+
+  local project_id
+  project_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"name":"StaticBlogSite","description":"Approved static export by clicking."}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/projects" | jq -r '.id')"
+
+  if [ -z "$project_id" ] || [ "$project_id" = "null" ]; then
+    echo "the static-blog-export seed could not create its project" >&2
+    return 1
+  fi
+
+  # The seeded bodies are English, so the voice an approval is judged under must be too.
+  local voice_language
+  voice_language="$(curl --silent --show-error --request PUT --cookie "$cookie_jar" \
+    --data '{"presetId":"technical-blog","overrides":{"language":"en"}}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 0' \
+    "${origin}/api/projects/${project_id}/voice-profile" | jq -r '.effectiveValues.language')"
+
+  if [ "$voice_language" != "en" ]; then
+    echo "the static-blog-export seed could not set the project's voice" >&2
+    return 1
+  fi
+
+  local first second bare
+  first="$(seed_static_blog_export_milestone "$origin" "$cookie_jar" "$antiforgery" "$project_id" \
+    "Export source story" "The site now builds from approved stories.")"
+  second="$(seed_static_blog_export_milestone "$origin" "$cookie_jar" "$antiforgery" "$project_id" \
+    "Unexported draft story" "A story nobody approved stays out of every archive.")"
+  bare="$(seed_static_blog_export_milestone "$origin" "$cookie_jar" "$antiforgery" "$project_id" \
+    "Bare milestone" "A milestone with no draft states its empty case honestly.")"
+
+  # shellcheck disable=SC2086: the helper prints exactly four space-separated ids.
+  seed_static_blog_export_rows "$postgres_container" "chronicleaf_e2e_static_blog_export" \
+    $first "Export source story" yes
+  # shellcheck disable=SC2086: the helper prints exactly four space-separated ids.
+  seed_static_blog_export_rows "$postgres_container" "chronicleaf_e2e_static_blog_export" \
+    $second "Unexported draft story" no
+  # The bare milestone keeps no content rows at all: no draft, no variant, nothing to select.
+}
+
+seed_static_blog_export_milestone() {
+  local origin="$1"
+  local cookie_jar="$2"
+  local antiforgery="$3"
+  local project_id="$4"
+  local title="$5"
+  local note="$6"
+
+  local milestone_id
+  milestone_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data "{\"title\":\"${title}\",\"version\":\"0.1.0\",\"occurredAt\":\"2026-10-01T09:00:00Z\",\"type\":\"feature\",\"notes\":\"Recorded by the e2e seed.\",\"knownLimitations\":[],\"nextSteps\":[]}" \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/projects/${project_id}/milestones" | jq -r '.id')"
+
+  if [ -z "$milestone_id" ] || [ "$milestone_id" = "null" ]; then
+    echo "the static-blog-export seed could not create its milestone '${title}'" >&2
+    return 1
+  fi
+
+  curl --silent --show-error --cookie "$cookie_jar" \
+    --data "{\"notes\":\"${note}\",\"expectedRevision\":0}" \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 0' \
+    "${origin}/api/milestones/${milestone_id}/evidence/manual" >/dev/null
+
+  local bundle_id
+  bundle_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/milestones/${milestone_id}/evidence" \
+    | jq -r '.items[0].id')"
+
+  local evidence_item_id
+  evidence_item_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/milestones/${milestone_id}/evidence" \
+    | jq -r '.items[0].items[0].id')"
+
+  if [ -z "$evidence_item_id" ] || [ "$evidence_item_id" = "null" ]; then
+    echo "the static-blog-export seed could not read the evidence bundle the product created" >&2
+    return 1
+  fi
+
+  printf '%s %s %s %s\n' "$project_id" "$milestone_id" "$bundle_id" "$evidence_item_id"
+}
+
+seed_static_blog_export_rows() {
+  local container="$1"
+  local database_name="$2"
+  local project_id="$3"
+  local milestone_id="$4"
+  local bundle_id="$5"
+  local evidence_item_id="$6"
+  local title="$7"
+  local approve="$8"
+
+  local body summary voice_snapshot body_hash voice_hash media_hash fingerprint now
+  now="$(date -u +%Y-%m-%dT%H:%M:%S.000000Z)"
+
+  body=$(printf '# %s\n\nThe site now builds from approved stories.[^c1]\n\n## What changed\n\n- The site builds from approved stories.[^c1]\n\n## Problems solved\n\n- An approved story had no portable page.[^c2]\n\n## Known limitations\n\nOnly Linux is covered.[^c3]\n\n## Next steps\n\nCover the other platform.[^c4]\n\n[^c1]: The site now builds from approved stories.\n[^c2]: An approved story had no portable page.\n[^c3]: Only Linux is covered.\n[^c4]: Cover the other platform.\n' "$title")
+
+  body_hash="$(printf '%s' "$body" | sha256sum | cut -d' ' -f1)"
+
+  fingerprint="$(printf 'en\037restrained\037true\03760\037high\037low\037true\037革命性\037震撼\037game-changing\037exciting news' \
+    | sha256sum | cut -d' ' -f1)"
+
+  voice_snapshot="{\"presetId\":\"technical-blog\",\"profileRevision\":0,\"capturedAt\":\"${now}\",\"language\":\"en\",\"tone\":\"restrained\",\"emoji\":true,\"titleMaxChars\":60,\"technicalDetail\":\"high\",\"marketing\":\"low\",\"firstPerson\":true,\"forbiddenTerms\":[\"革命性\",\"震撼\",\"game-changing\",\"exciting news\"],\"fingerprint\":\"${fingerprint}\"}"
+
+  voice_hash="$(printf '%s' "$voice_snapshot" | sha256sum | cut -d' ' -f1)"
+
+  media_hash="$(printf '' | sha256sum | cut -d' ' -f1)"
+
+  summary=$(jq -cn --arg e "$evidence_item_id" --arg t "$title" '{
+    milestoneTitle: $t,
+    summary: "The site now builds from approved stories.",
+    changes: [
+      { text: "The site builds from approved stories.", evidenceIds: [$e] }
+    ],
+    problemsSolved: [
+      { text: "An approved story had no portable page.", evidenceIds: [$e] }
+    ],
+    knownLimitations: [
+      { text: "Only Linux is covered.", evidenceIds: [$e] }
+    ],
+    nextSteps: [
+      { text: "Cover the other platform.", evidenceIds: [$e] }
+    ]
+  }')
+
+  local asset_id revision_id approval_id scope_id
+  asset_id="$(cat /proc/sys/kernel/random/uuid)"
+  revision_id="$(cat /proc/sys/kernel/random/uuid)"
+  approval_id="$(cat /proc/sys/kernel/random/uuid)"
+  scope_id="$(docker exec "$container" psql --username=chronicleaf --dbname="$database_name" --quiet --tuples-only --no-align \
+    --command 'SELECT id FROM installation LIMIT 1')"
+
+  docker exec -i "$container" psql --username=chronicleaf --dbname="$database_name" --quiet \
+    --set=ON_ERROR_STOP=1 --set=body="$body" --set=summary="$summary" --set=voice_snapshot="$voice_snapshot" \
+    <<SQL >/dev/null
+INSERT INTO content_assets
+  (id, scope_id, project_id, milestone_id, type, status, current_revision, created_at, updated_at)
+VALUES
+  ('${asset_id}', '${scope_id}', '${project_id}', '${milestone_id}', 'markdown-story', 'draft', 1, '${now}', '${now}');
+
+INSERT INTO content_revisions
+  (id, asset_id, scope_id, revision, evidence_bundle_id, evidence_revision, voice_revision,
+   voice_snapshot, summary, body_markdown, body_hash, provider_id, model, prompt_version, schema_version, created_at)
+VALUES
+  ('${revision_id}', '${asset_id}', '${scope_id}', 1, '${bundle_id}', 1, 0,
+   :'voice_snapshot'::jsonb, :'summary'::jsonb, :'body', '${body_hash}',
+   'openai', 'seeded-not-called', 'grounded-markdown/1', 'grounded-summary/1', '${now}');
+SQL
+
+  if [ "$approve" = "yes" ]; then
+    docker exec -i "$container" psql --username=chronicleaf --dbname="$database_name" --quiet \
+      --set=ON_ERROR_STOP=1 <<SQL >/dev/null
+INSERT INTO content_approvals
+  (id, scope_id, asset_id, content_revision, actor_id, payload_kind, body_hash,
+   evidence_revision, voice_snapshot_hash, media_selection_hash, artifact_hash,
+   approved_at, invalidated_at, reason)
+VALUES
+  ('${approval_id}', '${scope_id}', '${asset_id}', 1, NULL, 'text', '${body_hash}',
+   1, '${voice_hash}', '${media_hash}', NULL, '${now}', NULL, NULL);
+SQL
+  fi
+
+  local stored
+  stored="$(docker exec "$container" psql --username=chronicleaf --dbname="$database_name" \
+    --quiet --tuples-only --no-align \
+    --command "SELECT count(*) || ' ' || coalesce(max(body_hash), '') FROM content_revisions WHERE asset_id = '${asset_id}'")"
+
+  if [ "$stored" != "1 ${body_hash}" ]; then
+    echo "the static-blog-export seed stored '${stored}', which is not the one revision hashed as ${body_hash}" >&2
+    return 1
+  fi
+
+  local live
+  live="$(docker exec "$container" psql --username=chronicleaf --dbname="$database_name" \
+    --quiet --tuples-only --no-align \
+    --command "SELECT count(*) FROM content_approvals WHERE asset_id = '${asset_id}' AND invalidated_at IS NULL")"
+
+  local expected_live="0"
+  if [ "$approve" = "yes" ]; then
+    expected_live="1"
+  fi
+
+  if [ "$live" != "$expected_live" ]; then
+    echo "the static-blog-export seed stored '${live}' live approvals for '${title}', which is not the ${expected_live} the panel derives from" >&2
+    return 1
+  fi
+}
+
 seed_review_rows() {
   local container="$1"
   local database_name="$2"
@@ -2105,4 +2345,33 @@ seed_publish_variant "$publish_variant_base_url" "$(cat "$repo_root/$publish_dir
 echo "==> npm run test:e2e (real browser against $publish_variant_base_url)"
 run_suite "$publish_variant_base_url" "$publish_variant_log_file" "$repo_root/$publish_dir/access-token-publish-variant" \
   tests/publish-from-variant.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 23: static blog export UI. It needs a project with one approved story and one
+# never-approved story - and neither an approval nor a story can be produced through the UI
+# without a provider, while an approval, once recorded, cannot be un-recorded - so its own
+# installation, its own database and its own published instance, for the same reason suites
+# 2 to 22 each have one.
+#
+# Jobs stay enabled for this installation (the default start_suite path): the claim under
+# test is that the worker really builds the archive the panel offers for download, so a
+# silenced dispatch loop would test the wrong thing here. What a pass establishes is that
+# pick milestone → check asset → Export reaches the delivered routes, the panel watches
+# the job to its terminal word with no invented progress, the offered download serves
+# bytes byte-equal to the delivered download route, an unapproved selection is refused
+# in the server's own words with no download offered, and nothing exported before the
+# owner acted. It is NOT evidence that the archive renders any particular page: the bytes
+# inside the ZIP are the .NET suite's claim, not this one's.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a twenty-third disposable PostgreSQL and published application at $static_blog_export_base_url"
+start_suite static_blog_export "$static_blog_export_base_url" "$static_blog_export_log_file" \
+  "$repo_root/$publish_dir/access-token-static-blog-export"
+
+echo "==> seeding one approved story and one never-approved story"
+seed_static_blog_export "$static_blog_export_base_url" "$(cat "$repo_root/$publish_dir/access-token-static-blog-export")"
+
+echo "==> npm run test:e2e (real browser against $static_blog_export_base_url)"
+run_suite "$static_blog_export_base_url" "$static_blog_export_log_file" "$repo_root/$publish_dir/access-token-static-blog-export" \
+  tests/static-blog-export-ui.spec.ts
 stop_suite

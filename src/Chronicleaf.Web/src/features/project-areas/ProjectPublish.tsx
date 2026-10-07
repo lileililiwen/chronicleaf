@@ -1,5 +1,6 @@
 import { JourneyPanel } from '../journey-publish/JourneyPanel';
 import { PublicationPanel } from '../publications/PublicationPanel';
+import { ExportPanel } from '../static-blog-export/ExportPanel';
 
 /**
  * The Publish area (PROJECT-AREA-IA-001): journey projection and
@@ -28,6 +29,16 @@ export function ProjectPublish({ projectId }: { readonly projectId: string }) {
         already produced. Unpublished material never renders on the public page.
       */}
       <JourneyPanel projectId={projectId} />
+
+      {/*
+        STATIC-BLOG-EXPORT-UI-001/002. The approved static site this project can
+        become: pick approved assets over delivered list routes, see included
+        versus excluded, trigger the export job explicitly, watch it, and take
+        the portable download only when the server reports it ready. It sits
+        last because an export depicts approved entries other panels already
+        produced. Nothing exports by rendering.
+      */}
+      <ExportPanel projectId={projectId} />
     </>
   );
 }

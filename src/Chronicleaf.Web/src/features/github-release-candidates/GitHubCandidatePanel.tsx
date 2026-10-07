@@ -68,7 +68,8 @@ export function GitHubCandidatePanel({
           <p className="empty__body" data-testid="github-candidate-no-connection-body">
             A candidate is something read from a repository, so there is nothing to read until this
             project names one. Connect a repository in the panel above and this one will have something to
-            propose.
+            propose — and connecting is also what unlocks candidate sync and scheduled sync in the
+            Automations area, so new releases propose themselves instead of waiting to be asked for.
           </p>
         </div>
       ) : (

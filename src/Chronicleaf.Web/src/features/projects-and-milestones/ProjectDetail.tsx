@@ -1,65 +1,49 @@
 import { useState } from 'react';
 
-import {
-  MilestoneApiError,
-  archiveProject,
-  confirmMilestone,
-  dismissMilestone,
-  getProject,
-  listMilestones,
-} from './api';
-import { GitHubCandidatePanel } from '../github-release-candidates/GitHubCandidatePanel';
-import { GitHubConnectionPanel } from '../github-evidence/GitHubConnectionPanel';
-import { GitHubSyncPanel } from '../github-evidence/GitHubSyncPanel';
-import { LocalGitSyncPanel } from '../local-git-evidence/LocalGitSyncPanel';
-import { LocalRepositoryPanel } from '../local-git-evidence/LocalRepositoryPanel';
-import { GroundedMarkdownDraftPanel } from '../grounded-markdown-drafts/GroundedMarkdownDraftPanel';
-import { MarkdownReviewPanel } from '../markdown-review-export/MarkdownReviewPanel';
-import { ContentVariantPanel } from '../content-asset-variants/ContentVariantPanel';
-import { EvolutionImagePanel } from '../evolution-images/EvolutionImagePanel';
-import { EvolutionGifPanel } from '../evolution-gifs/EvolutionGifPanel';
-import { JourneyPanel } from '../journey-publish/JourneyPanel';
-import { PublicationPanel } from '../publications/PublicationPanel';
-import { NarrativeMemoryPanel } from '../narrative-memory/NarrativeMemoryPanel';
-import { MilestoneEvidencePanel } from '../milestone-evidence/MilestoneEvidencePanel';
-import { LlmProviderArea } from '../llm-provider-contract/LlmProviderArea';
-import { ProjectTimeline } from '../milestone-timeline/ProjectTimeline';
-import { ScreenshotCapturePanel } from '../screenshot-capture/ScreenshotCapturePanel';
-import { ScreenshotPicker } from '../screenshot-curation/ScreenshotPicker';
-import { VoiceArea } from '../voice-profiles/VoiceArea';
-import { milestoneTypeLabel, type Milestone, type MilestoneStatus, type Project } from './types';
-import { useMilestones, useProject } from './useRecords';
+import { MilestoneApiError, archiveProject, getProject } from './api';
+import type { Project } from './types';
+import { useProject } from './useRecords';
+import { ProjectSubNav } from '../project-areas/ProjectSubNav';
+import { ProjectAutomations } from '../project-areas/ProjectAutomations';
+import { ProjectContent } from '../project-areas/ProjectContent';
+import { ProjectEvidence } from '../project-areas/ProjectEvidence';
+import { ProjectEvolution } from '../project-areas/ProjectEvolution';
+import { ProjectOverview } from '../project-areas/ProjectOverview';
+import { ProjectPublish } from '../project-areas/ProjectPublish';
+import type { ProjectAreaId } from '../project-areas/areas';
 
 /**
- * One project and the milestones actually stored under it.
+ * One project, six addresses (PROJECT-AREA-IA-001).
  *
- * Three states are visible here and each is shown as what it is. A project with no milestones says
- * so. A record that arrived from a source is shown as a candidate, with the owner's own confirm and
- * dismiss actions beside it and nothing else able to move it. An archived project shows its history
- * unchanged and offers no way to change anything, because the server would refuse every one of them.
- *
- * The confirm and dismiss buttons are the only controls in this client that change a status, and
- * they are the owner's: there is no bulk action, no "accept all" and no automation.
+ * The page used to be one endless scroll of 20 panels. It is now a
+ * header — the project's own facts and the owner's own actions — plus
+ * one sub-navigation and one area. The header renders identically on
+ * every area, so header-level suites keep passing wherever they
+ * navigate; each area renders exactly the panels the move map assigns
+ * it, and the Automations area renders only new components over
+ * delivered routes.
  */
 export function ProjectDetail({
   projectId,
+  area,
   onEditProject,
   onNewMilestone,
   onEditMilestone,
   onBack,
+  onNavigate,
 }: {
   readonly projectId: string;
+  readonly area: ProjectAreaId;
   readonly onEditProject: (projectId: string) => void;
   readonly onNewMilestone: (projectId: string) => void;
   readonly onEditMilestone: (projectId: string, milestoneId: string) => void;
   readonly onBack: () => void;
+  readonly onNavigate: (to: string) => void;
 }) {
   const project = useProject(getProject, projectId);
-  const [status, setStatus] = useState<MilestoneStatus | 'all'>('all');
-  const milestones = useMilestones(listMilestones, projectId, status);
-  const [actionFailure, setActionFailure] = useState<MilestoneApiError | null>(null);
-  const [actionNotice, setActionNotice] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [archiveFailure, setArchiveFailure] = useState<MilestoneApiError | null>(null);
+  const [archiveNotice, setArchiveNotice] = useState<string | null>(null);
+  const [archiving, setArchiving] = useState(false);
 
   if (project.failure?.status === 404) {
     return (
@@ -78,50 +62,23 @@ export function ProjectDetail({
   const record: Project | null = project.data;
   const archived = record?.archivedAt !== null && record?.archivedAt !== undefined;
 
-  const act = async (milestone: Milestone, action: 'confirm' | 'dismiss') => {
-    setBusyId(milestone.id);
-    setActionFailure(null);
-    setActionNotice(null);
-
-    try {
-      const saved =
-        action === 'confirm'
-          ? await confirmMilestone(milestone.id, milestone.revision)
-          : await dismissMilestone(milestone.id, milestone.revision);
-
-      // The list is re-read rather than patched locally: the record that is now stored is the one
-      // the owner sees, including any revision the action advanced.
-      milestones.reload();
-      setActionNotice(
-        action === 'confirm'
-          ? `“${saved.title}” is now confirmed.`
-          : `“${saved.title}” is dismissed and kept. Confirm it to bring it back.`,
-      );
-    } catch (thrown) {
-      setActionFailure(thrown instanceof MilestoneApiError ? thrown : null);
-      milestones.reload();
-    } finally {
-      setBusyId(null);
-    }
-  };
-
   const archive = async () => {
     if (record === null) {
       return;
     }
 
-    setBusyId('project');
-    setActionFailure(null);
-    setActionNotice(null);
+    setArchiving(true);
+    setArchiveFailure(null);
+    setArchiveNotice(null);
 
     try {
       await archiveProject(record.id, record.revision);
       project.reload();
-      setActionNotice('The project is archived. Its milestones are kept and stay readable.');
+      setArchiveNotice('The project is archived. Its milestones are kept and stay readable.');
     } catch (thrown) {
-      setActionFailure(thrown instanceof MilestoneApiError ? thrown : null);
+      setArchiveFailure(thrown instanceof MilestoneApiError ? thrown : null);
     } finally {
-      setBusyId(null);
+      setArchiving(false);
     }
   };
 
@@ -179,408 +136,44 @@ export function ProjectDetail({
                 type="button"
                 className="action action--danger"
                 onClick={() => void archive()}
-                disabled={busyId === 'project'}
+                disabled={archiving}
                 data-testid="project-archive"
               >
-                {busyId === 'project' ? 'Archiving…' : 'Archive project'}
+                {archiving ? 'Archiving…' : 'Archive project'}
               </button>
             </div>
           ) : null}
 
-          {/*
-            VOICE-PROFILES-001/002. The project's writing voice, a check of text against it and the
-            drafts already written under it. It sits behind its own toggle because it is three
-            surfaces and an owner opening a project to record a milestone does not need all of them
-            at once. An archived project still shows it read-only: a voice is a fact about how this
-            project was written, and the drafts it produced are kept.
-          */}
-          <VoiceArea projectId={record.id} />
+          {archiveNotice ? (
+            <p className="notice notice--ok" role="status" data-testid="project-notice">
+              {archiveNotice}
+            </p>
+          ) : null}
 
-          {/*
-            GITHUB-EVIDENCE-001. Which repository this project collects from, and the one form that
-            changes it. It is here rather than under a milestone because a connection belongs to the
-            project: every milestone below asks the same repository, and a per-milestone connection
-            would be a second answer to a question the project has already been asked. An archived
-            project still shows what it collected, read-only.
-          */}
-          <GitHubConnectionPanel projectId={record.id} archived={archived} />
+          {archiveFailure ? (
+            <p className="notice notice--error" role="alert" data-testid="project-action-error">
+              {archiveFailure.message}
+            </p>
+          ) : null}
 
-          {/*
-            LOCAL-GIT-EVIDENCE-001/002. Which local repository this project collects from, and the one form
-            that changes it. It is beside the GitHub panel rather than under a milestone for the same reason
-            that one is: a registration belongs to the project, and every milestone below asks the same
-            repository. The two are separate because they are separate facts - a project may collect from a
-            hosted repository, a local one, or both - and a panel that merged them would have to invent an
-            answer to "which one?" that the server does not give.
-          */}
-          <LocalRepositoryPanel projectId={record.id} archived={archived} />
-
-          {/*
-            GITHUB-RELEASE-CANDIDATES-001/002. The tag and event derived Milestone candidates this
-            project's repository has produced, and the one form that asks for another read. It sits under
-            the connection panel because a candidate is something read from the connection above: with no
-            repository connected this panel has nothing to read, and it says so rather than showing an
-            empty list that would look like a quiet repository.
-
-            It is here and not under a milestone because a candidate is a proposal about the project, not
-            about any one milestone: nothing in it can be confirmed from here, so there is no milestone to
-            scope it to. An archived project still shows what was proposed, read-only, because a
-            candidate somebody did not act on is a fact about the repository and not about the project.
-          */}
-          <GitHubCandidatePanel projectId={record.id} archived={archived} />
-
-          {/*
-            NARRATIVE-MEMORY-001/002. The explicit history the owner wrote and the generated
-            summary the last refresh concluded, rendered as different facts in separate sections.
-            It sits beside the candidate panel because a narrative is about the project, not about
-            any one milestone: nothing in it can be confirmed from here, so there is no milestone
-            to scope it to. An archived project still shows what was recorded, read-only, because
-            history somebody did not act on is still history.
-          */}
-          <NarrativeMemoryPanel projectId={record.id} archived={archived} />
+          <ProjectSubNav projectId={record.id} current={area} onNavigate={onNavigate} />
         </header>
       )}
 
-      {actionNotice ? (
-        <p className="notice notice--ok" role="status" data-testid="project-notice">
-          {actionNotice}
-        </p>
-      ) : null}
-
-      {actionFailure ? (
-        <p className="notice notice--error" role="alert" data-testid="project-action-error">
-          {actionFailure.message}
-        </p>
-      ) : null}
-
-      <div className="filters" role="group" aria-label="Filter milestones by status">
-        {(['all', 'confirmed', 'candidate', 'dismissed'] as const).map((candidate) => (
-          <button
-            key={candidate}
-            type="button"
-            className={candidate === status ? 'filter filter--active' : 'filter'}
-            aria-pressed={candidate === status}
-            onClick={() => setStatus(candidate)}
-            data-testid={`milestone-filter-${candidate}`}
-          >
-            {candidate === 'all' ? 'All' : candidate}
-          </button>
-        ))}
-      </div>
-
-      {milestones.loading ? (
-        <p className="view__state" data-testid="milestones-loading">
-          Loading milestones…
-        </p>
-      ) : milestones.failure ? (
-        <p className="notice notice--error" role="alert" data-testid="milestones-error">
-          {milestones.failure.message}
-        </p>
-      ) : (milestones.data?.items.length ?? 0) === 0 ? (
-        <div className="empty" data-testid="milestones-empty">
-          <p className="empty__title">
-            {status === 'all' ? 'No milestones recorded yet.' : `No ${status} milestones.`}
-          </p>
-          <p className="empty__body">
-            {status === 'all'
-              ? 'Nothing has been recorded for this project. What you record here becomes the history a story is written from.'
-              : 'Change the filter to see the other milestones.'}
-          </p>
-        </div>
+      {record === null ? null : area === 'overview' ? (
+        <ProjectOverview projectId={record.id} archived={archived} onEditMilestone={onEditMilestone} />
+      ) : area === 'evidence' ? (
+        <ProjectEvidence projectId={record.id} archived={archived} onEditMilestone={onEditMilestone} />
+      ) : area === 'content' ? (
+        <ProjectContent projectId={record.id} archived={archived} onEditMilestone={onEditMilestone} />
+      ) : area === 'publish' ? (
+        <ProjectPublish projectId={record.id} />
+      ) : area === 'evolution' ? (
+        <ProjectEvolution projectId={record.id} archived={archived} onEditMilestone={onEditMilestone} />
       ) : (
-        <ul className="milestones" data-testid="milestone-list">
-          {milestones.data?.items.map((milestone) => (
-            <MilestoneRow
-              key={milestone.id}
-              milestone={milestone}
-              archived={archived}
-              busy={busyId === milestone.id}
-              onEdit={() => onEditMilestone(projectId, milestone.id)}
-              onConfirm={() => void act(milestone, 'confirm')}
-              onDismiss={() => void act(milestone, 'dismiss')}
-            />
-          ))}
-        </ul>
+        <ProjectAutomations projectId={record.id} archived={archived} onNavigate={onNavigate} />
       )}
-
-      {/*
-        MILESTONE-TIMELINE-001/002. The confirmed history oldest first, under the date each
-        record happened on. It reads the timeline route rather than re-sorting the list above,
-        because the list is newest first and filtered by status while this is chronology.
-        Selecting a row opens the milestone editor for that record.
-      */}
-      {record !== null ? (
-        <ProjectTimeline projectId={record.id} onEditMilestone={onEditMilestone} />
-      ) : null}
-
-      {/*
-        FEATURE-TRIGGER-PANELS-003. Rendered version comparisons of this project's selected
-        screenshots. It sits beside the timeline because an evolution is about the project,
-        not about any one milestone: nothing in it can be confirmed from here, so there is
-        no milestone to scope it to. Candidates are never compared and nothing here promotes
-        one, because curation owns that.
-      */}
-      {record !== null ? <EvolutionImagePanel projectId={record.id} /> : null}
-
-      {/*
-        FEATURE-TRIGGER-PANELS-004. Rendered chronological animations of this project's
-        selected screenshots. It sits beside the image panel because it consumes the same
-        selection contract - selected screenshots in canvas order with the authorized
-        playback - and adds the one thing a still comparison has not: motion. No animation
-        is synthesised client-side.
-      */}
-      {record !== null ? <EvolutionGifPanel projectId={record.id} /> : null}
-
-      {/*
-        FEATURE-TRIGGER-PANELS-005. Publication status, reconcile and the publish entry from
-        an asset. It sits beside the content panels because a publish sends an approved
-        asset through a named target: the preview authorizes nothing, and the publish carries
-        a separate explicit confirmation. Nothing is published by rendering.
-      */}
-      {record !== null ? <PublicationPanel /> : null}
-
-      {/*
-        FEATURE-TRIGGER-PANELS-006. The explicit public projection of this project: preview
-        what a selection would publish, publish or revoke it, and follow the link to the
-        anonymous page. It sits last because a journey depicts approved entries other panels
-        already produced. Unpublished material never renders on the public page.
-      */}
-      {record !== null ? <JourneyPanel projectId={record.id} /> : null}
     </section>
-  );
-}
-
-function MilestoneRow({
-  milestone,
-  archived,
-  busy,
-  onEdit,
-  onConfirm,
-  onDismiss,
-}: {
-  readonly milestone: Milestone;
-  readonly archived: boolean;
-  readonly busy: boolean;
-  readonly onEdit: () => void;
-  readonly onConfirm: () => void;
-  readonly onDismiss: () => void;
-}) {
-  // How many collections this milestone has finished, and therefore how many times the evidence
-  // panel above has been told to read the bundle again. The count lives here because this row is the
-  // only place both panels are in the same scope: neither feature has to know the other exists, and
-  // the row is a plain number passed to one and a plain function passed to the other.
-  const [settledCollections, setSettledCollections] = useState(0);
-
-  return (
-    <li className="milestone" data-testid="milestone" data-status={milestone.status}>
-      <div className="milestone__head">
-        <h3 className="milestone__title" data-testid="milestone-title">
-          {milestone.title}
-        </h3>
-        <span
-          className={
-            milestone.status === 'confirmed'
-              ? 'badge badge--ok'
-              : milestone.status === 'candidate'
-                ? 'badge badge--pending'
-                : 'badge badge--muted'
-          }
-          data-testid="milestone-status"
-        >
-          {milestone.status}
-        </span>
-      </div>
-
-      <p className="milestone__meta">
-        <span data-testid="milestone-type">{milestoneTypeLabel(milestone.type)}</span>
-        {milestone.version ? <span data-testid="milestone-version"> · {milestone.version}</span> : null}
-        <span data-testid="milestone-occurred-at"> · {formatInstant(milestone.occurredAt)}</span>
-        <span data-testid="milestone-revision"> · revision {milestone.revision}</span>
-        {milestone.sourceKey ? (
-          <span data-testid="milestone-source">
-            {' '}
-            · from {milestone.source} ({milestone.sourceKey})
-          </span>
-        ) : null}
-      </p>
-
-      {milestone.notes ? <p className="milestone__notes" data-testid="milestone-notes">{milestone.notes}</p> : null}
-
-      {milestone.knownLimitations.length > 0 ? (
-        <div className="milestone__list" data-testid="milestone-limitations">
-          <h4>Known limitations</h4>
-          <ul>
-            {milestone.knownLimitations.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {milestone.nextSteps.length > 0 ? (
-        <div className="milestone__list" data-testid="milestone-next-steps">
-          <h4>Next steps</h4>
-          <ul>
-            {milestone.nextSteps.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {/* What was actually collected for this milestone, read from the server on its own route. The
-          reload token is the one thing passed in from below: a collection that finishes appends a
-          revision this panel did not ask for, and a token that changed is how it hears about it. */}
-      <MilestoneEvidencePanel
-        milestoneId={milestone.id}
-        milestoneTitle={milestone.title}
-        archived={archived}
-        reloadToken={settledCollections}
-      />
-
-      {/* GITHUB-EVIDENCE-001/002. Asking this milestone's repository for a ref, and following the job
-          that does it. It goes directly under the evidence panel because the two are the same subject:
-          what is collected is appended to the bundle above, and the revision this form sends is the
-          revision that bundle is on. Above the draft below, because a draft is written from evidence
-          and a collection is how more of it arrives.
-
-          When the job reaches a status it will not leave, once, the evidence panel above is told to
-          read the bundle again - so an owner watching a collection land sees what the server holds
-          without reloading the page, and no panel here starts polling for a change this row is
-          already told about. */}
-      <GitHubSyncPanel
-        projectId={milestone.projectId}
-        milestoneId={milestone.id}
-        milestoneTitle={milestone.title}
-        archived={archived}
-        onSettled={() => setSettledCollections((value) => value + 1)}
-      />
-
-      {/* LOCAL-GIT-EVIDENCE-001/002. Asking this milestone's local repository for a ref, and following the
-          job that does it. It goes directly under the evidence panel for the same reason the panel above does,
-          and it raises the same one-shot reload signal when its job reaches a status it will not leave - so a
-          background collection of a local checkout refreshes the evidence without any panel here polling for
-          a change it has already been told about. */}
-      <LocalGitSyncPanel
-        projectId={milestone.projectId}
-        milestoneId={milestone.id}
-        milestoneTitle={milestone.title}
-        archived={archived}
-        onSettled={() => setSettledCollections((value) => value + 1)}
-      />
-
-      {/* A bounded draft from exactly that evidence, through a provider the owner named. The panel is
-          absent for an archived milestone: a generation is a draft for a live record, and offering
-          one for something that can no longer change would invite work nobody can finish. */}
-      <LlmProviderArea
-        milestoneId={milestone.id}
-        milestoneTitle={milestone.title}
-        archived={archived}
-      />
-
-      {/* GROUNDED-MARKDOWN-DRAFTS-001/002. A draft written from exactly the evidence above, through a
-          provider the owner names, and shown with its citations and both lists of findings. It sits under
-          the generation panel because it consumes that panel's contract - the consent handshake - and
-          drives it itself so an owner sees one flow rather than being sent somewhere else to authorize
-          one.
-
-          The panel offers no approval and no edit. A draft is text a human has not reviewed, its body is
-          rendered as source rather than as HTML, and a job that stops says the server's own refusal in
-          words while re-reading the asset from the server rather than inferring the outcome from a
-          status. Human editing and approval are the review package's, bound to a revision and a body
-          hash. */}
-      <GroundedMarkdownDraftPanel
-        milestoneId={milestone.id}
-        milestoneTitle={milestone.title}
-        archived={archived}
-        confirmed={milestone.status === 'confirmed'}
-      />
-
-      {/* MARKDOWN-REVIEW-EXPORT-001/002. Human editing, approval and export of exactly that
-          draft. It sits under the draft panel because it consumes that panel's read contract -
-          the stored body, its claims and both finding lists - and adds the three things the
-          draft panel deliberately has not: an editor that appends human revisions, an approval
-          bound to a revision and a body hash, and an export that downloads approved bytes as a
-          file. The preview renders the text as inert characters rather than as a document, and
-          the approve control is a button only a press can reach. */}
-      <MarkdownReviewPanel
-        milestoneId={milestone.id}
-        milestoneTitle={milestone.title}
-        archived={archived}
-        confirmed={milestone.status === 'confirmed'}
-      />
-
-      {/* CONTENT-ASSET-VARIANTS-001/002. Reusable formats derived from exactly that approved
-          story. It sits under the review panel because it consumes that panel's decision - the
-          live approval - and adds the one thing neither the draft nor the review panel has: the
-          same facts rendered in another shape. Deriving calls no provider, so there is no consent
-          to authorize and no job to watch; each derived asset is a draft with its own approve
-          control, because approving the story never approves the variant. The preview renders the
-          text as inert characters through the review package's own renderer, and the readme-update
-          format names its proposal notice rather than offering any control that could write a
-          repository. */}
-      <ContentVariantPanel
-        projectId={milestone.projectId}
-        milestoneId={milestone.id}
-        archived={archived}
-        confirmed={milestone.status === 'confirmed'}
-      />
-
-      {/* Bounded screenshots of one public page for that milestone, which are candidates and nothing
-          else. The panel asks for a job rather than producing a picture, and says so while it waits:
-          a capture is browser work in the delivered queue, so the owner is told the work was accepted
-          and nothing more. It offers no way to select a candidate or attach one to evidence, because
-          screenshot-curation owns that and reads these rows below. On a host that cannot confine a
-          browser the job answers capture_sandbox_unavailable before any browser starts, and the panel
-          reports that refusal as an answer rather than as a spinner that stopped. */}
-      <ScreenshotCapturePanel
-        milestoneId={milestone.id}
-        milestoneTitle={milestone.title}
-        archived={archived}
-      />
-
-      {/* SCREENSHOT-CURATION-001/002. What the owner chose about those pictures: which are selected
-          evidence, which are rejected, which one is primary, in what sequence, and with what words.
-          Selecting publishes the picture into the evidence panel above in the same server
-          transaction, so a change that advances the bundle tells that panel to read again on its own
-          terms - the same token the sync panel already uses, because neither feature has to know the
-          other exists. */}
-      <ScreenshotPicker
-        milestoneId={milestone.id}
-        milestoneTitle={milestone.title}
-        archived={archived}
-        onEvidenceChanged={() => setSettledCollections((value) => value + 1)}
-      />
-
-      {archived ? null : (
-        <div className="milestone__actions">
-          <button type="button" className="action" onClick={onEdit} data-testid="milestone-edit">
-            Edit
-          </button>
-          {milestone.status === 'confirmed' ? (
-            <button
-              type="button"
-              className="action"
-              onClick={onDismiss}
-              disabled={busy}
-              data-testid="milestone-dismiss"
-            >
-              Dismiss
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="action action--primary"
-              onClick={onConfirm}
-              disabled={busy}
-              data-testid="milestone-confirm"
-            >
-              Confirm
-            </button>
-          )}
-        </div>
-      )}
-    </li>
   );
 }
 

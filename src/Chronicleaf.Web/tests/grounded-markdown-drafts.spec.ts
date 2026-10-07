@@ -241,6 +241,11 @@ async function openProjectHolding(page: Page, title: string): Promise<void> {
   await page.goto(`/projects/${found.projectId}`);
   await expect(page.getByTestId('project-name')).toBeVisible();
   await expect(row(page, title)).toBeVisible();
+
+  // PROJECT-AREA-IA-001 migration: the draft panel moved to the Content area;
+  // the same selectors are asserted there with the same expectations.
+  await page.getByTestId('project-area-content').click();
+  await expect(row(page, title)).toBeVisible();
 }
 
 /** Creates a project by the same clicks an owner would make, and returns its id from the URL. */
@@ -279,11 +284,20 @@ async function createProjectWithDraftableMilestone(
   await expect(target.getByTestId('milestone-title')).toHaveText(title);
   await expect(target.getByTestId('milestone-status')).toHaveText('confirmed');
 
+  // PROJECT-AREA-IA-001 migration: the evidence form moved to the Evidence
+  // area and the draft panel to Content; the bundle below is recorded in
+  // Evidence with the same expectations, then the suite moves to Content.
+  await page.getByTestId('project-area-evidence').click();
+  await expect(row(page, title)).toBeVisible();
+
   // The evidence a draft claims to rest on, recorded through the delivered evidence form. A draft whose
   // citations pointed at evidence that did not exist would make every provenance assertion meaningless.
   await target.getByTestId('evidence-notes').fill('The pipeline now reproduces from a clean checkout.');
   await target.getByTestId('evidence-submit').click();
   await expect(target.getByTestId('evidence-bundles')).toBeVisible();
+
+  await page.getByTestId('project-area-content').click();
+  await expect(row(page, title)).toBeVisible();
 }
 
 /** The project id in the address, which is the only place the application ever exposes it. */

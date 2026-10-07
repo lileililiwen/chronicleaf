@@ -50,6 +50,10 @@ test('a project with no repository connected says so rather than showing an empt
   await page.getByTestId('project-description-input').fill('No repository here yet.');
   await page.getByTestId('project-save').click();
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/);
+
+  // PROJECT-AREA-IA-001 migration: the candidate panel moved to the Evidence
+  // area; the same selectors are asserted there with the same expectations.
+  await page.getByTestId('project-area-evidence').click();
   await expect(page.getByTestId('github-candidate-panel')).toBeVisible();
 
   // The framing is above everything else, because it is the thing an owner must not misread: a row on
@@ -202,6 +206,9 @@ async function openCandidatePanel(page: Page) {
 
   // Waiting for the panel to appear is not waiting for its read: the panel renders its framing and its
   // buttons before the list arrives, so an assertion on the list has to wait for the list.
+  // PROJECT-AREA-IA-001 migration: the candidate panel moved to the Evidence
+  // area; the same selectors are asserted there with the same expectations.
+  await page.getByTestId('project-area-evidence').click();
   await expect(page.getByTestId('github-candidate-panel')).toBeVisible();
 }
 

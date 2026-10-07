@@ -184,6 +184,11 @@ async function openProjectHolding(page: Page, title: string): Promise<void> {
   await page.goto(`/projects/${found.projectId}`);
   await expect(page.getByTestId('project-name')).toBeVisible();
   await expect(row(page, title)).toBeVisible();
+
+  // PROJECT-AREA-IA-001 migration: the review panel moved to the Content
+  // area; the same selectors are asserted there with the same expectations.
+  await page.getByTestId('project-area-content').click();
+  await expect(row(page, title)).toBeVisible();
 }
 
 /** The milestone row with this exact title, so two milestones in two projects cannot be confused. */

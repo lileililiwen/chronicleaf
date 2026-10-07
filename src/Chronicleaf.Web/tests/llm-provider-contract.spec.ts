@@ -231,11 +231,21 @@ async function openGenerationPanel(page: Page): Promise<void> {
   const milestone = page.getByTestId('milestone').first();
   await expect(milestone.getByTestId('milestone-title')).toHaveText('First release');
 
+  // PROJECT-AREA-IA-001 migration: the evidence panel moved to the Evidence
+  // area and the generation panel to Content; the bundle below is recorded
+  // in Evidence with the same expectations, then the suite moves to Content.
+  await page.getByTestId('project-area-evidence').click();
+  await expect(page.getByTestId('evidence-panel')).toBeVisible();
+
   // The evidence the generation will draft from, recorded through the delivered evidence form.
   await milestone.getByTestId('evidence-notes').fill('The pipeline now reproduces from a clean checkout.');
   await milestone.getByTestId('evidence-submit').click();
   await expect(milestone.getByTestId('evidence-bundles')).toBeVisible();
   await expect(milestone.getByTestId('evidence-revision').first()).toContainText('Revision 1');
+
+  // PROJECT-AREA-IA-001 migration (continued): the generation panel moved to
+  // the Content area; the assertions below run there with the same expectations.
+  await page.getByTestId('project-area-content').click();
 
   // The generation panel is present on the same milestone, below the evidence it drafts from, and it
   // offers to draft from what was just recorded rather than claiming there is nothing yet. It keeps

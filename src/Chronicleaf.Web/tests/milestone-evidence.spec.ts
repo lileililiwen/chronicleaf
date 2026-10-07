@@ -237,6 +237,11 @@ async function createProjectWithMilestone(
 
   expect(answer.status).toBe(200);
 
+  // PROJECT-AREA-IA-001 migration: the evidence panel moved to the Evidence
+  // area; the same selectors are asserted there with the same expectations.
+  await page.getByTestId('project-area-evidence').click();
+  await expect(page.getByTestId('evidence-panel')).toBeVisible();
+
   return answer.body.items[0].id as string;
 }
 

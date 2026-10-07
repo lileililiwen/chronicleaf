@@ -80,6 +80,12 @@ async function createProject(page: Page, name: string, description: string): Pro
 
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/);
 
+  // PROJECT-AREA-IA-001 migration: the evolution GIF panel moved to the
+  // Evolution area; the same selectors are asserted there with the same
+  // expectations.
+  await page.getByTestId('project-area-evolution').click();
+  await expect(page.getByTestId('evolution-gif-panel')).toBeVisible();
+
   return projectIdFrom(page.url());
 }
 

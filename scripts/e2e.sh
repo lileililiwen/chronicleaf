@@ -88,6 +88,7 @@ evolution_base_url="${CHRONICLEAF_EVOLUTION_BASE_URL:-http://127.0.0.1:5097}"
 gif_base_url="${CHRONICLEAF_GIF_BASE_URL:-http://127.0.0.1:5098}"
 publication_base_url="${CHRONICLEAF_PUBLICATION_BASE_URL:-http://127.0.0.1:5099}"
 journey_base_url="${CHRONICLEAF_JOURNEY_BASE_URL:-http://127.0.0.1:5100}"
+area_base_url="${CHRONICLEAF_AREA_BASE_URL:-http://127.0.0.1:5101}"
 log_file="$repo_root/$publish_dir/server.log"
 evidence_log_file="$repo_root/$publish_dir/server-evidence.log"
 credentials_log_file="$repo_root/$publish_dir/server-credentials.log"
@@ -108,6 +109,7 @@ evolution_log_file="$repo_root/$publish_dir/server-evolution.log"
 gif_log_file="$repo_root/$publish_dir/server-gif.log"
 publication_log_file="$repo_root/$publish_dir/server-publication.log"
 journey_log_file="$repo_root/$publish_dir/server-journey.log"
+area_log_file="$repo_root/$publish_dir/server-area.log"
 key_file=""
 
 # The operator key for this run: 32 random bytes in a temporary file outside the repository and
@@ -144,7 +146,7 @@ cleanup() {
     "$repo_root/$publish_dir/access-token-review" "$repo_root/$publish_dir/access-token-team" \
     "$repo_root/$publish_dir/access-token-tenancy" "$repo_root/$publish_dir/access-token-evolution" \
     "$repo_root/$publish_dir/access-token-gif" "$repo_root/$publish_dir/access-token-publication" \
-    "$repo_root/$publish_dir/access-token-journey"
+    "$repo_root/$publish_dir/access-token-journey" "$repo_root/$publish_dir/access-token-area"
   # So is the encryption key: it is removed whether the run passed or failed.
   remove_key_file
   exit "$exit_status"
@@ -1799,4 +1801,18 @@ start_suite journey "$journey_base_url" "$journey_log_file" "$repo_root/$publish
 echo "==> npm run test:e2e (real browser against $journey_base_url)"
 run_suite "$journey_base_url" "$journey_log_file" "$repo_root/$publish_dir/access-token-journey" \
   tests/journey-publish.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 21: project area information architecture. It creates its own project by name and
+# never asserts global emptiness, so it has to run against its own installation and its own
+# published instance rather than against the one the projects-and-milestones suite started
+# empty - otherwise the first group's empty-state assertions would already see a project.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a twenty-first disposable PostgreSQL and published application at $area_base_url"
+start_suite area "$area_base_url" "$area_log_file" "$repo_root/$publish_dir/access-token-area"
+
+echo "==> npm run test:e2e (real browser against $area_base_url)"
+run_suite "$area_base_url" "$area_log_file" "$repo_root/$publish_dir/access-token-area" \
+  tests/project-area-ia.spec.ts
 stop_suite

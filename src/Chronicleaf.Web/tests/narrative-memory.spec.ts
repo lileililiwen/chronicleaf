@@ -149,6 +149,11 @@ async function createProject(page: Page, name: string, description: string): Pro
 
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/);
 
+  // PROJECT-AREA-IA-001 migration: the narrative panel moved to the Content
+  // area; the same selectors are asserted there with the same expectations.
+  await page.getByTestId('project-area-content').click();
+  await expect(page.getByTestId('narrative-memory')).toBeVisible();
+
   return projectIdFrom(page.url());
 }
 

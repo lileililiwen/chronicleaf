@@ -212,7 +212,9 @@ async function signIn(page: Page) {
 
 async function openProject(page: Page) {
   await signIn(page);
-  await page.goto(`/projects/${PROJECT_ID as string}`);
+  // PROJECT-AREA-IA-001 migration: the picker moved to the Evidence area;
+  // the same selectors are asserted there with the same expectations.
+  await page.goto(`/projects/${PROJECT_ID as string}/evidence`);
   await expect(page.getByTestId('curation-panel')).toBeVisible();
 }
 

@@ -85,6 +85,11 @@ async function createProject(page: Page, name: string, description: string): Pro
 
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/);
 
+  // PROJECT-AREA-IA-001 migration: the publication panel moved to the Publish
+  // area; the same selectors are asserted there with the same expectations.
+  await page.getByTestId('project-area-publish').click();
+  await expect(page.getByTestId('publication-panel')).toBeVisible();
+
   return projectIdFrom(page.url());
 }
 

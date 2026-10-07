@@ -253,6 +253,11 @@ async function openVoicePanel(page: Page): Promise<void> {
 
   await expect(page.getByTestId('project-name')).toHaveText('Ledger');
 
+  // PROJECT-AREA-IA-001 migration: the voice panels moved to the Content
+  // area; the same selectors are asserted there with the same expectations.
+  await page.getByTestId('project-area-content').click();
+  await expect(page.getByTestId('voice-area')).toBeVisible();
+
   await page.getByTestId('voice-toggle').click();
   await expect(page.getByTestId('voice-panels')).toBeVisible();
   await expect(page.getByTestId('voice-profile-heading')).toBeVisible();

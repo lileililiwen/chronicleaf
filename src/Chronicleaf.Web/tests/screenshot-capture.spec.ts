@@ -245,6 +245,11 @@ async function createProjectWithMilestone(
 
   expect(answer.status).toBe(200);
 
+  // PROJECT-AREA-IA-001 migration: the capture panel moved to the Evolution
+  // area; the same selectors are asserted there with the same expectations.
+  await page.getByTestId('project-area-evolution').click();
+  await expect(page.getByTestId('capture-panel')).toBeVisible();
+
   return answer.body.items[0].id as string;
 }
 

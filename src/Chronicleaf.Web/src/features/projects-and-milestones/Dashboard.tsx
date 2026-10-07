@@ -12,6 +12,8 @@ export function Dashboard({
   projects,
   loading,
   onOpen,
+  onPublish,
+  onAutomations,
   onCreate,
   onList,
   onCredentials,
@@ -19,6 +21,10 @@ export function Dashboard({
   readonly projects: ProjectPage | null;
   readonly loading: boolean;
   readonly onOpen: (projectId: string) => void;
+  /** PROJECT-AREA-IA-003: Publish is one deep-link from the dashboard, two steps from anywhere. */
+  readonly onPublish: (projectId: string) => void;
+  /** PROJECT-AREA-IA-003: Automations is one deep-link from the dashboard, two steps from anywhere. */
+  readonly onAutomations: (projectId: string) => void;
   readonly onCreate: () => void;
   readonly onList: () => void;
   readonly onCredentials: () => void;
@@ -58,6 +64,14 @@ export function Dashboard({
                   <span className="card__body">{project.description || 'No description yet.'}</span>
                   {project.archivedAt ? <span className="badge badge--muted">Archived</span> : null}
                 </button>
+                <p className="card__areas">
+                  <button type="button" className="link" onClick={() => onPublish(project.id)} data-testid="project-publish-link">
+                    Publish
+                  </button>{' '}
+                  <button type="button" className="link" onClick={() => onAutomations(project.id)} data-testid="project-automations-link">
+                    Automations
+                  </button>
+                </p>
               </li>
             ))}
           </ul>

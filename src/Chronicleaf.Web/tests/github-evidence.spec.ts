@@ -315,6 +315,11 @@ async function createProjectWithMilestone(page: Page, name: string): Promise<voi
   const milestone = page.getByTestId('milestone').first();
   await expect(milestone.getByTestId('milestone-title')).toHaveText('First release');
 
+  // PROJECT-AREA-IA-001 migration: the evidence panel moved to the Evidence
+  // area; the bundle below is recorded there with the same expectations.
+  await page.getByTestId('project-area-evidence').click();
+  await expect(page.getByTestId('evidence-panel')).toBeVisible();
+
   // The evidence the collection would be appended to. A milestone with no bundle at all is at revision
   // 0, and that is a different request, so the bundle is created through the delivered evidence form.
   await milestone.getByTestId('evidence-notes').fill('The pipeline now reproduces from a clean checkout.');
@@ -325,7 +330,11 @@ async function createProjectWithMilestone(page: Page, name: string): Promise<voi
 
 /** The project this page is showing, taken from the address bar rather than from a list's ordering. */
 function projectIdFromUrl(page: Page): string {
-  const id = new URL(page.url()).pathname.split('/').filter((part) => part.length > 0).pop() ?? '';
+  const segments = new URL(page.url()).pathname.split('/').filter((part) => part.length > 0);
+
+  // PROJECT-AREA-IA-001: the URL is now `/projects/{id}/{area}` rather than `/projects/{id}`, so the
+  // project id is the second segment, not the last.
+  const id = segments[1] ?? '';
 
   expect(id).not.toBe('');
   return id;

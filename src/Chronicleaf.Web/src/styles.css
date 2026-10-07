@@ -133,6 +133,78 @@ body {
   outline-offset: 2px;
 }
 
+/* The project-area sub-navigation (PROJECT-AREA-IA-001/003). Sits under the
+   project header so every area is one step from every other area, without
+   duplicating the chrome the top nav already carries. */
+.nav--sub {
+  margin-top: var(--space-3);
+  padding: var(--space-2) 0 0;
+  border-top: 1px solid var(--shell-border);
+}
+
+.nav--sub .nav__item {
+  padding: 0.375rem 0.75rem;
+  font-size: var(--font-size-small);
+}
+
+/* One named block inside a project area (PROJECT-AREA-IA-002). The Automations
+   view is composed of these; the heading ranks below the project header so
+   the area still reads as a single page. */
+.section {
+  margin: var(--space-5) 0 0;
+  padding: var(--space-3) 0 0;
+  border-top: 1px solid var(--shell-border);
+}
+
+.section__heading {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-title);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* The facts list a section reads from the server (PROJECT-AREA-IA-002). A
+   definition list renders the same shape the session and credential views
+   use, so an owner is not learning a new vocabulary for an answer that
+   has always been the same kind of answer. */
+.section .facts {
+  margin: var(--space-2) 0 0;
+}
+
+/* The list of jobs a section reads (PROJECT-AREA-IA-002). No bespoke bullet
+   chrome - a plain list reads as the schedule of operations it actually is. */
+.jobs {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.375rem;
+}
+
+.jobs li {
+  font-size: var(--font-size-small);
+  color: var(--shell-muted);
+}
+
+/* The per-area deep-link on dashboard and projects list cards
+   (PROJECT-AREA-IA-003). One row of plain buttons so the card stays the
+   primary action and the deep-links are not buttons styled to look like
+   a card. */
+.card__areas {
+  display: flex;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+}
+
+/* The checkbox the schedule form arms (PROJECT-AREA-IA-002). Same accent as
+   every other form control; nothing bespoke, no visual invention. */
+.form__check {
+  margin: 0;
+  width: 1.125rem;
+  height: 1.125rem;
+  accent-color: var(--shell-accent);
+}
+
 /* One header per page, rendered by the shell from the current path. */
 .page {
   padding: var(--space-5) 0 0;

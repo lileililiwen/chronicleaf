@@ -8,6 +8,8 @@ import { TeamPanel } from '../team-panels/TeamPanel';
 import { TenancyPanel } from '../tenancy-views/TenancyPanel';
 import { TimelinePage } from '../milestone-timeline/TimelinePage';
 import { SettingsPage } from '../community-access/Settings/SettingsPage';
+import { ProjectSubNav } from '../project-areas/ProjectSubNav';
+import { areaOfSegment } from '../project-areas/areas';
 import { getMilestone, getProject, listProjects } from './api';
 import { useMilestone, useProject, useProjects } from './useRecords';
 import { segmentsOf } from './useRoute';
@@ -32,7 +34,14 @@ import type { OwnerSessionState } from '../community-access/useOwnerSession';
  * - `/` the dashboard
  * - `/projects` every project
  * - `/projects/new` a new project
- * - `/projects/{id}` one project and its milestones
+ * - `/projects/{id}` one project, Overview area (milestones + timeline)
+ * - `/projects/{id}/evidence` the Evidence area (PROJECT-AREA-IA-001)
+ * - `/projects/{id}/content` the Content area (PROJECT-AREA-IA-001)
+ * - `/projects/{id}/publish` the Publish area (PROJECT-AREA-IA-001)
+ * - `/projects/{id}/evolution` the Evolution area (PROJECT-AREA-IA-001)
+ * - `/projects/{id}/automations` the Automations area (PROJECT-AREA-IA-002)
+ *   (an unknown area renders the delivered "Nothing here" view, with the
+ *   project sub-nav intact so the owner is one click from a real area)
  * - `/projects/{id}/edit` editing that project
  * - `/projects/{id}/milestones/new` recording a milestone
  * - `/projects/{id}/milestones/{milestoneId}` editing a milestone
@@ -85,11 +94,46 @@ export function ProjectArea({ route, session }: { readonly route: Route; readonl
       return (
         <ProjectDetail
           projectId={projectId}
+          area="overview"
           onEditProject={(id) => navigate(`/projects/${id}/edit`)}
           onNewMilestone={(id) => navigate(`/projects/${id}/milestones/new`)}
           onEditMilestone={(id, milestoneId) => navigate(`/projects/${id}/milestones/${milestoneId}`)}
           onBack={() => navigate('/projects')}
+          onNavigate={navigate}
         />
+      );
+    }
+
+    if (segments.length === 3 && segments[2] !== 'edit' && segments[2] !== 'milestones') {
+      const area = areaOfSegment(segments[2]);
+
+      if (area !== null) {
+        return (
+          <ProjectDetail
+            projectId={projectId}
+            area={area}
+            onEditProject={(id) => navigate(`/projects/${id}/edit`)}
+            onNewMilestone={(id) => navigate(`/projects/${id}/milestones/new`)}
+            onEditMilestone={(id, milestoneId) => navigate(`/projects/${id}/milestones/${milestoneId}`)}
+            onBack={() => navigate('/projects')}
+            onNavigate={navigate}
+          />
+        );
+      }
+
+      return (
+        <section className="view" data-testid="route-not-found">
+          <p className="view__crumbs">
+            <button type="button" className="link" onClick={() => navigate('/projects')} data-testid="project-back">
+              ← Projects
+            </button>
+          </p>
+          <h1 className="view__heading">Nothing here</h1>
+          <p className="view__state">
+            This address is not part of Chronicleaf. Nothing was changed.
+          </p>
+          <ProjectSubNav projectId={projectId} current={null} onNavigate={navigate} />
+        </section>
       );
     }
 
@@ -149,6 +193,8 @@ function DashboardRoute({ onNavigate }: { readonly onNavigate: (to: string) => v
         projects={projects.data}
         loading={projects.loading}
         onOpen={(projectId) => onNavigate(`/projects/${projectId}`)}
+        onPublish={(projectId) => onNavigate(`/projects/${projectId}/publish`)}
+        onAutomations={(projectId) => onNavigate(`/projects/${projectId}/automations`)}
         onCreate={() => onNavigate('/projects/new')}
         onList={() => onNavigate('/projects')}
         onCredentials={() => onNavigate('/settings/credentials')}
@@ -259,6 +305,14 @@ function ProjectsRoute({ onNavigate }: { readonly onNavigate: (to: string) => vo
                 <span className="card__body">{project.description || 'No description yet.'}</span>
                 {project.archivedAt ? <span className="badge badge--muted">Archived</span> : null}
               </button>
+              <p className="card__areas">
+                <button type="button" className="link" onClick={() => onNavigate(`/projects/${project.id}/publish`)} data-testid="project-publish-link">
+                  Publish
+                </button>{' '}
+                <button type="button" className="link" onClick={() => onNavigate(`/projects/${project.id}/automations`)} data-testid="project-automations-link">
+                  Automations
+                </button>
+              </p>
             </li>
           ))}
         </ul>

@@ -284,6 +284,14 @@ public static class ChronicleafSchema
     /// render.
     /// </summary>
     public const string EvolutionGifExportMigrationId = "20261020090000_AddEvolutionGifExport";
+    /// <summary>
+    /// The forward migration that adds the <c>xiaohongshu_pack_media</c> table
+    /// (XIAOHONGSHU-CONTENT-PACKAGE-001/002). A database that has never applied it has nowhere
+    /// to bind a pack's arranged pictures, so its Xiaohongshu routes would fail against a
+    /// missing table; readiness says so by name rather than answering 200 and failing on the
+    /// first request.
+    /// </summary>
+    public const string XiaohongshuContentPackageMigrationId = "20261021090000_AddXiaohongshuContentPackage";
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
         InitialMigrationId,
@@ -317,6 +325,7 @@ public static class ChronicleafSchema
         LinkedInCopyPackageMigrationId,
         PublisherContractMigrationId,
         EvolutionGifExportMigrationId,
+        XiaohongshuContentPackageMigrationId,
     ];
 
     /// <summary>
@@ -324,7 +333,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = EvolutionGifExportMigrationId;
+    public const string ExpectedMigrationId = XiaohongshuContentPackageMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

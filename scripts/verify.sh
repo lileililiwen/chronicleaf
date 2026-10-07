@@ -547,6 +547,25 @@ else
   # capture job behind the delivered browser seam. Packaging itself calls no provider and
   # nothing here reaches any Medium endpoint.
   step "medium import package tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~MediumImportPackageTests"
+  # XIAOHONGSHU-CONTENT-PACKAGE-001/002. That an approved story adapts into a Xiaohongshu pack
+  # draft carrying its citations, the owner's chosen title from the derived candidates, tags,
+  # cover line, call to action and image-ordered per-picture accessibility words beside a voice
+  # value snapshot no later profile edit can reach; that an explicit project voice restriction
+  # wins over the emoji-asking preset and the derivative then approves; that a pack without a
+  # call to action stays informational with no invented engagement promise; that the title must
+  # name a derived candidate and a retitle appends a new revision; that an unapproved source, a
+  # foreign id, moved evidence or voice heads, an unknown picture, a digit the evidence never
+  # stated and every malformed title, tag, cover, call to action, selection or source kind is
+  # refused with nothing stored; that an approved pack exports copy.txt, package.json, the
+  # arranged pictures and their checksum manifest in the owner's image order while a draft
+  # exports nothing and an edit ends the approval; that native publication is refused as
+  # publisher_unsupported with no operation, no audit row and no outbound request; and that the
+  # internal length ceiling refuses while the threshold warns - all proven against the same real
+  # disposable PostgreSQL through the real API host, with the approved story produced by a real
+  # generation job behind the delivered provider seam and the selected pictures by real capture
+  # jobs behind the delivered browser seam. Adapting itself calls no provider and nothing here
+  # reaches any Xiaohongshu endpoint, account or login.
+  step "xiaohongshu content package tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~XiaohongshuContentPackageTests"
   # PUBLISHER-CONTRACT-001/002. That a confirmed current preview and approval records one
   # target-specific dispatch with the scope's publisher credential leased for the call; that a
   # draft, a tampered preview, an edited head and a revoked approval are each refused before

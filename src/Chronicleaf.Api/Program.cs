@@ -56,6 +56,7 @@ using Chronicleaf.Infrastructure.GitHubEnrichment;
 using Chronicleaf.Infrastructure.GitHubCandidates;
 using Chronicleaf.Infrastructure.Journey;
 using Chronicleaf.Infrastructure.LinkedIn;
+using Chronicleaf.Infrastructure.Xiaohongshu;
 using Chronicleaf.Infrastructure.Media;
 using Chronicleaf.Infrastructure.Medium;
 using Chronicleaf.Infrastructure.Media.S3;
@@ -366,6 +367,15 @@ builder.Services.AddContentAssetVariants();
 // stays the review package's table, and publication is a refusal rather than a call. A database
 // without the LinkedIn-copy migration reports schema_mismatch at /api/ready.
 builder.Services.AddLinkedInCopy();
+
+// XIAOHONGSHU-CONTENT-PACKAGE-001/002. The Xiaohongshu pack service and its ordered
+// selection-row store: a reviewed copy-ready note derived from an approved story, exported as
+// copy.txt plus package.json with the arranged pictures and refused unconditionally at the
+// publish route. It registers no provider, no credential, no account and no transport:
+// adaptation renders deterministically from stored rows, approval stays the review package's
+// table, and publication stays the owner's own hand. A database without the Xiaohongshu-pack
+// migration reports schema_mismatch at /api/ready.
+builder.Services.AddXiaohongshuPack();
 
 // MEDIUM-IMPORT-PACKAGE-001/002. The Medium manual-import service: the approved article's
 // exact bytes re-served through the review package's own Markdown and HTML exports, packed
@@ -683,6 +693,14 @@ app.MapContentVariantEndpoints();
 // approval row, and the publish route refuses with publisher_unsupported instead of calling
 // anything. Preview, edit, approval and the LinkedIn export shape stay the review package's.
 app.MapLinkedInCopyEndpoints();
+
+// XIAOHONGSHU-CONTENT-PACKAGE-001/002: the private adapt and publish routes. None of them is marked
+// public, so the access package's default-deny boundary already covers every one of them. There
+// is no generation here, no approval, no account and no transport: adapting renders an approved
+// story's accepted summary through a deterministic template and stores the result as a draft with
+// no approval row, and the publish route refuses with publisher_unsupported instead of calling
+// anything. Preview, edit, approval and the Xiaohongshu export shape stay the review package's.
+app.MapXiaohongshuPackEndpoints();
 
 // MEDIUM-IMPORT-PACKAGE-001: the private Medium publish refusal route. Not marked public, so
 // the access package's default-deny boundary already covers it. There is no generation here,

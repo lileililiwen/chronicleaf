@@ -172,6 +172,14 @@ public static class ApiErrorStatus
         LinkedIn.LinkedInError.PublisherUnsupported => 422,
         LinkedIn.LinkedInError.CopyTooLong => 422,
 
+        // The xiaohongshu-content-package's code. Additive in the same way: 422 for a rendered
+        // pack over the package's own internal ceiling, because the remedy is less text rather
+        // than a retry of the same derivation. The publish refusal needs no arm of its own:
+        // its string matches the Medium and LinkedIn packages' own refusal by design, so the
+        // LinkedIn arm above already answers it - all three answer one envelope code for one
+        // decision, told apart by type in the middleware.
+        Xiaohongshu.XiaohongshuPackError.PackTooLong => 422,
+
         // The public-project-journey package's codes. Additive in the same way: 409 for a slug
         // already taken by another project's journey, because the remedy is another slug rather
         // than a corrected body - and 409 for a preview hash that no longer matches the stored

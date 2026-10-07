@@ -7,6 +7,7 @@ using Chronicleaf.Application.Content;
 using Chronicleaf.Application.LinkedIn;
 using Chronicleaf.Application.Medium;
 using Chronicleaf.Application.Milestones;
+using Chronicleaf.Application.Xiaohongshu;
 
 namespace Chronicleaf.Api.Content;
 
@@ -177,6 +178,7 @@ public static class ContentReviewEndpoints
         IContentReviewService reviews,
         ILinkedInCopyService copies,
         IMediumImportService imports,
+        IXiaohongshuPackService packs,
         IOwnerAccessService access,
         CancellationToken cancellationToken)
     {
@@ -212,6 +214,17 @@ public static class ContentReviewEndpoints
         if (string.Equals((format ?? "markdown").Trim(), "medium", StringComparison.OrdinalIgnoreCase))
         {
             return await ExportMediumAsync(assetId, revisionText, context, imports, access, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        // XIAOHONGSHU-CONTENT-PACKAGE-002. The Xiaohongshu package is the same approval in a
+        // hand-posted shape: copy.txt, package.json, the arranged pictures in the owner's image
+        // order and their manifest, served by its own use case under the same bindings the
+        // Markdown export re-checks. Preview and approval stay the review package's own
+        // routes; this branch only serves what they authorized.
+        if (string.Equals((format ?? "markdown").Trim(), "xiaohongshu", StringComparison.OrdinalIgnoreCase))
+        {
+            return await ExportXiaohongshuAsync(assetId, revisionText, context, packs, access, cancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -310,6 +323,40 @@ public static class ContentReviewEndpoints
         // The approved copy as a package the owner chose to download: copy.txt, the selected
         // pictures and their manifest. Never a public page and never an upstream call, under
         // the same approval the Markdown export re-checks.
+        return Results.File(export.Bytes, export.ContentType, export.FileName);
+    }
+
+    private static async Task<IResult> ExportXiaohongshuAsync(
+        Guid assetId,
+        string? revisionText,
+        HttpContext context,
+        IXiaohongshuPackService packs,
+        IOwnerAccessService access,
+        CancellationToken cancellationToken)
+    {
+        var owner = await OwnerScopeAsync(context, access, cancellationToken).ConfigureAwait(false);
+
+        long? revision = null;
+        if (revisionText is not null)
+        {
+            if (!long.TryParse(revisionText, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed) ||
+                parsed < 1)
+            {
+                throw new ValidationFailedException(
+                    "revision",
+                    "A revision is a stored version number, from 1.");
+            }
+
+            revision = parsed;
+        }
+
+        var export = await packs
+            .ExportAsync(owner, assetId, revision, cancellationToken)
+            .ConfigureAwait(false);
+
+        // The approved pack as a hand-posted package the owner chose to download: copy.txt,
+        // package.json, the arranged pictures and their manifest. Never a public page and never
+        // an upstream call, under the same approval the Markdown export re-checks.
         return Results.File(export.Bytes, export.ContentType, export.FileName);
     }
 

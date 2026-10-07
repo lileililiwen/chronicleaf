@@ -38,6 +38,11 @@ using PublisherError = Chronicleaf.Application.Publishing.PublisherError;
 // contributing `...Error` constants to one switch is exactly where a mistyped arm would compile.
 using CandidateError = Chronicleaf.Application.GitHubCandidates.GitHubCandidateError;
 
+// The Xiaohongshu package's refusal shares its class name with the LinkedIn package's, and both
+// answer the same envelope code for the same decision. The alias keeps the two arms apart: the
+// middleware tells them apart by type, never by string.
+using XiaohongshuRefusal = Chronicleaf.Application.Xiaohongshu.PublisherUnsupportedException;
+
 namespace Chronicleaf.Api.Common;
 
 /// <summary>
@@ -576,6 +581,29 @@ public sealed class ApiErrorMiddleware(
             case LinkedInCopyTooLongException copyTooLong:
                 return (
                     Envelope.Create(LinkedInError.CopyTooLong, copyTooLong.Message, traceId),
+                    LogLevel.Information);
+
+            // XIAOHONGSHU-CONTENT-PACKAGE-001/002. Written here for the same reason as every
+            // other feature package's refusals: this package raises them and this middleware is
+            // still the only place an envelope is written. The messages are authored in the
+            // Xiaohongshu package and name no prose, no claim, no URL, no token, no account and
+            // no host path: a native publish is refused because there is no account, no login
+            // and no transport behind it, and an over-long pack is refused against the
+            // package's own ceiling rather than any platform claim.
+            case XiaohongshuRefusal xiaohongshuRefused:
+                return (
+                    Envelope.Create(
+                        Chronicleaf.Application.Xiaohongshu.XiaohongshuPackError.PublisherUnsupported,
+                        xiaohongshuRefused.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            case Chronicleaf.Application.Xiaohongshu.XiaohongshuPackTooLongException packTooLong:
+                return (
+                    Envelope.Create(
+                        Chronicleaf.Application.Xiaohongshu.XiaohongshuPackError.PackTooLong,
+                        packTooLong.Message,
+                        traceId),
                     LogLevel.Information);
 
             // MEDIUM-IMPORT-PACKAGE-001. Written here for the same reason as every other

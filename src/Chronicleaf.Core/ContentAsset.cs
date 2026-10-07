@@ -81,6 +81,20 @@ public static class ContentAssetTypes
     /// </remarks>
     public const string LinkedinCopy = "linkedin-copy";
 
+    /// <summary>
+    /// A copy-ready Xiaohongshu note derived from an approved story
+    /// (XIAOHONGSHU-CONTENT-PACKAGE-001).
+    /// </summary>
+    /// <remarks>
+    /// A draft until the review package approves it separately, exactly like every other
+    /// derivative: approval of the source never travels here. The text cites only the footnote
+    /// ids the source summary's claim map assigned; the title is the owner's choice from the
+    /// derived candidates, and the pictures it may carry are named by the Xiaohongshu
+    /// package's own ordered selection rows rather than by this type. Publication stays the
+    /// owner's own hand: no account, no login and no transport behind it.
+    /// </remarks>
+    public const string XiaohongshuPack = "xiaohongshu-pack";
+
     /// <summary>Every kind, in the order a surface would list them.</summary>
     public static IReadOnlyList<string> All { get; } =
     [
@@ -93,6 +107,7 @@ public static class ContentAssetTypes
         Portfolio,
         WeeklyProgress,
         LinkedinCopy,
+        XiaohongshuPack,
     ];
 
     /// <summary>Bounded to the width of the <c>content_assets.type</c> column.</summary>

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Chronicleaf.Application.Access;
 using Chronicleaf.Application.Agency;
+using Chronicleaf.Application.AgencyReports;
 using Chronicleaf.Application.AI;
 using Chronicleaf.Application.Archive;
 using Chronicleaf.Application.Capture;
@@ -169,6 +170,18 @@ public sealed class ApiErrorMiddleware(
             // back to personal) rather than a retry.
             case ClientArchivedException clientArchived:
                 return (Envelope.Create(AgencyError.ClientArchived, clientArchived.Message, traceId), LogLevel.Information);
+
+            // AGENCY-WEEKLY-REPORTS-001/002. Written here for the same reason as the refusals
+            // above: the weekly-report package raises them, and this middleware is still the
+            // only place an envelope is written. Each arm is explicit by type - the status-code
+            // mapping alone would still answer 500 - and every message is authored in the
+            // weekly-report package: no client name, no project name and no report prose a
+            // caller may not reach.
+            case WeeklyReportProjectOutsideClientException outsideClient:
+                return (Envelope.Create(WeeklyReportError.ProjectOutsideClient, outsideClient.Message, traceId), LogLevel.Information);
+
+            case WeeklyReportIdempotencyConflictException idempotencyConflict:
+                return (Envelope.Create(WeeklyReportError.IdempotencyConflict, idempotencyConflict.Message, traceId), LogLevel.Information);
 
             // CLOUD-TENANT-BOUNDARY-001/002. Written here for the same reason as the refusals
             // above: the tenancy package raises them, and this middleware is still the only place

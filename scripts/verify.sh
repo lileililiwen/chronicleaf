@@ -734,6 +734,15 @@ else
   # forward migration readiness requires - all proven against the same real disposable PostgreSQL
   # through the real API host.
   step "agency client project tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~AgencyClientProjectsTests"
+  # AGENCY-WEEKLY-REPORTS-001/002. That one client week aggregates confirmed milestones,
+  # evidence heads and explicit owner notes into the named sections with no byte of another
+  # client's work; that a foreign project is refused before any render; that an empty week
+  # says so; that a DST week still bounds exactly seven local dates; that a regrouping
+  # supersedes generation and approval; and that an export needs a live approval - all
+  # proven against the same real disposable PostgreSQL through the real API host, with the
+  # one declared substitution the capture package names (a recording screenshot provider,
+  # for the screenshots section only).
+  step "agency weekly report tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~AgencyWeeklyReportsTests"
   # CLOUD-TENANT-BOUNDARY-001/002. That a verified login creates and selects an owned tenant
   # whose scope every private request then resolves; that a bad state, nonce, issuer, key,
   # expiry or operator token issues no session; that a revoked membership denies subsequent

@@ -9,6 +9,7 @@ using Chronicleaf.Api;
 using Chronicleaf.Api.Access;
 using Chronicleaf.Api.AI;
 using Chronicleaf.Api.Agency;
+using Chronicleaf.Api.AgencyReports;
 using Chronicleaf.Api.Capture;
 using Chronicleaf.Api.Common;
 using Chronicleaf.Api.Content;
@@ -42,6 +43,7 @@ using Chronicleaf.AI.OpenAI;
 using Chronicleaf.AI.OpenRouter;
 using Chronicleaf.Infrastructure.Access;
 using Chronicleaf.Infrastructure.Agency;
+using Chronicleaf.Infrastructure.AgencyReports;
 using Chronicleaf.Infrastructure.AI;
 using Chronicleaf.Infrastructure.Archive;
 using Chronicleaf.Infrastructure.Capture;
@@ -126,6 +128,14 @@ builder.Services.AddProjectMilestones();
 // installation with no clients. No portal, no invoice, no team identity: a client is
 // organizational context over the owner's own records.
 builder.Services.AddAgencyClients();
+
+// AGENCY-WEEKLY-REPORTS-001/002. The agency weekly-report service and its report-row store:
+// a deterministic per-client aggregation of confirmed window milestones, evidence heads and
+// explicit owner notes, approved by this package's own stamp and exported as reviewed
+// Markdown or sanitized HTML. It registers no provider, no credential, no portal, no
+// invoicing and no transport. A database without the agency-weekly-reports migration
+// reports schema_mismatch at /api/ready.
+builder.Services.AddAgencyWeeklyReports();
 
 // MILESTONE-TIMELINE-001/002. The private chronological read over the milestone records above.
 // It keeps no table of its own: the projects-and-milestones migration is its schema, and a
@@ -575,6 +585,13 @@ app.MapProjectMilestoneEndpoints();
 // one of them and the public allow-list stays exactly as the access package fixed it - a client
 // hierarchy is readable only by the owner it belongs to.
 app.MapAgencyClientEndpoints();
+
+// AGENCY-WEEKLY-REPORTS-001/002: the private generate, read, approve and export routes. None
+// of them is marked public, so the access package's default-deny boundary already covers every
+// one of them and the public allow-list stays exactly as the access package fixed it. There
+// is no portal, no invoicing and no email sending here: the report is an artifact the owner
+// acts on, and no route takes a recipient, a price or a send flag.
+app.MapAgencyWeeklyReportEndpoints();
 
 // MILESTONE-TIMELINE-001/002: the private chronological timeline of one project. It is not marked
 // public, so the access package's default-deny boundary already covers it and the public allow-list

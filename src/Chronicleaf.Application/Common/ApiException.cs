@@ -204,6 +204,13 @@ public static class ApiErrorStatus
         // delivered NotFound, so a caller cannot probe for another scope's clients.
         Agency.AgencyError.ClientArchived => 409,
 
+        // The agency-weekly-reports package's codes. Additive in the same way: 422 for a
+        // project outside the reported client, because the request names a scope the report
+        // must not cover, and 409 for an idempotency key that already names different
+        // inputs, because replaying the stored report would answer a different question.
+        AgencyReports.WeeklyReportError.ProjectOutsideClient => 422,
+        AgencyReports.WeeklyReportError.IdempotencyConflict => 409,
+
         // The cloud-tenant-boundary package's codes. Additive in the same way: 401 for an OIDC
         // exchange this deployment does not accept, 403 for a tenant the caller holds no live
         // membership in, 409 for a session with no selected tenant and for a Community volume

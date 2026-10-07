@@ -292,6 +292,14 @@ public static class ChronicleafSchema
     /// first request.
     /// </summary>
     public const string XiaohongshuContentPackageMigrationId = "20261021090000_AddXiaohongshuContentPackage";
+    /// <summary>
+    /// The forward migration that adds the <c>weekly_reports</c> table
+    /// (AGENCY-WEEKLY-REPORTS-001/002). A database that has never applied it has nowhere to
+    /// record a client weekly report, so its weekly-report routes would fail against a missing
+    /// table; readiness says so by name rather than answering 200 and failing on the first
+    /// request.
+    /// </summary>
+    public const string AgencyWeeklyReportsMigrationId = "20261022090000_AddAgencyWeeklyReports";
     public static readonly IReadOnlyList<string> RequiredMigrationIds =
     [
         InitialMigrationId,
@@ -326,6 +334,7 @@ public static class ChronicleafSchema
         PublisherContractMigrationId,
         EvolutionGifExportMigrationId,
         XiaohongshuContentPackageMigrationId,
+        AgencyWeeklyReportsMigrationId,
     ];
 
     /// <summary>
@@ -333,7 +342,7 @@ public static class ChronicleafSchema
     /// later migrations and for the readiness message. It is the last entry of
     /// <see cref="RequiredMigrationIds"/>.
     /// </summary>
-    public const string ExpectedMigrationId = XiaohongshuContentPackageMigrationId;
+    public const string ExpectedMigrationId = AgencyWeeklyReportsMigrationId;
 
     /// <summary>True when the applied migrations include every id this build requires.</summary>
     public static bool IsCurrent(IReadOnlyCollection<string> appliedMigrationIds) =>

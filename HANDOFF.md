@@ -2,7 +2,7 @@
 
 ## Current state — 2026-10-07
 
-Fifty-five changes implemented, verified and archived, each with exactly two commits (implementation/
+Fifty-six changes implemented, verified and archived, each with exactly two commits (implementation/
 tests/archive, then this HANDOFF-only pointer). No `current_spec` remains: every drainable change is
 archived and the two owner-BLOCKED changes are deferred to ROADMAP for later
 (`semantic-narrative-retrieval`: demand plus embedding model/provider/dimension and consent policy;
@@ -66,6 +66,7 @@ packages parked intact in `openspec/deferred/`, nothing active remains).
 | 53 | `project-area-ia` | `66d041b` | `openspec/specs/project-area-ia/spec.md` |
 | 54 | `publish-from-variant` | `eb58a43` | `openspec/specs/publish-from-variant/spec.md` |
 | 55 | `static-blog-export-ui` | `39b5b9f` | `openspec/specs/static-blog-export-ui/spec.md` |
+| 56 | `publisher-adapter-panels` | `13b2cb8` | `openspec/specs/publisher-adapter-panels/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
@@ -2112,4 +2113,52 @@ before and after the archive, which used no `--skip-specs`. One stale-prose note
 left untouched by rule: `project-area-ia.spec.ts` still names its structural test
 "each of the 20 panels" while the Publish area now mounts 21 — prose only, no
 assertion counts panels. Deployment stays `deployable: false`; there is no remote,
+no push and no publication.
+
+`publisher-adapter-panels` is archived
+(`13b2cb8`, canonical spec `openspec/specs/publisher-adapter-panels/spec.md`):
+every delivered publisher transport now has a real surface behind the target
+picker, and the known binding 500 is repaired for all five remaining adapters.
+`AdapterTargetPanel` renders under the one shared `PublishForm` (both
+`publication-` and `variant-publish-` namespaces) naming the picked transport,
+its registry classification served field-for-field, what it sends and needs,
+and — after preview — the adapter's own target line as the bound configuration
+the confirm would authorize; the mode box offers only registry-served modes
+(`github-pages` is publish-only); `medium`/`linkedin` are pickable instead of
+disabled so the server's `publisher_target_export_only` (422) is what the owner
+reads, verbatim, with no send and no client-invented refusal. Backend repair is
+exactly five binder-visible parameterless constructors (`DevTo`, `Hashnode`,
+`Ghost`, `WordPress`, `CustomBlog` options, mirroring the archived Pages
+repair) with no validation change, each proven by a new
+`Configured_section_registers_target_and_serves_preview` fact through the
+production registration path. The per-entity CRUD circulation: target
+configuration is Created/Updated/Deleted operator-side (config file/env; no
+API by design) and Read via the targets list plus the new per-adapter block;
+attempts/receipts are Created via publish, Read via receipt, Updated via
+reconcile where the target supports it, with Delete absent by design (no list
+route serves attempts → named future package `publication-history`, already
+named upstream); bound option values are read only through the preview's target
+line, never a second source of truth. Read that package's own boundary before
+extending it, and note the two defects verification found: without its ctor the
+new devto fact fails with preview 500 `internal_error` while the target still
+lists (the exact reported shape — reproduced, then fixed, 5/5 facts green);
+and the new e2e suite's first run failed its seed because
+`seed_publish_variant` hardcoded suite 22's database name, so suite 24 now
+passes its own (`chronicleaf_e2e_adapter_panels`) via an optional third seed
+argument defaulting to suite 22's. Evidence, all run by the implementer rather
+than taken on report: `npm ci`, `tsc --noEmit` clean, `vite build` green,
+dotnet publisher stages 21/21 contract, 13/13 github-pages, 12/12 devto, 15/15
+hashnode, 13/13 ghost, 13/13 wordpress, 16/16 custom-blog (103 total, each
+stage asserted to select its tests), `bash scripts/e2e.sh` exit 0 with
+112/112 Playwright across all 24 database-isolated browser suites
+(29/3/6/4/4/3/3/4/4/3/2/5/3/2/3/3/2/2/3/3/6/5/3/7 in suite order; suite 24 is
+the new `publisher-adapter-panels` 7/7 on its own PostgreSQL at port 5104 with
+all six transports configured and the dispatch loop silenced — per-adapter
+surface, served modes, bound configuration naming the configured value,
+confirm → 202 → receipt naming the server's answer, both export-only refusals
+verbatim, and an armed counter proving no preview/publish POST before the
+clicks); name preflight exit 0; `openspec validate --all --strict
+--no-interactive` 58/58 before and after the archive, which used no
+`--skip-specs`. No `current_spec` remains: the two owner-BLOCKED changes stay
+deferred to ROADMAP. Deployment stays `deployable: false`; there is no remote,
 no push and no publication.

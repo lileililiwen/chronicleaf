@@ -386,6 +386,17 @@ builder.Services.AddXiaohongshuPack();
 // service.
 builder.Services.AddMediumImport();
 
+// VIDEO-STORY-SCRIPTS-001/002. The video-story service: an evidence-based storyboard
+// validated against an approved story and the frozen evidence head, exported as
+// storyboard.json plus narration.md plus caption.srt with the depicted pictures and refused
+// unconditionally at the publish route. It registers no provider, no renderer, no encoder,
+// no credential and no transport: generation validates an owner's shot list against stored
+// rows, approval stays the review package's table, and publication is a refusal rather than
+// a call. The package stores scripts as video-story rows in the drafts package's own tables,
+// so there is no migration behind this registration; disabling it is unregistering this one
+// service.
+builder.Services.AddVideoStory();
+
 // SCREENSHOT-EVOLUTION-IMAGES-001/002. The evolution store and service that render selected
 // screenshots into a derived comparison PNG with a re-derivable manifest, and approve the exact
 // selection and artifact hashes for export. It registers no provider, no browser and no
@@ -708,6 +719,14 @@ app.MapXiaohongshuPackEndpoints();
 // of calling anything. Preview, edit, approval and the Medium export shape stay the review
 // package's.
 app.MapMediumImportEndpoints();
+
+// VIDEO-STORY-SCRIPTS-001/002: the private generate and publish routes. None of them is marked
+// public, so the access package's default-deny boundary already covers every one of them. There
+// is no synthesis here, no rendering, no approval and no transport: generation validates an
+// owner's shot list against stored rows and stores the result as a draft with no approval row,
+// and the publish route refuses with publisher_unsupported instead of calling anything.
+// Preview, edit, approval and the video-story export shape stay the review package's.
+app.MapVideoStoryEndpoints();
 
 // NARRATIVE-MEMORY-001/002: the private narrative read, create, edit and refresh routes. None of
 // them is marked public, so the access package's default-deny boundary already covers every one

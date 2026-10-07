@@ -23,6 +23,7 @@ using Chronicleaf.Application.Secrets;
 using Chronicleaf.Application.Schedules;
 using Chronicleaf.Application.Teams;
 using Chronicleaf.Application.Tenancy;
+using Chronicleaf.Application.VideoStory;
 // `ApiError` also names the runtime shell's compact not_found/web_assets_unavailable record in
 // namespace Chronicleaf.Api, which wins the lookup from inside this namespace. The alias keeps the
 // envelope type unambiguous: the shell record is a different, shipped contract.
@@ -603,6 +604,31 @@ public sealed class ApiErrorMiddleware(
                     Envelope.Create(
                         Chronicleaf.Application.Xiaohongshu.XiaohongshuPackError.PackTooLong,
                         packTooLong.Message,
+                        traceId),
+                    LogLevel.Information);
+
+            // VIDEO-STORY-SCRIPTS-001/002. Written here for the same reason as every other
+            // feature package's refusals: this package raises them and this middleware is still
+            // the only place an envelope is written. The messages are authored in the video-story
+            // package and name no prose, no claim, no URL, no token and no host path: a shot
+            // list that does not cover the runtime exactly, or cites material the frozen
+            // evidence does not hold, is refused against the storyboard schema rather than
+            // stored as half a script, and a native publish is refused because there is no
+            // renderer, no encoder and no transport behind it.
+            case InvalidStorySchemaException invalidStory:
+                return (
+                    Envelope.Create(
+                        VideoStoryError.InvalidStorySchema,
+                        invalidStory.Message,
+                        traceId,
+                        invalidStory.FieldErrors),
+                    LogLevel.Information);
+
+            case VideoStoryPublishUnsupportedException storyPublishRefused:
+                return (
+                    Envelope.Create(
+                        VideoStoryError.PublisherUnsupported,
+                        storyPublishRefused.Message,
                         traceId),
                     LogLevel.Information);
 

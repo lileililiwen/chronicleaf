@@ -7,6 +7,7 @@ using Chronicleaf.Application.Content;
 using Chronicleaf.Application.LinkedIn;
 using Chronicleaf.Application.Medium;
 using Chronicleaf.Application.Milestones;
+using Chronicleaf.Application.VideoStory;
 using Chronicleaf.Application.Xiaohongshu;
 
 namespace Chronicleaf.Api.Content;
@@ -179,6 +180,7 @@ public static class ContentReviewEndpoints
         ILinkedInCopyService copies,
         IMediumImportService imports,
         IXiaohongshuPackService packs,
+        IVideoStoryService stories,
         IOwnerAccessService access,
         CancellationToken cancellationToken)
     {
@@ -225,6 +227,18 @@ public static class ContentReviewEndpoints
         if (string.Equals((format ?? "markdown").Trim(), "xiaohongshu", StringComparison.OrdinalIgnoreCase))
         {
             return await ExportXiaohongshuAsync(assetId, revisionText, context, packs, access, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        // VIDEO-STORY-SCRIPTS-002. The video-story package is the same approval in a handoff
+        // shape: storyboard.json, narration.md, caption.srt, the depicted pictures in
+        // first-appearance order and their manifest, served by its own use case under the same
+        // bindings the Markdown export re-checks. Preview and approval stay the review
+        // package's own routes; this branch only serves what they authorized. No video is
+        // synthesized, no footage is rendered and nothing is published.
+        if (string.Equals((format ?? "markdown").Trim(), "video-story", StringComparison.OrdinalIgnoreCase))
+        {
+            return await ExportVideoStoryAsync(assetId, revisionText, context, stories, access, cancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -392,6 +406,41 @@ public static class ContentReviewEndpoints
         // article.html, article.md, the approval-covered pictures, their manifest and the
         // hand-carry instructions. Never a public page and never an upstream call, under
         // the same approval the Markdown export re-checks.
+        return Results.File(export.Bytes, export.ContentType, export.FileName);
+    }
+
+    private static async Task<IResult> ExportVideoStoryAsync(
+        Guid assetId,
+        string? revisionText,
+        HttpContext context,
+        IVideoStoryService stories,
+        IOwnerAccessService access,
+        CancellationToken cancellationToken)
+    {
+        var owner = await OwnerScopeAsync(context, access, cancellationToken).ConfigureAwait(false);
+
+        long? revision = null;
+        if (revisionText is not null)
+        {
+            if (!long.TryParse(revisionText, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed) ||
+                parsed < 1)
+            {
+                throw new ValidationFailedException(
+                    "revision",
+                    "A revision is a stored version number, from 1.");
+            }
+
+            revision = parsed;
+        }
+
+        var export = await stories
+            .ExportAsync(owner, assetId, revision, cancellationToken)
+            .ConfigureAwait(false);
+
+        // The approved scripts as a handoff package the owner chose to download:
+        // storyboard.json, narration.md, caption.srt, the depicted pictures and their
+        // manifest. Never a video, never footage and never an upstream call, under the same
+        // approval the Markdown export re-checks.
         return Results.File(export.Bytes, export.ContentType, export.FileName);
     }
 

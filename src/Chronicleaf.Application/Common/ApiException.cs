@@ -180,6 +180,15 @@ public static class ApiErrorStatus
         // decision, told apart by type in the middleware.
         Xiaohongshu.XiaohongshuPackError.PackTooLong => 422,
 
+        // The video-story-scripts package's code. Additive in the same way: 422 for a shot
+        // list that does not satisfy the storyboard schema, because the remedy is a list that
+        // covers the runtime exactly with material the frozen evidence holds rather than a
+        // retry of the same generation. The publish refusal needs no arm of its own: its
+        // string matches the LinkedIn package's own refusal by design, so the LinkedIn arm
+        // above already answers it - all four answer one envelope code for one decision, told
+        // apart by type in the middleware.
+        VideoStory.VideoStoryError.InvalidStorySchema => 422,
+
         // The public-project-journey package's codes. Additive in the same way: 409 for a slug
         // already taken by another project's journey, because the remedy is another slug rather
         // than a corrected body - and 409 for a preview hash that no longer matches the stored

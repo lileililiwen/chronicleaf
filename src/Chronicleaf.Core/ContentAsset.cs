@@ -95,6 +95,19 @@ public static class ContentAssetTypes
     /// </remarks>
     public const string XiaohongshuPack = "xiaohongshu-pack";
 
+    /// <summary>
+    /// An evidence-based video storyboard derived from an approved story
+    /// (VIDEO-STORY-SCRIPTS-001).
+    /// </summary>
+    /// <remarks>
+    /// A draft until the review package approves it separately, exactly like every other
+    /// derivative: approval of the source never travels here. Every shot cites evidence the
+    /// frozen bundle holds, and the pictures the shots depict are named by media id rather
+    /// than by this type. The revision body is the storyboard JSON document itself: a reviewed
+    /// script a human acts on, never a synthesized video, never rendered footage, never a post.
+    /// </remarks>
+    public const string VideoStory = "video-story";
+
     /// <summary>Every kind, in the order a surface would list them.</summary>
     public static IReadOnlyList<string> All { get; } =
     [
@@ -108,6 +121,7 @@ public static class ContentAssetTypes
         WeeklyProgress,
         LinkedinCopy,
         XiaohongshuPack,
+        VideoStory,
     ];
 
     /// <summary>Bounded to the width of the <c>content_assets.type</c> column.</summary>

@@ -566,6 +566,22 @@ else
   # jobs behind the delivered browser seam. Adapting itself calls no provider and nothing here
   # reaches any Xiaohongshu endpoint, account or login.
   step "xiaohongshu content package tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~XiaohongshuContentPackageTests"
+  # VIDEO-STORY-SCRIPTS-001/002. That an approved story scripts into 15, 30 and 60-second
+  # storyboards whose shots cover the runtime exactly with no gaps and no overlaps, each shot
+  # citing evidence the frozen bundle holds and depicting a selected screenshot; that a
+  # runtime outside 15/30/60, a gapped, overlapped, hurried or mis-handed shot list, an
+  # invented picture, an unsupported evidence reference and a figure the evidence never
+  # stated are each refused as invalid_story_schema with nothing stored; that an approved
+  # script exports storyboard.json, narration.md, caption.srt and the depicted pictures with
+  # their checksum manifest while a draft exports nothing and a caption edit or a reorder
+  # ends the approval; that native publication is refused as publisher_unsupported with no
+  # operation, no audit row and no outbound request; and that no export claims a video,
+  # footage or render anywhere - all proven against the same real disposable PostgreSQL
+  # through the real API host, with the approved story produced by a real generation job
+  # behind the delivered provider seam and the depicted pictures by real capture jobs behind
+  # the delivered browser seam. Scripting itself calls no provider and nothing here reaches
+  # any renderer, encoder or publishing endpoint.
+  step "video story scripts tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~VideoStoryScriptsTests"
   # PUBLISHER-CONTRACT-001/002. That a confirmed current preview and approval records one
   # target-specific dispatch with the scope's publisher credential leased for the call; that a
   # draft, a tampered preview, an edited head and a revoked approval are each refused before

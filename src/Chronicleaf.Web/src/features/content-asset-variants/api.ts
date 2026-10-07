@@ -23,8 +23,30 @@ export async function listVariants(
   milestoneId: string,
   signal?: AbortSignal,
 ): Promise<readonly VariantSummary[]> {
+  return listMilestoneAssets(milestoneId, 'variants', signal);
+}
+
+/**
+ * Lists the derived pack assets a milestone holds, in picker order, over the
+ * same delivered route with the pack kinds asked for explicitly
+ * (CONTENT-PACK-PANELS-004). The default read stays the variant formats every
+ * older caller relies on.
+ */
+export async function listPacks(
+  milestoneId: string,
+  signal?: AbortSignal,
+): Promise<readonly VariantSummary[]> {
+  return listMilestoneAssets(milestoneId, 'packs', signal);
+}
+
+async function listMilestoneAssets(
+  milestoneId: string,
+  kinds: 'variants' | 'packs',
+  signal?: AbortSignal,
+): Promise<readonly VariantSummary[]> {
+  const query = kinds === 'packs' ? '?kinds=packs' : '';
   const answer = await send<{ readonly variants: readonly VariantSummary[] }>(
-    `/api/milestones/${encodeURIComponent(milestoneId)}/assets`,
+    `/api/milestones/${encodeURIComponent(milestoneId)}/assets${query}`,
     { method: 'GET', signal },
   );
 

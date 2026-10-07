@@ -101,7 +101,21 @@ public static class ContentVariantEndpoints
     {
         var owner = await OwnerScopeAsync(context, access, cancellationToken).ConfigureAwait(false);
 
-        var listed = await variants.ListAsync(owner, milestoneId, cancellationToken).ConfigureAwait(false);
+        // CONTENT-PACK-PANELS-004. The pack picker reads this same delivered
+        // route with ?kinds=packs; every older caller reads it without the
+        // query and gets exactly the variant formats it always got. Any other
+        // value is a 422 naming the field rather than a silent default.
+        var kinds = (context.Request.Query["kinds"].FirstOrDefault() ?? string.Empty).Trim();
+        bool includePacks = kinds switch
+        {
+            "" => false,
+            "packs" => true,
+            _ => throw new ValidationFailedException(
+                "kinds",
+                "The asset kinds are \"packs\" or, when unnamed, the variant formats."),
+        };
+
+        var listed = await variants.ListAsync(owner, milestoneId, cancellationToken, includePacks).ConfigureAwait(false);
 
         return Results.Json(new VariantListResponse(
             [.. listed.Select(entry => new VariantSummaryResponse(

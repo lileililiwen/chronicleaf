@@ -801,6 +801,41 @@ public sealed class XiaohongshuContentPackageTests(ChronicleafPostgresFixture po
     }
 
     // ==============================================================================================
+    // CONTENT-PACK-PANELS-004: the milestone asset list serves derived pack kinds for pickers.
+    // ==============================================================================================
+
+    [Fact]
+    public async Task Xiaohongshu_Panels_derived_pack_is_listed_for_select()
+    {
+        await using var fixture = await ArrangeAsync("xh_panels_list");
+
+        using var before = await fixture.Owner.GetAsync($"/api/milestones/{fixture.MilestoneId:D}/assets");
+        Assert.Equal(HttpStatusCode.OK, before.StatusCode);
+        Assert.Empty(JsonDocument.Parse(await before.Content.ReadAsStringAsync())
+            .RootElement.GetProperty("variants").EnumerateArray());
+
+        var assetId = await AdaptAsync(fixture, CallToAction, ["#buildinpublic"]);
+
+        // The default read is exactly what older callers rely on: the derived
+        // pack is not in it.
+        using var plain = await fixture.Owner.GetAsync($"/api/milestones/{fixture.MilestoneId:D}/assets");
+        Assert.Equal(HttpStatusCode.OK, plain.StatusCode);
+        Assert.Empty(JsonDocument.Parse(await plain.Content.ReadAsStringAsync())
+            .RootElement.GetProperty("variants").EnumerateArray());
+
+        // Asked for packs, the same delivered route names the derived pack
+        // with its type, revision and digests.
+        using var listed = await fixture.Owner.GetAsync($"/api/milestones/{fixture.MilestoneId:D}/assets?kinds=packs");
+        Assert.Equal(HttpStatusCode.OK, listed.StatusCode);
+        var entries = JsonDocument.Parse(await listed.Content.ReadAsStringAsync())
+            .RootElement.GetProperty("variants").EnumerateArray().ToList();
+        var entry = Assert.Single(entries);
+        Assert.Equal(assetId, entry.GetProperty("assetId").GetGuid());
+        Assert.Equal("xiaohongshu-pack", entry.GetProperty("type").GetString());
+        Assert.Equal(1, entry.GetProperty("currentRevision").GetInt64());
+    }
+
+    // ==============================================================================================
     // Length rules: the internal ceiling refuses, the threshold warns, both deterministically.
     // ==============================================================================================
 

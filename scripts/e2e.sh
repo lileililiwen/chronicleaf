@@ -92,6 +92,7 @@ area_base_url="${CHRONICLEAF_AREA_BASE_URL:-http://127.0.0.1:5101}"
 publish_variant_base_url="${CHRONICLEAF_PUBLISH_VARIANT_BASE_URL:-http://127.0.0.1:5102}"
 static_blog_export_base_url="${CHRONICLEAF_STATIC_BLOG_EXPORT_BASE_URL:-http://127.0.0.1:5103}"
 adapter_panels_base_url="${CHRONICLEAF_ADAPTER_PANELS_BASE_URL:-http://127.0.0.1:5104}"
+content_pack_base_url="${CHRONICLEAF_CONTENT_PACK_BASE_URL:-http://127.0.0.1:5105}"
 log_file="$repo_root/$publish_dir/server.log"
 evidence_log_file="$repo_root/$publish_dir/server-evidence.log"
 credentials_log_file="$repo_root/$publish_dir/server-credentials.log"
@@ -116,6 +117,7 @@ area_log_file="$repo_root/$publish_dir/server-area.log"
 publish_variant_log_file="$repo_root/$publish_dir/server-publish-variant.log"
 static_blog_export_log_file="$repo_root/$publish_dir/server-static-blog-export.log"
 adapter_panels_log_file="$repo_root/$publish_dir/server-adapter-panels.log"
+content_pack_log_file="$repo_root/$publish_dir/server-content-pack.log"
 key_file=""
 
 # The operator key for this run: 32 random bytes in a temporary file outside the repository and
@@ -155,7 +157,8 @@ cleanup() {
     "$repo_root/$publish_dir/access-token-journey" "$repo_root/$publish_dir/access-token-area" \
     "$repo_root/$publish_dir/access-token-publish-variant" \
     "$repo_root/$publish_dir/access-token-static-blog-export" \
-    "$repo_root/$publish_dir/access-token-adapter-panels"
+    "$repo_root/$publish_dir/access-token-adapter-panels" \
+    "$repo_root/$publish_dir/access-token-content-pack"
   # So is the encryption key: it is removed whether the run passed or failed.
   remove_key_file
   exit "$exit_status"
@@ -1388,6 +1391,121 @@ SQL
   fi
 }
 
+# ---------------------------------------------------------------------------------------------
+# Suite 25 seed: one project, one confirmed milestone with an approved story and one
+# bare milestone with no draft at all.
+#
+# Everything above the content tables is made through the running server's own routes with
+# the real access token and a real antiforgery value, so the project, the milestones,
+# their confirmation and the first milestone's evidence are records the product itself
+# created. The approved story rows are inserted directly with the same technique and
+# the same read-back refusal as seed_static_blog_export_rows — a story is produced by
+# a provider call, and this installation has an adapter with an empty model allowlist,
+# so there is nothing that could produce one honestly here. No credential is stored:
+# no pack contract leases one. Every pack derivation and every pack approval below
+# goes through the shipped panels and the published server.
+# ---------------------------------------------------------------------------------------------
+seed_content_pack_panels() {
+  local origin="$1"
+  local token="$2"
+  local cookie_jar
+  cookie_jar="$(mktemp -d)/cookies.txt"
+
+  local antiforgery
+  antiforgery="$(curl --silent --show-error --cookie-jar "$cookie_jar" --cookie "$cookie_jar" \
+    --data "{\"accessToken\":\"${token}\"}" \
+    -H 'Content-Type: application/json' \
+    "${origin}/api/session" >/dev/null && \
+    curl --silent --show-error --cookie-jar "$cookie_jar" --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/session/antiforgery" | jq -r '.token')"
+
+  if [ -z "$antiforgery" ] || [ "$antiforgery" = "null" ]; then
+    echo "the content-pack seed could not read an antiforgery value from ${origin}" >&2
+    return 1
+  fi
+
+  local project_id
+  project_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"name":"Content packs","description":"Read and export panels for pack backends."}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/projects" | jq -r '.id')"
+
+  if [ -z "$project_id" ] || [ "$project_id" = "null" ]; then
+    echo "the content-pack seed could not create its project" >&2
+    return 1
+  fi
+
+  # The seeded body is English, so the voice a derivation and an approval are judged under
+  # must be too: the default profile declares Chinese and would report language findings on
+  # every field, which would leave the browser with nothing it can approve. The stored
+  # language is read back, because a PUT that did not take would leave the same
+  # un-approvable fixture behind.
+  local voice_language
+  voice_language="$(curl --silent --show-error --request PUT --cookie "$cookie_jar" \
+    --data '{"presetId":"technical-blog","overrides":{"language":"en"}}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 0' \
+    "${origin}/api/projects/${project_id}/voice-profile" | jq -r '.effectiveValues.language')"
+
+  if [ "$voice_language" != "en" ]; then
+    echo "the content-pack seed could not set the project's voice" >&2
+    return 1
+  fi
+
+  local milestone_id
+  milestone_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"title":"Pack source story","version":"0.1.0","occurredAt":"2026-10-01T09:00:00Z","type":"feature","notes":"Recorded by the e2e seed.","knownLimitations":[],"nextSteps":[]}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/projects/${project_id}/milestones" | jq -r '.id')"
+
+  if [ -z "$milestone_id" ] || [ "$milestone_id" = "null" ]; then
+    echo "the content-pack seed could not create its milestone" >&2
+    return 1
+  fi
+
+  # A manual milestone is confirmed by the act of saving it, so no confirm call is needed here.
+  curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"notes":"The pipeline now reproduces from a clean checkout.","expectedRevision":0}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 0' \
+    "${origin}/api/milestones/${milestone_id}/evidence/manual" >/dev/null
+
+  local bundle_id
+  bundle_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/milestones/${milestone_id}/evidence" \
+    | jq -r '.items[0].id')"
+
+  local evidence_item_id
+  evidence_item_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/milestones/${milestone_id}/evidence" \
+    | jq -r '.items[0].items[0].id')"
+
+  if [ -z "$evidence_item_id" ] || [ "$evidence_item_id" = "null" ]; then
+    echo "the content-pack seed could not read the evidence bundle the product created" >&2
+    return 1
+  fi
+
+  seed_static_blog_export_rows "$postgres_container" "chronicleaf_e2e_content_pack" \
+    "$project_id" "$milestone_id" "$bundle_id" "$evidence_item_id" \
+    "Pack source story" "yes"
+
+  # The bare milestone carries no evidence and no story: the pack panels on its row
+  # prove the empty states rather than a second derivation.
+  local bare_id
+  bare_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"title":"Bare pack milestone","version":"0.1.0","occurredAt":"2026-10-02T09:00:00Z","type":"feature","notes":"Recorded by the e2e seed.","knownLimitations":[],"nextSteps":[]}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/projects/${project_id}/milestones" | jq -r '.id')"
+
+  if [ -z "$bare_id" ] || [ "$bare_id" = "null" ]; then
+    echo "the content-pack seed could not create its bare milestone" >&2
+    return 1
+  fi
+}
+
 seed_review_rows() {
   local container="$1"
   local database_name="$2"
@@ -2410,4 +2528,34 @@ seed_publish_variant "$adapter_panels_base_url" "$(cat "$repo_root/$publish_dir/
 echo "==> npm run test:e2e (real browser against $adapter_panels_base_url)"
 run_suite "$adapter_panels_base_url" "$adapter_panels_log_file" "$repo_root/$publish_dir/access-token-adapter-panels" \
   tests/publisher-adapter-panels.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 25: content pack panels. It needs a project with one approved story and one bare
+# milestone - and neither a story nor an approval can be produced through the UI without
+# a provider, while an approval, once recorded, cannot be un-recorded - so its own
+# installation, its own database and its own published instance, for the same reason
+# suites 2 to 24 each have one.
+#
+# Jobs stay enabled for this installation (the default start_suite path), although no
+# pack route enqueues one: every derivation below answers 201 synchronously and every
+# export serves stored bytes. What a pass establishes is that derive (LinkedIn,
+# Xiaohongshu) or select (Medium) → preview → approve → download serves bytes
+# byte-equal to the delivered export route, that the native-publish attempt is refused
+# in the server's own `publisher_unsupported` words with no account action, that the
+# empty states are honest, and that nothing posts anywhere: an armed counter proves no
+# POST leaves before its explicit control. It is NOT evidence that anything was sent
+# to any pack host: no transport exists, and the suite asserts no request ever aims
+# at one.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a twenty-fifth disposable PostgreSQL and published application at $content_pack_base_url"
+start_suite content_pack "$content_pack_base_url" "$content_pack_log_file" \
+  "$repo_root/$publish_dir/access-token-content-pack"
+
+echo "==> seeding one approved story and one bare milestone"
+seed_content_pack_panels "$content_pack_base_url" "$(cat "$repo_root/$publish_dir/access-token-content-pack")"
+
+echo "==> npm run test:e2e (real browser against $content_pack_base_url)"
+run_suite "$content_pack_base_url" "$content_pack_log_file" "$repo_root/$publish_dir/access-token-content-pack" \
+  tests/content-pack-panels.spec.ts
 stop_suite

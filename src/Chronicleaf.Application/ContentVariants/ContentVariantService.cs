@@ -417,7 +417,8 @@ public sealed class ContentVariantService(
     public async Task<IReadOnlyList<VariantSummary>> ListAsync(
         OwnerScope owner,
         Guid milestoneId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool includePacks = false)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -426,7 +427,20 @@ public sealed class ContentVariantService(
 
         var listed = new List<VariantSummary>();
 
-        foreach (var type in ContentVariantTypes.All)
+        // CONTENT-PACK-PANELS-004. The picker surface for packs is this same
+        // delivered route with the pack kinds asked for explicitly: the two
+        // pack kinds the delivered backends store are listed alongside the
+        // variant formats only when includePacks is set, so the default read
+        // the variant panel and every older caller rely on is unchanged. The
+        // story itself and the video-story kind stay out in both modes: the
+        // story has its own draft read, and video-story selection is that
+        // package's own surface.
+        var types = includePacks
+            ? ContentVariantTypes.All.Concat(
+                [ContentAssetTypes.LinkedinCopy, ContentAssetTypes.XiaohongshuPack])
+            : ContentVariantTypes.All;
+
+        foreach (var type in types)
         {
             var asset = await assets
                 .FindForMilestoneAsync(owner.ScopeId, milestoneId, type, cancellationToken)

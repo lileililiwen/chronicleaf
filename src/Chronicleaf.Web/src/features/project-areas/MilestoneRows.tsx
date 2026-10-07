@@ -13,6 +13,9 @@ import { LlmProviderArea } from '../llm-provider-contract/LlmProviderArea';
 import { GroundedMarkdownDraftPanel } from '../grounded-markdown-drafts/GroundedMarkdownDraftPanel';
 import { MarkdownReviewPanel } from '../markdown-review-export/MarkdownReviewPanel';
 import { ContentVariantPanel } from '../content-asset-variants/ContentVariantPanel';
+import { LinkedInPackPanel } from '../content-pack-panels/LinkedInPackPanel';
+import { MediumPackPanel } from '../content-pack-panels/MediumPackPanel';
+import { XiaohongshuPackPanel } from '../content-pack-panels/XiaohongshuPackPanel';
 import { ScreenshotCapturePanel } from '../screenshot-capture/ScreenshotCapturePanel';
 import { ScreenshotPicker } from '../screenshot-curation/ScreenshotPicker';
 import {
@@ -350,6 +353,33 @@ function MilestoneRow({
           <ContentVariantPanel
             projectId={milestone.projectId}
             milestoneId={milestone.id}
+            archived={archived}
+            confirmed={milestone.status === 'confirmed'}
+          />
+
+          {/* CONTENT-PACK-PANELS-001/002/003. Read/export panels for the three
+              delivered content-pack backends. They sit under the variant panel
+              because they consume its subject - derived assets of an approved
+              story - and add the one thing it has not: the pack shapes with
+              their own derive, inert preview, approval, exact-byte download
+              and verbatim publish refusal. Nothing here sends anything. */}
+          <LinkedInPackPanel
+            projectId={milestone.projectId}
+            milestoneId={milestone.id}
+            milestoneTitle={milestone.title}
+            archived={archived}
+            confirmed={milestone.status === 'confirmed'}
+          />
+          <MediumPackPanel
+            milestoneId={milestone.id}
+            milestoneTitle={milestone.title}
+            archived={archived}
+            confirmed={milestone.status === 'confirmed'}
+          />
+          <XiaohongshuPackPanel
+            projectId={milestone.projectId}
+            milestoneId={milestone.id}
+            milestoneTitle={milestone.title}
             archived={archived}
             confirmed={milestone.status === 'confirmed'}
           />

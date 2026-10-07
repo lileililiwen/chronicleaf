@@ -103,11 +103,16 @@ public interface IContentVariantService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Lists the variant assets a milestone holds, in picker order.
+    /// Lists the derived assets a milestone holds, in picker order: every variant
+    /// format, plus the LinkedIn copy and Xiaohongshu pack kinds
+    /// (CONTENT-PACK-PANELS-004) only when <paramref name="includePacks"/> is set,
+    /// so a panel can select a previously derived pack over this delivered route
+    /// while the default read stays exactly what older callers rely on.
     /// </summary>
     /// <exception cref="ResourceNotFoundException">The milestone is absent or in another scope (404).</exception>
     Task<IReadOnlyList<VariantSummary>> ListAsync(
         OwnerScope owner,
         Guid milestoneId,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        bool includePacks = false);
 }

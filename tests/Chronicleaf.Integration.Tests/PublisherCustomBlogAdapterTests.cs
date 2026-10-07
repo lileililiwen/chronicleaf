@@ -884,6 +884,47 @@ public sealed class PublisherCustomBlogAdapterTests(ChronicleafPostgresFixture p
         Assert.Equal(new[] { "markdown" }, minimal.ParsedFormats);
     }
 
+    // ==============================================================================================
+    // PUBLISHER-ADAPTER-PANELS-001: a configured section binds through production registration.
+    // ==============================================================================================
+
+    /// <summary>
+    /// The configured section must bind through the production registration path - the demand
+    /// gate plus <c>Configure</c> - rather than only through the stub monitor this suite's
+    /// other hosts use. Without a binder-visible constructor the target registers and then
+    /// every preview against it 500s inside the options factory, which is a publishing
+    /// dead-end no picker can route around.
+    /// </summary>
+    [Fact]
+    public async Task Configured_section_registers_target_and_serves_preview()
+    {
+        await using var fixture = await ArrangeAsync("cb_configured_section");
+        await using var host = PublisherCustomBlogApiHost.StartConfigured(
+            fixture.Database,
+            new FixedTimeProvider(Clock),
+            fixture.KeyFile.FilePath,
+            Origin,
+            "markdown,html");
+        using var owner = await OwnerClient.CreateAsync(host);
+
+        using var listed = await owner.GetAsync("/api/publisher-targets");
+        Assert.Equal(HttpStatusCode.OK, listed.StatusCode);
+
+        var body = JsonDocument.Parse(await listed.Content.ReadAsStringAsync());
+        var entry = body.RootElement
+            .GetProperty("targets")
+            .EnumerateArray()
+            .Single(target => target.GetProperty("targetId").GetString() == CustomBlogPublisher.TargetId);
+        Assert.False(entry.GetProperty("exportOnly").GetBoolean());
+        Assert.True(entry.GetProperty("supportsDraft").GetBoolean());
+        Assert.True(entry.GetProperty("supportsPublish").GetBoolean());
+        Assert.False(entry.GetProperty("supportsReconcile").GetBoolean());
+
+        // The preview renders against the bound target: CPU only, no wire, no 500.
+        var preview = await PreviewAsync(owner, fixture.StoryAssetId, CustomBlogPublisher.TargetId, "draft");
+        Assert.NotEmpty(preview.PreviewHash);
+    }
+
     [Fact]
     public async Task Prepare_pictures_are_named_not_carried_and_preview_binds_origin_formats_bytes()
     {
@@ -1652,6 +1693,7 @@ public sealed class PublisherCustomBlogApiHost : WebApplicationFactory<Program>
     private readonly string? _keyFile;
     private readonly IOptionsMonitor<CustomBlogOptions>? _targets;
     private readonly ScriptedCustomBlogHandler? _wire;
+    private readonly IReadOnlyDictionary<string, string?>? _configured;
     private readonly LogCapture _logs;
 
     private PublisherCustomBlogApiHost(
@@ -1660,7 +1702,8 @@ public sealed class PublisherCustomBlogApiHost : WebApplicationFactory<Program>
         string? keyFile,
         IOptionsMonitor<CustomBlogOptions>? targets,
         ScriptedCustomBlogHandler? wire,
-        LogCapture logs)
+        LogCapture logs,
+        IReadOnlyDictionary<string, string?>? configured = null)
     {
         _connectionString = connectionString;
         _clock = clock;
@@ -1668,6 +1711,7 @@ public sealed class PublisherCustomBlogApiHost : WebApplicationFactory<Program>
         _targets = targets;
         _wire = wire;
         _logs = logs;
+        _configured = configured;
     }
 
     /// <summary>Starts a host with the shipped adapter over the scenario's scripted wire.</summary>
@@ -1704,6 +1748,31 @@ public sealed class PublisherCustomBlogApiHost : WebApplicationFactory<Program>
     }
 
     /// <summary>
+    /// Starts a host through the production registration path with an explicit target
+    /// configured: the demand gate reads the section and <c>Configure</c> binds it, exactly
+    /// as a deployment configures it. No scripted wire is installed, so nothing here may
+    /// reach a remote side - the scenarios this host serves stop at acceptance.
+    /// </summary>
+    public static PublisherCustomBlogApiHost StartConfigured(
+        string connectionString,
+        TimeProvider clock,
+        string? keyFile,
+        string origin,
+        string? formats) =>
+        new(
+            connectionString,
+            clock,
+            keyFile,
+            targets: null,
+            wire: null,
+            new LogCapture(),
+            configured: new Dictionary<string, string?>
+            {
+                [$"{CustomBlogOptions.SectionName}:{nameof(CustomBlogOptions.Origin)}"] = origin,
+                [$"{CustomBlogOptions.SectionName}:{nameof(CustomBlogOptions.Formats)}"] = formats,
+            });
+
+    /// <summary>
     /// Starts a host with the production composition root and no explicit target: demand-gated
     /// off, so the slot answers unknown.
     /// </summary>
@@ -1735,6 +1804,14 @@ public sealed class PublisherCustomBlogApiHost : WebApplicationFactory<Program>
         if (_keyFile is not null)
         {
             builder.UseSetting(SecretVaultSettings.EncryptionKeyFileSettingName, _keyFile);
+        }
+
+        if (_configured is not null)
+        {
+            foreach (var setting in _configured)
+            {
+                builder.UseSetting(setting.Key, setting.Value);
+            }
         }
 
         builder.ConfigureLogging(logging =>

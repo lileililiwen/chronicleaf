@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { listTargets, previewPublish, publishAsset, readReceipt } from './api';
+import { AdapterTargetPanel } from './AdapterTargetPanel';
 import { PublicationApiError, type PublicationReceipt, type PublishAccepted, type PublishPreview, type PublisherTarget } from './types';
 
 /**
@@ -145,6 +146,29 @@ export function PublishForm({
 
   const loadingTargets = targets === null && targetsFailure === null;
 
+  const pickedTarget = targets?.find((target) => target.targetId === targetId) ?? null;
+
+  // The mode box offers only what the picked target's registry entry serves, so the
+  // confirm can never name a mode the server refuses for this target. Before the
+  // list lands there is no classification yet, so both modes stay offered.
+  const supportedModes: readonly string[] =
+    pickedTarget === null
+      ? ['draft', 'publish']
+      : [
+          ...(pickedTarget.supportsDraft ? ['draft'] : []),
+          ...(pickedTarget.supportsPublish ? ['publish'] : []),
+        ];
+
+  // A target change keeps a still-supported mode and falls to the first supported
+  // one otherwise. An export-only target serves no mode, so the mode is left alone
+  // there: previewing against it is refused by the server either way.
+  useEffect(() => {
+    if (supportedModes.length > 0 && !supportedModes.includes(mode)) {
+      setMode(supportedModes[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetId, targets]);
+
   return (
     <section aria-label="Publish form" data-testid={`${namespace}-form`}>
       {notice ? (
@@ -178,6 +202,7 @@ export function PublishForm({
             send to.
           </p>
         ) : (
+          <>
           <label className="form__label">
             Target
             <select
@@ -187,31 +212,36 @@ export function PublishForm({
               data-testid={`${namespace}-target-picker`}
             >
               {targets.map((target) => (
-                <option
-                  key={target.targetId}
-                  value={target.targetId}
-                  disabled={target.exportOnly}
-                >
+                <option key={target.targetId} value={target.targetId}>
                   {targetLabel(target)}
                 </option>
               ))}
             </select>
           </label>
+          {pickedTarget !== null ? (
+            <AdapterTargetPanel target={pickedTarget} preview={preview} namespace={namespace} />
+          ) : null}
+          </>
         )
       ) : null}
 
-      <label className="form__label">
-        Mode
-        <select
-          className="form__input"
-          value={mode}
-          onChange={(event) => setMode(event.target.value)}
-          data-testid={`${namespace}-mode-input`}
-        >
-          <option value="draft">draft</option>
-          <option value="publish">publish</option>
-        </select>
-      </label>
+      {pickedTarget?.exportOnly === true ? null : (
+        <label className="form__label">
+          Mode
+          <select
+            className="form__input"
+            value={mode}
+            onChange={(event) => setMode(event.target.value)}
+            data-testid={`${namespace}-mode-input`}
+          >
+            {supportedModes.map((supported) => (
+              <option key={supported} value={supported}>
+                {supported}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <div className="view__actions">
         <button
           type="button"

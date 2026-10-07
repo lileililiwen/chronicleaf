@@ -37,6 +37,19 @@ namespace Chronicleaf.Publishers.Ghost;
 /// <param name="Tags">The raw comma-separated default tags, or null for none.</param>
 public sealed partial record GhostOptions(string? Origin, string? ApiVersion, string? Tags)
 {
+    /// <summary>
+    /// The binder's construction: the composition root binds the configured section through
+    /// <c>Configure</c>, which builds options through a parameterless constructor. Without
+    /// this, a configured section registers the target and then answers every preview and
+    /// publish against it with a 500, because the options factory cannot build the record.
+    /// Values still validate on every call through <c>Create</c>, so a bound-but-invalid
+    /// section is refused rather than served.
+    /// </summary>
+    public GhostOptions()
+        : this(Origin: null, ApiVersion: null, Tags: null)
+    {
+    }
+
     /// <summary>The configuration section this target binds from.</summary>
     public const string SectionName = "Chronicleaf:Ghost";
 

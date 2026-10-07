@@ -91,6 +91,7 @@ journey_base_url="${CHRONICLEAF_JOURNEY_BASE_URL:-http://127.0.0.1:5100}"
 area_base_url="${CHRONICLEAF_AREA_BASE_URL:-http://127.0.0.1:5101}"
 publish_variant_base_url="${CHRONICLEAF_PUBLISH_VARIANT_BASE_URL:-http://127.0.0.1:5102}"
 static_blog_export_base_url="${CHRONICLEAF_STATIC_BLOG_EXPORT_BASE_URL:-http://127.0.0.1:5103}"
+adapter_panels_base_url="${CHRONICLEAF_ADAPTER_PANELS_BASE_URL:-http://127.0.0.1:5104}"
 log_file="$repo_root/$publish_dir/server.log"
 evidence_log_file="$repo_root/$publish_dir/server-evidence.log"
 credentials_log_file="$repo_root/$publish_dir/server-credentials.log"
@@ -114,6 +115,7 @@ journey_log_file="$repo_root/$publish_dir/server-journey.log"
 area_log_file="$repo_root/$publish_dir/server-area.log"
 publish_variant_log_file="$repo_root/$publish_dir/server-publish-variant.log"
 static_blog_export_log_file="$repo_root/$publish_dir/server-static-blog-export.log"
+adapter_panels_log_file="$repo_root/$publish_dir/server-adapter-panels.log"
 key_file=""
 
 # The operator key for this run: 32 random bytes in a temporary file outside the repository and
@@ -152,7 +154,8 @@ cleanup() {
     "$repo_root/$publish_dir/access-token-gif" "$repo_root/$publish_dir/access-token-publication" \
     "$repo_root/$publish_dir/access-token-journey" "$repo_root/$publish_dir/access-token-area" \
     "$repo_root/$publish_dir/access-token-publish-variant" \
-    "$repo_root/$publish_dir/access-token-static-blog-export"
+    "$repo_root/$publish_dir/access-token-static-blog-export" \
+    "$repo_root/$publish_dir/access-token-adapter-panels"
   # So is the encryption key: it is removed whether the run passed or failed.
   remove_key_file
   exit "$exit_status"
@@ -920,6 +923,8 @@ SQL
 seed_publish_variant() {
   local origin="$1"
   local token="$2"
+  # The suite's own database: suite 22 leaves the default, suite 24 names its own.
+  local database_name="${3:-chronicleaf_e2e_publish_variant}"
   local cookie_jar
   cookie_jar="$(mktemp -d)/cookies.txt"
 
@@ -1024,7 +1029,7 @@ seed_publish_variant() {
     return 1
   fi
 
-  seed_publish_variant_rows "$postgres_container" "chronicleaf_e2e_publish_variant" \
+  seed_publish_variant_rows "$postgres_container" "$database_name" \
     "$project_id" "$milestone_id" "$bundle_id" "$evidence_item_id"
 }
 
@@ -2374,4 +2379,35 @@ seed_static_blog_export "$static_blog_export_base_url" "$(cat "$repo_root/$publi
 echo "==> npm run test:e2e (real browser against $static_blog_export_base_url)"
 run_suite "$static_blog_export_base_url" "$static_blog_export_log_file" "$repo_root/$publish_dir/access-token-static-blog-export" \
   tests/static-blog-export-ui.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 24: publisher adapter panels. It needs a project with an approved story, a sealed
+# `publisher` credential and every transport registered - and a publish, once accepted, can
+# never be un-accepted - so its own installation, its own database and its own published
+# instance, for the same reason suites 2 to 23 each have one.
+#
+# Six deployment facts are configured for this installation only. Each transport registers
+# solely because an explicit section names it, and each preview renders CPU-only - no
+# credential lease, no row, no remote call - so previewing proves the picker aims at a real
+# classification through the repaired production binding. The dispatch loop is silenced, so
+# every receipt the suite reads stays at the acceptance the request committed: what a pass
+# establishes is that pick target → adapter surface → preview naming the bound
+# configuration → confirm reaches the delivered routes and the receipt names the server's
+# answer, with the export-only medium and linkedin previews refused in the server's own
+# words. It is NOT evidence that anything was sent anywhere: no run executes here (every
+# configured origin is a name, not a destination), and the dispatch-to-terminal half is the
+# .NET suites' claim, not this one's.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a twenty-fourth disposable PostgreSQL and published application at $adapter_panels_base_url"
+start_suite adapter_panels "$adapter_panels_base_url" "$adapter_panels_log_file" \
+  "$repo_root/$publish_dir/access-token-adapter-panels" \
+  "Chronicleaf__Operations__Enabled=false Chronicleaf__GitHubPages__RepositoryOwner=e2e-owner Chronicleaf__GitHubPages__RepositoryName=e2e-docs Chronicleaf__GitHubPages__Branch=main Chronicleaf__DevTo__Tags=e2e,chronicleaf Chronicleaf__Hashnode__PublicationId=e2e-publication-01 Chronicleaf__Ghost__Origin=https://ghost.example.invalid Chronicleaf__Ghost__ApiVersion=v5.0 Chronicleaf__Ghost__Tags=e2e Chronicleaf__WordPress__Origin=https://wp.example.invalid Chronicleaf__WordPress__Username=e2euser Chronicleaf__CustomBlog__Origin=https://blog.example.invalid Chronicleaf__CustomBlog__Formats=markdown"
+
+echo "==> seeding one approved story and one sealed publisher credential"
+seed_publish_variant "$adapter_panels_base_url" "$(cat "$repo_root/$publish_dir/access-token-adapter-panels")" "chronicleaf_e2e_adapter_panels"
+
+echo "==> npm run test:e2e (real browser against $adapter_panels_base_url)"
+run_suite "$adapter_panels_base_url" "$adapter_panels_log_file" "$repo_root/$publish_dir/access-token-adapter-panels" \
+  tests/publisher-adapter-panels.spec.ts
 stop_suite

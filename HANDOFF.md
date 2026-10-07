@@ -2,9 +2,11 @@
 
 ## Current state — 2026-10-05
 
-Twenty-six changes implemented, verified and archived, each with exactly two commits (implementation/
-tests/archive, then this HANDOFF-only pointer). `current_spec` selects `content-asset-variants`, the
-next POST-MVP package in ROADMAP order after `html-content-export`.
+Fifty-two changes implemented, verified and archived, each with exactly two commits (implementation/
+tests/archive, then this HANDOFF-only pointer). No `current_spec` remains: every drainable change is
+archived and the two still-active changes are owner-BLOCKED and held, never selected
+(`semantic-narrative-retrieval`: demand plus embedding model/provider/dimension and consent policy;
+`hosted-managed-ai`: provider/model/quota/unit weights plus financial settlement policy).
 
 | # | Change | Implementation commit | Canonical spec |
 |---|---|---|---|
@@ -32,17 +34,34 @@ next POST-MVP package in ROADMAP order after `html-content-export`.
 | 22 | `markdown-review-export` | `64d6868` | `openspec/specs/markdown-review-export/spec.md` |
 | 23 | `community-compose-release` | `5a40d46` | `openspec/specs/community-compose-release/spec.md` |
 | 24 | `local-git-evidence` | `f7e4a81` | `openspec/specs/local-git-evidence/spec.md` |
-| 25 | `narrative-memory` | `a7d12f4` | `openspec/specs/narrative-memory/spec.md` |
-| 26 | `html-content-export` | `aae5181` | `openspec/specs/html-content-export/spec.md` |
-| 27 | `content-asset-variants` | `65309ac` | `openspec/specs/content-asset-variants/spec.md` |
-| 28 | `screenshot-evolution-images` | `f2916e1` | `openspec/specs/screenshot-evolution-images/spec.md` |
-| 29 | `static-blog-export` | `066e153` | `openspec/specs/static-blog-export/spec.md` |
-| 30 | `public-project-journey` | `6bc7e8e` | `openspec/specs/public-project-journey/spec.md` |
-| 31 | `agency-client-projects` | `764eb0e` | `openspec/specs/agency-client-projects/spec.md` |
-| 32 | `cloud-tenant-boundary` | `0a6a935` | `openspec/specs/cloud-tenant-boundary/spec.md` |
-| 33 | `team-project-permissions` | `0f47fca` | `openspec/specs/team-project-permissions/spec.md` |
-| 34 | `cloud-object-storage` | `bdfcec9` | `openspec/specs/cloud-object-storage/spec.md` |
-| 35 | `scheduled-project-sync` | `bfa302a` | `openspec/specs/scheduled-project-sync/spec.md` |
+| 25 | `github-release-candidates` | `08651c4` | `openspec/specs/github-release-candidates/spec.md` |
+| 26 | `github-graphql-enrichment` | `c7a97b8` | `openspec/specs/github-graphql-enrichment/spec.md` |
+| 27 | `narrative-memory` | `a7d12f4` | `openspec/specs/narrative-memory/spec.md` |
+| 28 | `html-content-export` | `aae5181` | `openspec/specs/html-content-export/spec.md` |
+| 29 | `content-asset-variants` | `65309ac` | `openspec/specs/content-asset-variants/spec.md` |
+| 30 | `screenshot-evolution-images` | `f2916e1` | `openspec/specs/screenshot-evolution-images/spec.md` |
+| 31 | `static-blog-export` | `066e153` | `openspec/specs/static-blog-export/spec.md` |
+| 32 | `public-project-journey` | `6bc7e8e` | `openspec/specs/public-project-journey/spec.md` |
+| 33 | `agency-client-projects` | `764eb0e` | `openspec/specs/agency-client-projects/spec.md` |
+| 34 | `cloud-tenant-boundary` | `0a6a935` | `openspec/specs/cloud-tenant-boundary/spec.md` |
+| 35 | `team-project-permissions` | `0f47fca` | `openspec/specs/team-project-permissions/spec.md` |
+| 36 | `cloud-object-storage` | `bdfcec9` | `openspec/specs/cloud-object-storage/spec.md` |
+| 37 | `scheduled-project-sync` | `bfa302a` | `openspec/specs/scheduled-project-sync/spec.md` |
+| 38 | `hosted-archive-operations` | `2db6039` | `openspec/specs/hosted-archive-operations/spec.md` |
+| 39 | `github-app-connection` | `f5a93d4` | `openspec/specs/github-app-connection/spec.md` |
+| 40 | `linkedin-copy-package` | `637a1fc` | `openspec/specs/linkedin-copy-package/spec.md` |
+| 41 | `medium-import-package` | `780b6fd` | `openspec/specs/medium-import-package/spec.md` |
+| 42 | `publisher-contract` | `8e53d58` | `openspec/specs/publisher-contract/spec.md` |
+| 43 | `publisher-github-pages-adapter` | `6a4fb12` | `openspec/specs/publisher-github-pages-adapter/spec.md` |
+| 44 | `publisher-devto-adapter` | `b880186` | `openspec/specs/publisher-devto-adapter/spec.md` |
+| 45 | `publisher-hashnode-adapter` | `f1d990c` | `openspec/specs/publisher-hashnode-adapter/spec.md` |
+| 46 | `publisher-ghost-adapter` | `49707ac` | `openspec/specs/publisher-ghost-adapter/spec.md` |
+| 47 | `publisher-wordpress-adapter` | `e99205b` | `openspec/specs/publisher-wordpress-adapter/spec.md` |
+| 48 | `publisher-custom-blog-adapter` | `7350a78` | `openspec/specs/publisher-custom-blog-adapter/spec.md` |
+| 49 | `evolution-gif-export` | `95350b3` | `openspec/specs/evolution-gif-export/spec.md` |
+| 50 | `xiaohongshu-content-package` | `75a8fba` | `openspec/specs/xiaohongshu-content-package/spec.md` |
+| 51 | `video-story-scripts` | `cfaacc1` | `openspec/specs/video-story-scripts/spec.md` |
+| 52 | `agency-weekly-reports` | `6457c2b` | `openspec/specs/agency-weekly-reports/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)

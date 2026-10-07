@@ -29,7 +29,9 @@ test('a keyboard-only sign-in opens the owner session', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Owner sign-in' })).toBeVisible();
 
   // The owner never sees a private value while signed out: the gate is a form and nothing more.
-  await expect(page.getByTestId('session-actor')).toHaveCount(0);
+  // PRODUCT-SHELL-UX-001 migration (named, in-package): session internals
+  // render only under /settings, so no actor testid exists outside it.
+  await expect(page.getByTestId('settings-actor')).toHaveCount(0);
 
   // Keyboard only: focus the labelled field, type the token, submit with Enter.
   await page.getByTestId('session-token-input').focus();
@@ -38,18 +40,22 @@ test('a keyboard-only sign-in opens the owner session', async ({ page }) => {
   await page.keyboard.press('Enter');
 
   await expect(page.getByRole('heading', { name: 'Owner session' })).toBeVisible();
-  const actor = page.getByTestId('session-actor');
-  await expect(actor).toBeVisible();
-
-  // The owner identity is a stable UUID from the database, not anything the page decided.
-  await expect(actor).toHaveText(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
-  const actorId = await actor.textContent();
 
   // A private route now works for this browser, from the page's own session cookie: the request is
   // made by the page itself, so the cookie is the browser's, not a test-supplied header.
+  // The owner identity is a stable UUID from the database, not anything the page decided — proven
+  // at the API boundary, because the page renders the actor as a label, never as a raw UUID dump.
   const session = await readSessionFromThePage(page);
   expect(session.status).toBe(200);
+  const actorId = (session.body as { actorId: string }).actorId;
+  expect(actorId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
   expect(session.body).toEqual({ authenticated: true, actorId });
+
+  // The settings page names the session facts without dumping the raw identity.
+  await page.getByTestId('nav-settings').click();
+  await expect(page.getByTestId('settings-actor')).toContainText("This installation's owner");
+  await expect(page.getByTestId('settings-idle')).toContainText('12 hours');
+  await expect(page.getByTestId('settings-lifetime')).toContainText('7 days');
 });
 
 test('the session cookie is HttpOnly and SameSite=Strict, and is not readable by script', async ({ page }) => {

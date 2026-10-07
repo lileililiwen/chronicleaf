@@ -36,7 +36,7 @@ export function CredentialVaultPanel() {
 
   return (
     <section className="view" data-testid="credential-vault">
-      <h2 className="view__heading">Provider credentials</h2>
+      <h1 className="view__heading">Provider credentials</h1>
 
       <p className="view__state" data-testid="credential-vault-intro">
         Paste a token to store it, or paste a new one to replace what is already stored. Chronicleaf
@@ -112,13 +112,13 @@ export function CredentialVaultPanel() {
                 </span>
               )}
 
-              <label className="field" htmlFor={`credential-${provider}-input`}>
-                <span className="field__label">
+              <label className="form__field" htmlFor={`credential-${provider}-input`}>
+                <span className="form__label">
                   {configured ? 'Replace the stored token' : 'Store a token'}
                 </span>
                 <input
                   id={`credential-${provider}-input`}
-                  className="field__input"
+                  className="form__input"
                   data-testid={`credential-${provider}-input`}
                   type="password"
                   name={`credential-${provider}`}

@@ -144,9 +144,9 @@ export function TeamPanel() {
 
   return (
     <section className="view" aria-label="Team invitations and members" data-testid="team-panel">
-      <h3 className="view__heading" data-testid="team-heading">
+      <h1 className="view__heading" data-testid="team-heading">
         Team invitations and members
-      </h3>
+      </h1>
       <p className="view__hint" data-testid="team-hint">
         Invitations and memberships belong to one tenant, named by its id. Every change below is
         an explicit act, and every answer is the server&apos;s own.

@@ -1,0 +1,62 @@
+/**
+ * PRODUCT-SHELL-UX-002. The one design-token set for the Chronicleaf Web client.
+ *
+ * Owner-decided (2026-10-07): KEEP the near-black/gold theme and systematize it
+ * into tokens. No rebrand, no light default, no new accent. Delicate means
+ * systematic, spaced, and consistent — not different.
+ *
+ * Every value below is the delivered palette, spacing and type of the
+ * pre-restyle client, named once here. Feature panels consume these roles and
+ * primitives through styles.css and never define local colors, type ramps, or
+ * spacing outside them. A value that is not here does not belong in the UI:
+ * move it here or replace it with a primitive.
+ */
+:root {
+  color-scheme: dark;
+
+  /* Color roles. */
+  --color-background: #101114;
+  --color-surface: #16171b;
+  --color-foreground: #f4f4f2;
+  --color-muted: #a3a29d;
+  --color-accent: #d9a441;
+  --color-border: #2a2b30;
+  --color-error: #e8896b;
+  --color-error-border: #a8543f;
+  --color-ok: #86c39b;
+  --color-ok-border: #4f7d5c;
+  --color-code-background: #ffffff;
+
+  /* Type scale. */
+  --font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-size-display: clamp(2.25rem, 6vw, 3.5rem);
+  --font-size-page: 1.75rem;
+  --font-size-section: 1.375rem;
+  --font-size-title: 1.0625rem;
+  --font-size-body: 0.9375rem;
+  --font-size-small: 0.875rem;
+  --font-size-caption: 0.8125rem;
+  --line-height-body: 1.6;
+  --line-height-tight: 1.5;
+
+  /* Spacing scale. */
+  --space-1: 0.375rem;
+  --space-2: 0.625rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.75rem;
+  --space-7: 2.5rem;
+  --space-page: 2rem;
+
+  /* Shape scale. */
+  --radius-small: 0.375rem;
+  --radius-medium: 0.5rem;
+  --radius-card: 0.75rem;
+  --radius-pill: 999px;
+
+  /* Layout. */
+  --layout-max-width: 72rem;
+}

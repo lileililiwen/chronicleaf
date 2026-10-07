@@ -147,7 +147,7 @@ export function NarrativeMemoryPanel({
 
   return (
     <section aria-label="Project narrative" data-testid="narrative-memory">
-      <h2>Project narrative</h2>
+      <h2 className="view__section">Project narrative</h2>
 
       {readFailure ? (
         <p className="notice notice--error" role="alert">
@@ -156,7 +156,7 @@ export function NarrativeMemoryPanel({
       ) : null}
 
       <div data-testid="narrative-entries">
-        <h3>History the owner wrote</h3>
+        <h3 className="view__subsection">History the owner wrote</h3>
 
         {narrative !== null && narrative.entries.length === 0 ? (
           <p>No narrative history has been recorded for this project.</p>
@@ -208,7 +208,7 @@ export function NarrativeMemoryPanel({
       </div>
 
       <div data-testid="narrative-summary">
-        <h3>Generated summary</h3>
+        <h3 className="view__subsection">Generated summary</h3>
 
         {narrative?.summary == null ? (
           <p>No summary has been generated for this project.</p>
@@ -226,7 +226,7 @@ export function NarrativeMemoryPanel({
 
       {archived ? null : (
         <div>
-          <h3>Record history</h3>
+          <h3 className="view__subsection">Record history</h3>
 
           <label>
             Kind

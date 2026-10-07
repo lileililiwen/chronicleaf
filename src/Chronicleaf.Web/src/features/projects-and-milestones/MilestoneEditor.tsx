@@ -86,7 +86,7 @@ export function MilestoneEditor({
 
   return (
     <section className="view" data-testid={milestone === null ? 'milestone-create' : 'milestone-edit'}>
-      <h2 className="view__heading">{milestone === null ? 'New milestone' : `Edit ${milestone.title}`}</h2>
+      <h1 className="view__heading">{milestone === null ? 'New milestone' : `Edit ${milestone.title}`}</h1>
 
       <p className="view__hint" data-testid="milestone-editor-hint">
         {milestone === null

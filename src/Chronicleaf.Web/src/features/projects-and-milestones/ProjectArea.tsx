@@ -6,9 +6,13 @@ import { OperationsArea } from '../background-jobs/OperationsArea';
 import { CredentialsArea } from '../credential-vault/CredentialsArea';
 import { TeamPanel } from '../team-panels/TeamPanel';
 import { TenancyPanel } from '../tenancy-views/TenancyPanel';
+import { TimelinePage } from '../milestone-timeline/TimelinePage';
+import { SettingsPage } from '../community-access/Settings/SettingsPage';
 import { getMilestone, getProject, listProjects } from './api';
 import { useMilestone, useProject, useProjects } from './useRecords';
-import { segmentsOf, useRoute } from './useRoute';
+import { segmentsOf } from './useRoute';
+import type { Route } from './useRoute';
+import type { OwnerSessionState } from '../community-access/useOwnerSession';
 
 /**
  * The product area, rendered only for a signed-in owner.
@@ -17,10 +21,12 @@ import { segmentsOf, useRoute } from './useRoute';
  * because every route below is private and would answer 401 anyway. What this adds is the small map
  * from a path to a view.
  *
- * This is the only place that map lives, and there is one route reader behind it. A second reader
- * elsewhere in the tree would hold its own copy of the current path, and a navigation from one of them
- * would leave the other reading a route the owner is no longer on - which is the kind of disagreement
- * that shows up as a page that navigated and did not.
+ * This is the only place that map lives. The route reader is owned by
+ * the shell (App.tsx) and handed in, so the nav and the view always agree
+ * about which path the owner is on. A second reader here would hold its own
+ * copy of the current path, and a navigation from the nav would leave this
+ * map reading a route the owner is no longer on - which is the kind of
+ * disagreement that shows up as a page that navigated and did not.
  *
  * Paths:
  * - `/` the dashboard
@@ -30,18 +36,24 @@ import { segmentsOf, useRoute } from './useRoute';
  * - `/projects/{id}/edit` editing that project
  * - `/projects/{id}/milestones/new` recording a milestone
  * - `/projects/{id}/milestones/{milestoneId}` editing a milestone
+ * - `/timeline` the project timeline picker (PRODUCT-SHELL-UX-001)
  * - `/operations` the background jobs panel (BACKGROUND-JOBS-001/002)
  * - `/operations/{id}` one background job
+ * - `/settings` session internals plus the credentials link (PRODUCT-SHELL-UX-001)
  * - `/settings/credentials` the credential settings surface (CREDENTIAL-VAULT-001/002)
  * - `/settings/team` the team invitation and member triggers (FEATURE-TRIGGER-PANELS-001)
  * - `/settings/tenancy` the hosted tenancy triggers (FEATURE-TRIGGER-PANELS-002)
  */
-export function ProjectArea() {
-  const { path, navigate } = useRoute();
+export function ProjectArea({ route, session }: { readonly route: Route; readonly session: OwnerSessionState }) {
+  const { path, navigate } = route;
   const segments = segmentsOf(path);
 
   if (segments.length === 0) {
     return <DashboardRoute onNavigate={navigate} />;
+  }
+
+  if (segments[0] === 'timeline' && segments.length === 1) {
+    return <TimelinePage onNavigate={navigate} />;
   }
 
   if (segments[0] === 'operations') {
@@ -49,7 +61,7 @@ export function ProjectArea() {
   }
 
   if (segments[0] === 'settings') {
-    return <SettingsArea path={segments.join('/')} onNavigate={navigate} />;
+    return <SettingsArea path={segments.join('/')} onNavigate={navigate} session={session} />;
   }
 
   if (segments[0] === 'projects') {
@@ -109,7 +121,7 @@ export function ProjectArea() {
 
   return (
     <section className="view" data-testid="route-not-found">
-      <h2 className="view__heading">Nothing here</h2>
+      <h1 className="view__heading">Nothing here</h1>
       <p className="view__state">
         This address is not part of Chronicleaf. Nothing was changed.
       </p>
@@ -146,19 +158,28 @@ function DashboardRoute({ onNavigate }: { readonly onNavigate: (to: string) => v
 }
 
 /**
- * The settings area: credentials, team invitations and hosted tenancy.
+ * The settings area: session internals, credentials, team invitations and hosted tenancy.
  *
- * One map for the three settings surfaces, beside the existing route map. Each surface
+ * One map for the four settings surfaces, beside the existing route map. Each surface
  * keeps its own panel and its own routes; what this adds is the choice between them.
+ * `/settings` itself is the session page (PRODUCT-SHELL-UX-001): session
+ * internals plus the credentials link only — team and tenancy keep their own
+ * routes and are not listed there, per owner decision.
  */
 function SettingsArea({
   path,
   onNavigate,
+  session,
 }: {
   readonly path: string;
   readonly onNavigate: (to: string) => void;
+  readonly session: OwnerSessionState;
 }) {
   const segments = path.split('/').filter((segment) => segment.length > 0);
+
+  if (segments.length === 1) {
+    return <SettingsPage session={session} onNavigate={onNavigate} />;
+  }
 
   if (segments[1] === 'team' && segments.length === 2) {
     return (
@@ -200,7 +221,7 @@ function ProjectsRoute({ onNavigate }: { readonly onNavigate: (to: string) => vo
           ← Dashboard
         </button>
       </p>
-      <h2 className="view__heading">Projects</h2>
+      <h1 className="view__heading">Projects</h1>
 
       {projects.failure ? (
         <p className="notice notice--error" role="alert" data-testid="projects-error">
@@ -271,7 +292,7 @@ function ProjectEditRoute({
   if (project.failure?.status === 404) {
     return (
       <section className="view" data-testid="project-missing">
-        <h2 className="view__heading">Project not found</h2>
+        <h1 className="view__heading">Project not found</h1>
         <button type="button" className="action" onClick={() => onNavigate('/projects')} data-testid="project-missing-back">
           Back to projects
         </button>
@@ -316,7 +337,7 @@ function MilestoneEditRoute({
   if (milestone.failure?.status === 404) {
     return (
       <section className="view" data-testid="milestone-missing">
-        <h2 className="view__heading">Milestone not found</h2>
+        <h1 className="view__heading">Milestone not found</h1>
         <button
           type="button"
           className="action"

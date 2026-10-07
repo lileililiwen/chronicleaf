@@ -101,9 +101,9 @@ export function TenancyPanel() {
 
   return (
     <section className="view" aria-label="Hosted tenancy" data-testid="tenancy-panel">
-      <h3 className="view__heading" data-testid="tenancy-heading">
+      <h1 className="view__heading" data-testid="tenancy-heading">
         Hosted tenancy
-      </h3>
+      </h1>
       <p className="view__hint" data-testid="tenancy-hint">
         Tenants belong to the signed-in caller and are served by the server, never invented
         here. In a Community installation these same views show the server&apos;s own Community

@@ -1382,7 +1382,8 @@ run_suite "$base_url" "$log_file" "$repo_root/$publish_dir/access-token" \
   e2e/shell.spec.ts \
   tests/background-jobs.spec.ts \
   tests/community-access.spec.ts \
-  tests/projects-and-milestones.spec.ts
+  tests/projects-and-milestones.spec.ts \
+  tests/product-shell-ux.spec.ts
 stop_suite
 
 # ---------------------------------------------------------------------------------------------

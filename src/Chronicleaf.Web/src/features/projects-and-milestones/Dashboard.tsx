@@ -27,7 +27,7 @@ export function Dashboard({
 
   return (
     <section className="view" data-testid="dashboard">
-      <h2 className="view__heading">Dashboard</h2>
+      <h1 className="view__heading">Dashboard</h1>
 
       {loading ? (
         <p className="view__state" data-testid="dashboard-loading">
@@ -71,6 +71,16 @@ export function Dashboard({
           </p>
         </>
       )}
+
+      {/*
+        PRODUCT-SHELL-UX-001. The core journey, readable as one path: project
+        → milestone → evidence → draft → approve → export. The nav above
+        carries the order; this names the next step from the dashboard itself.
+      */}
+      <p className="view__hint" data-testid="dashboard-journey">
+        The path through Chronicleaf: create a project, record a milestone, collect evidence,
+        generate a draft, approve it, then export. Each step starts from a project.
+      </p>
 
       {/*
         The credential surface is settings, not a project, so it is reachable from the dashboard in

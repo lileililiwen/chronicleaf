@@ -64,7 +64,7 @@ export function ProjectDetail({
   if (project.failure?.status === 404) {
     return (
       <section className="view" data-testid="project-missing">
-        <h2 className="view__heading">Project not found</h2>
+        <h1 className="view__heading">Project not found</h1>
         <p className="view__state">
           This project is not part of this installation, so there is nothing to show.
         </p>
@@ -139,9 +139,9 @@ export function ProjectDetail({
         </p>
       ) : (
         <header className="project__header">
-          <h2 className="view__heading" data-testid="project-name">
+          <h1 className="view__heading" data-testid="project-name">
             {record.name}
-          </h2>
+          </h1>
           {archived ? (
             <p className="notice notice--muted" data-testid="project-archived">
               Archived on {formatInstant(record.archivedAt ?? '')}. This project is read-only and its

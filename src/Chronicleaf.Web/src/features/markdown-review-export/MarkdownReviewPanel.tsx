@@ -250,7 +250,7 @@ export function MarkdownReviewPanel({
 
           {draft.groundingFindings.length > 0 || draft.voiceFindings.length > 0 ? (
             <div className="draft__findings" data-testid="review-findings">
-              <h5>Findings on this revision</h5>
+              <h5 className="view__subsection">Findings on this revision</h5>
               <p className="view__hint" data-testid="review-findings-hint">
                 An approval is refused while any finding below remains. Correct the text - no
                 acknowledgment clears this - and ask for approval again.
@@ -342,7 +342,7 @@ export function MarkdownReviewPanel({
           )}
 
           <div data-testid="review-preview">
-            <h5>Preview</h5>
+            <h5 className="view__subsection">Preview</h5>
             <p className="view__hint" data-testid="review-preview-hint">
               Rendered from exactly the text above, with raw markup shown as characters rather
               than run. What you see is what the next revision would carry - and what a Markdown

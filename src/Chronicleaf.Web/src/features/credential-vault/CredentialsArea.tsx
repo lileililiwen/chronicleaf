@@ -23,7 +23,7 @@ export function CredentialsArea({
   if (segments[0] !== 'settings' || segments[1] !== 'credentials' || segments.length !== 2) {
     return (
       <section className="view" data-testid="route-not-found">
-        <h2 className="view__heading">Nothing here</h2>
+        <h1 className="view__heading">Nothing here</h1>
         <p className="view__state">
           This address is not part of Chronicleaf. Nothing was changed.
         </p>

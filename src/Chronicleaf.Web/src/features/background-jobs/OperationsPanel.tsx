@@ -84,7 +84,7 @@ export function OperationsPanel({
 
   return (
     <section className="view" data-testid="operations-panel">
-      <h2 className="view__heading">Background jobs</h2>
+      <h1 className="view__heading">Background jobs</h1>
       <p className="view__state" data-testid="operations-intro">
         What the application was asked to do in the background, and what became of it. Every status
         here is the one the application stored.

@@ -68,7 +68,7 @@ export function ProjectEditor({
 
   return (
     <section className="view" data-testid={project === null ? 'project-create' : 'project-edit'}>
-      <h2 className="view__heading">{project === null ? 'New project' : `Edit ${project.name}`}</h2>
+      <h1 className="view__heading">{project === null ? 'New project' : `Edit ${project.name}`}</h1>
 
       <form className="form" onSubmit={submit} data-testid="project-form">
         <div className="form__field">

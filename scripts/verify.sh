@@ -99,6 +99,10 @@ require_docker() {
 # variable. This stage proves that, and it is the FIRST one on purpose: a build that only succeeds on a
 # machine with a warm NuGet cache would otherwise look green here and fail on the next person's.
 step "platform feed" bash scripts/verify-platform-feed.sh
+# PRODUCT-SHELL-UX-003. Authoring scaffolding fails the gate before any test
+# runs: a forbidden production string in the Web tree stops here, not in a
+# browser fixture three stages later.
+step "web scaffolding lint" bash scripts/check-web-scaffolding.sh
 step "api build" dotnet build Chronicleaf.sln --nologo
 step "shell tests" dotnet test Chronicleaf.sln --nologo --filter "FullyQualifiedName~Chronicleaf.Api.Tests"
 
@@ -861,6 +865,9 @@ fi
 
 step "frontend install" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm ci'
 step "frontend build" bash -euo pipefail -c 'cd src/Chronicleaf.Web && npm run build'
+# The bundle half of the scaffolding lint: dist now exists, so the same stage
+# asserts the served production bundle carries no authoring text either.
+step "web scaffolding lint (bundle)" bash scripts/check-web-scaffolding.sh
 
 if [ "${CHRONICLEAF_E2E:-0}" = "1" ]; then
   # Publishes the real application, starts a disposable PostgreSQL per suite, applies the committed

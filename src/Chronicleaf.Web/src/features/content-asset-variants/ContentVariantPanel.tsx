@@ -166,7 +166,7 @@ export function ContentVariantPanel({
 
   return (
     <section aria-label="Reusable content formats" data-testid="variant-panel">
-      <h3>Reusable formats</h3>
+      <h3 className="view__subsection">Reusable formats</h3>
       {reading ? <p data-testid="variant-loading">Reading variants…</p> : null}
       {readFailure !== null ? (
         <p role="alert" data-testid="variant-read-failure">
@@ -233,7 +233,7 @@ export function ContentVariantPanel({
 
           {selected?.bodyMarkdown != null ? (
             <article data-testid="variant-preview">
-              <h4 data-testid="variant-preview-type">{selected.type}</h4>
+              <h4 className="view__subsection" data-testid="variant-preview-type">{selected.type}</h4>
               <p data-testid="variant-preview-revision">Revision {selected.currentRevision}</p>
               <p data-testid="variant-preview-status">
                 {review === null ? 'draft' : review.reviewStatus}

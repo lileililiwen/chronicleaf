@@ -25,7 +25,7 @@ export function OperationsArea({
   if (segments[0] !== 'operations') {
     return (
       <section className="view" data-testid="route-not-found">
-        <h2 className="view__heading">Nothing here</h2>
+        <h1 className="view__heading">Nothing here</h1>
         <p className="view__state">
           This address is not part of Chronicleaf. Nothing was changed.
         </p>
@@ -46,7 +46,7 @@ export function OperationsArea({
 
   return (
     <section className="view" data-testid="route-not-found">
-      <h2 className="view__heading">Nothing here</h2>
+      <h1 className="view__heading">Nothing here</h1>
       <p className="view__state">This address is not part of Chronicleaf. Nothing was changed.</p>
       <button
         type="button"
@@ -93,7 +93,7 @@ function OperationDetail({
   if (operation.failure?.status === 404) {
     return (
       <section className="view" data-testid="operation-missing">
-        <h2 className="view__heading">Background job not found</h2>
+        <h1 className="view__heading">Background job not found</h1>
         <p className="view__state">
           There is no such background job in this installation, or it is not yours to see.
         </p>

@@ -1,10 +1,18 @@
+/**
+ * The delivered class vocabulary, now bound to the token set in tokens.css.
+ *
+ * --shell-* names are kept as aliases so the 17 feature panels keep reading
+ * the same roles; every value resolves to exactly one token. No hex value may
+ * appear below this block: a color that is not a token does not belong here.
+ */
 :root {
-  color-scheme: light dark;
-  --shell-background: #101114;
-  --shell-foreground: #f4f4f2;
-  --shell-muted: #a3a29d;
-  --shell-accent: #d9a441;
-  --shell-border: #2a2b30;
+  color-scheme: dark;
+  --shell-background: var(--color-background);
+  --shell-surface: var(--color-surface);
+  --shell-foreground: var(--color-foreground);
+  --shell-muted: var(--color-muted);
+  --shell-accent: var(--color-accent);
+  --shell-border: var(--color-border);
 }
 
 * {
@@ -25,12 +33,21 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* PRODUCT-SHELL-UX-001/002: one app shell. Signed out it is a single
+   centered card; signed in it is a full-width product surface (nav plus a
+   per-page header) that uses wide viewports instead of one narrow column. */
 .shell {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100%;
-  padding: 2rem;
+  padding: var(--space-page);
+}
+
+.shell--app {
+  display: block;
+  min-height: 100%;
+  padding: 0 0 var(--space-7);
 }
 
 .shell__panel {
@@ -38,7 +55,119 @@ body {
   max-width: 44rem;
   padding: 3rem;
   border: 1px solid var(--shell-border);
-  border-radius: 0.75rem;
+  border-radius: var(--radius-card);
+}
+
+/* The signed-in product surface: one centered column at the layout width. */
+.app {
+  width: 100%;
+  max-width: var(--layout-max-width);
+  margin: 0 auto;
+  padding: 0 var(--space-page);
+}
+
+.app__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-5);
+  padding: var(--space-5) 0 var(--space-4);
+  border-bottom: 1px solid var(--shell-border);
+}
+
+.app__brand {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--shell-foreground);
+  font-size: 1.25rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+}
+
+.app__brand:focus-visible {
+  outline: 2px solid var(--shell-accent);
+  outline-offset: 2px;
+}
+
+.app__tagline {
+  margin: 0;
+  color: var(--shell-muted);
+  font-size: var(--font-size-small);
+}
+
+/* The top-level nav: the core journey in order. */
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  width: 100%;
+  margin-top: var(--space-3);
+  padding: 0;
+}
+
+.nav__item {
+  padding: 0.5rem 0.9375rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--shell-muted);
+  font: inherit;
+  font-size: var(--font-size-body);
+  cursor: pointer;
+}
+
+.nav__item:hover:not(:disabled) {
+  border-color: var(--shell-border);
+  color: var(--shell-foreground);
+}
+
+.nav__item--active {
+  border-color: var(--shell-accent);
+  color: var(--shell-accent);
+}
+
+.nav__item:focus-visible {
+  outline: 2px solid var(--shell-accent);
+  outline-offset: 2px;
+}
+
+/* One header per page, rendered by the shell from the current path. */
+.page {
+  padding: var(--space-5) 0 0;
+}
+
+.page__heading {
+  margin: 0;
+  font-size: var(--font-size-page);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.page__lede {
+  margin: var(--space-2) 0 0;
+  color: var(--shell-muted);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-tight);
+}
+
+/* A section inside a panel that arrived with a bare heading: same rank, same
+   spacing, no per-panel invention. */
+.view__section {
+  margin: var(--space-5) 0 0;
+  font-size: var(--font-size-title);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.view__subsection {
+  margin: var(--space-4) 0 0;
+  color: var(--shell-muted);
+  font-size: var(--font-size-small);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .shell__brand {
@@ -133,6 +262,14 @@ body {
   opacity: 0.5;
 }
 
+.session__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.625rem 1rem;
+  margin: 1rem 0 0;
+}
+
 .session__facts {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -149,7 +286,7 @@ body {
 
 .session__error {
   margin: 0.75rem 0 0;
-  color: #e8896b;
+  color: var(--color-error);
   font-size: 0.9375rem;
   min-height: 1.4em;
 }
@@ -211,8 +348,8 @@ body {
 }
 
 .action--danger {
-  border-color: #a8543f;
-  color: #e8896b;
+  border-color: var(--color-error-border);
+  color: var(--color-error);
 }
 
 .action:disabled {
@@ -308,8 +445,8 @@ body {
 }
 
 .badge--ok {
-  border-color: #4f7d5c;
-  color: #86c39b;
+  border-color: var(--color-ok-border);
+  color: var(--color-ok);
 }
 
 .badge--pending {
@@ -477,7 +614,7 @@ body {
 .form__error,
 .notice--error {
   margin: 0;
-  color: #e8896b;
+  color: var(--color-error);
   font-size: 0.875rem;
 }
 
@@ -492,43 +629,16 @@ body {
 
 .notice--conflict,
 .notice--error {
-  border-color: #a8543f;
+  border-color: var(--color-error-border);
 }
 
 .notice--ok {
-  border-color: #4f7d5c;
-  color: #86c39b;
+  border-color: var(--color-ok-border);
+  color: var(--color-ok);
 }
 
 .notice--muted {
   color: var(--shell-muted);
-}
-
-.later {
-  margin: 3rem 0 0;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--shell-border);
-}
-
-.later__heading {
-  margin: 0;
-  color: var(--shell-muted);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.later__list {
-  margin: 0.625rem 0 0;
-  padding-left: 1.125rem;
-  color: var(--shell-muted);
-  font-size: 0.9375rem;
-  line-height: 1.6;
-}
-
-.later .shell__state {
-  margin-top: 1.25rem;
 }
 
 /* BACKGROUND-JOBS-001/002: the operations panel. The record list reuses the delivered card rhythm
@@ -679,6 +789,96 @@ body {
   font-size: 0.875rem;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* MILESTONE-TIMELINE-001/002: the chronological history. The same card
+   rhythm as every other record list: one surface, one spacing, one badge. */
+.timeline {
+  margin: var(--space-5) 0 0;
+}
+
+.timeline__heading {
+  margin: 0;
+  font-size: var(--font-size-title);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.timeline__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: var(--space-3) 0 0;
+  color: var(--shell-muted);
+  font-size: var(--font-size-small);
+  cursor: pointer;
+}
+
+.timeline__list {
+  display: grid;
+  gap: var(--space-4);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timeline__day {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.timeline__date {
+  margin: 0;
+  color: var(--shell-muted);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.timeline__entries {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timeline__entry {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--shell-border);
+  border-radius: var(--radius-card);
+}
+
+.timeline__open {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.timeline__open:focus-visible {
+  outline: 2px solid var(--shell-accent);
+  outline-offset: 2px;
+}
+
+.timeline__title {
+  font-size: var(--font-size-title);
+  font-weight: 600;
+}
+
+.timeline__meta {
+  color: var(--shell-muted);
+  font-size: var(--font-size-small);
 }
 
 /* A recorded gap: the reason the source could not be read, never a fact about it. */
@@ -842,7 +1042,7 @@ body {
   margin: 0.5rem 0;
   padding: 0.625rem 0.75rem;
   overflow: auto;
-  background: var(--shell-background, #fff);
+  background: var(--color-code-background);
   border: 1px solid var(--shell-border);
   border-radius: 0.375rem;
   font-size: 0.825rem;

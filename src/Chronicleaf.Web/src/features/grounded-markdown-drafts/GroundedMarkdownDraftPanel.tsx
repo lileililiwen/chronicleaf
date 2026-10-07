@@ -366,7 +366,7 @@ function Findings<T>({
 }) {
   return (
     <div className="draft__findings" data-testid={testId}>
-      <h5>{heading}</h5>
+      <h5 className="view__subsection">{heading}</h5>
       <p className="view__hint">{intro}</p>
       {rules.length === 0 ? (
         <p className="view__state" data-testid={emptyTestId}>

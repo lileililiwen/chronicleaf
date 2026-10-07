@@ -2257,3 +2257,59 @@ name preflight exit 0; `openspec validate --all --strict --no-interactive` 60/60
 after the archive, which used no `--skip-specs`. No `current_spec` remains: the two
 owner-BLOCKED changes stay deferred to ROADMAP. Deployment stays `deployable: false`; there
 is no remote, no push and no publication.
+
+Next: `video-story-panel` is archived
+(`78e8f85`, canonical spec `openspec/specs/video-story-panel/spec.md`): the
+delivered `video-story-scripts` backend's read/export Web UI as an Evolution-area
+storyboard surface (duration 15/30/60s select plus story/screenshot/evidence pickers
+over delivered routes, shot composer with server-derived contiguous timings, inert
+shot-order preview with served thumbnails/subtitles/narration/transitions, press-only
+approval, always-offered download handing the server's exact ZIP to a file, explicit
+publish-attempt refused `publisher_unsupported`; no-synthesis boundary stated on
+screen). One additive `GET /api/milestones/{id}/video-story` discovery read (null
+asset when none, delivered 404/401 otherwise) and one additive guard refusing raw
+PATCH edits on video-story assets 422 naming `bodyMarkdown` (shots immutable,
+re-scripting is the update path). CRUD lifecycle per entity: video story script
+Create=POST generate (201, appends revision) / Read=discovery GET+asset GET /
+Update=regenerate (same POST, new revision) with raw PATCH refused / Delete=no route
+→ named future package `content-asset-retirement` (inherited hole, same name as
+`content-pack-panels`); script revision Create=generate CAS / Read=asset+review /
+Update,Delete=immutable by trigger, no future package (append-only is the contract);
+approval binding Create=POST approve / Read=GET review / Update=re-approve /
+Delete=POST unapprove route-complete but UI-unoffered by parity with pack panels
+(reported, not silent); exported ZIP Create/Read=GET export per call, re-checked /
+Update=re-export after re-approval / Delete=N/A (bytes never stored). No other
+out-of-scope hole was silently dropped. Read that package's own boundary before
+extending it, and note the five defects verification found: the e2e seed's capture
+curl lacked `If-Match` (428, fixed in `scripts/e2e.sh`); the shared story-rows
+helper wrote evidence revision 1 after the curation select moved the head (now a
+9th parameter, default 1); the seeded story approval carried the empty media hash
+while the head holds a selected picture (now a 10th `mediaId|caption` SHA-256
+parameter — and `$10` in shell is `${1}0`, fixed to `${10}` before it stored a
+34-char hash); `content_revisions` is append-only by trigger so the UPDATE
+workaround died loudly instead (parameterized at INSERT, nothing half-written);
+and the suite's regenerate round-trip reads `invalidated`, not `draft`, per the
+delivered review vocabulary. Also note two harness lessons recorded rather than
+hidden: the full gate's suite 27 failed once because a manual debug server still
+held port 5107 (bind failure → login failure, re-run fully green), and `pkill -f`
+with a pattern present in the invoker's own command line kills the invoker (kill
+by PID instead). Evidence, all run by the implementer rather than taken on report:
+`bash scripts/verify.sh` exit 0 (`verification passed`) with the platform-feed stage
+and all filtered stages each asserted to select at least one test, including
+**10/10 video story scripts** (7 delivered + 3 new: empty discovery reads null
+asset with 404/401 preserved, discovery names the generated script, PATCH edit
+refused 422 with the approved export still byte-identical); `npm ci`,
+`tsc --noEmit`, `vite build`, all green; `bash scripts/e2e.sh` exit 0 with 121/121
+Playwright across all 27 database-isolated browser suites (suite 27 is the new
+`video-story-panel` 2/2 on its own PostgreSQL at port 5107 — select → preview →
+approve → byte-equal ZIP download → `approval_required` pre-approval,
+`approval_stale` post-regenerate, `publisher_unsupported` publish-attempt, all
+verbatim; regenerate round-trip; honest empty states; armed POST/no-remote
+counters; no request ever aimed at a video host, of which none exists);
+`dotnet build --nologo --no-incremental` 0 errors with the same pre-existing
+warnings in files this change does not touch; `git diff --check` clean; name
+preflight exit 0; `openspec validate --all --strict --no-interactive` 61/61 before
+and after the archive, which used no `--skip-specs` (canonical Purpose restored
+after the archiver's TBD overwrite). No `current_spec` remains: the two
+owner-BLOCKED changes stay deferred to ROADMAP. Deployment stays
+`deployable: false`; there is no remote, no push and no publication.

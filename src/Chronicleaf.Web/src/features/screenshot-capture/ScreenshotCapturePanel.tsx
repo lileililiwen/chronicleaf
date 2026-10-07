@@ -47,6 +47,8 @@ export function ScreenshotCapturePanel({
 }) {
   const capture = useCapture(milestoneId);
   const [url, setUrl] = useState('');
+  const [url2, setUrl2] = useState('');
+  const [url3, setUrl3] = useState('');
   const [viewports, setViewports] = useState<readonly string[]>(['desktop']);
   const [waitSelector, setWaitSelector] = useState('');
   const [waitMs, setWaitMs] = useState('');
@@ -70,7 +72,7 @@ export function ScreenshotCapturePanel({
     // a panel left open across the owner's own note asks for what the server currently believes rather
     // than for the revision it happened to mount with.
     const draft: Omit<CaptureDraft, 'expectedBundleRevision'> = {
-      url,
+      urls: [url, url2, url3].map((value) => value.trim()).filter((value) => value.length > 0),
       viewports,
       waitSelector: waitSelector.length === 0 ? null : waitSelector,
       waitMs: toWaitMs(waitMs),
@@ -79,6 +81,9 @@ export function ScreenshotCapturePanel({
 
     void capture.submit(draft);
   };
+
+  const submittable =
+    [url, url2, url3].some((value) => value.trim().length > 0) && viewports.length > 0;
 
   return (
     <section className="evidence" data-testid="capture-panel">
@@ -131,8 +136,8 @@ export function ScreenshotCapturePanel({
           }}
         >
           <p className="view__hint" data-testid="capture-form-hint">
-            One page, up to {CAPTURE_BOUNDS.maximumPages} URLs and{' '}
-            {CAPTURE_BOUNDS.maximumViewports} viewports per request. A capture is queued work: pressing
+            Up to {CAPTURE_BOUNDS.maximumPages} pages and{' '}
+            {CAPTURE_BOUNDS.maximumViewports} viewports in one request. A capture is queued work: pressing
             this returns a job, and the pictures appear above when it has run. Candidates are not
             selected or attached to evidence here - curation does that.
           </p>
@@ -145,7 +150,7 @@ export function ScreenshotCapturePanel({
           </p>
 
           <label className="session__label" htmlFor="capture-url">
-            The page to photograph
+            The pages to photograph (up to {CAPTURE_BOUNDS.maximumPages})
           </label>
           <input
             id="capture-url"
@@ -156,6 +161,36 @@ export function ScreenshotCapturePanel({
             placeholder="https://example.com/pricing"
             data-testid="capture-url"
           />
+          <label className="session__label" htmlFor="capture-url-2">
+            Second page (optional)
+          </label>
+          <input
+            id="capture-url-2"
+            className="session__input"
+            type="url"
+            value={url2}
+            onChange={(event) => setUrl2(event.target.value)}
+            placeholder="https://example.com/tour"
+            data-testid="capture-url-2"
+          />
+          <label className="session__label" htmlFor="capture-url-3">
+            Third page (optional)
+          </label>
+          <input
+            id="capture-url-3"
+            className="session__input"
+            type="url"
+            value={url3}
+            onChange={(event) => setUrl3(event.target.value)}
+            placeholder="https://example.com/changelog"
+            data-testid="capture-url-3"
+          />
+          {capture.submitFailure?.messageFor('urls') !== null &&
+          capture.submitFailure?.messageFor('urls') !== undefined ? (
+            <p className="session__error" data-testid="capture-urls-error">
+              {capture.submitFailure.messageFor('urls')}
+            </p>
+          ) : null}
 
           <fieldset className="capture__viewports" data-testid="capture-viewports">
             <legend className="session__label">Viewports</legend>
@@ -210,10 +245,10 @@ export function ScreenshotCapturePanel({
             <button
               type="submit"
               className="action action--primary"
-              disabled={capture.busy || url.trim().length === 0 || viewports.length === 0}
+              disabled={capture.busy || !submittable}
               data-testid="capture-submit"
             >
-              {capture.busy ? 'Requesting…' : 'Capture this page'}
+              {capture.busy ? 'Requesting…' : 'Capture these pages'}
             </button>
           </div>
         </form>
@@ -293,8 +328,8 @@ export function ScreenshotCapturePanel({
             : capture.submitFailure.isRevisionConflict
               ? `Nothing was requested: somebody else added evidence to this milestone first, so this was asked for against revision ${capture.requestedRevision ?? 0}, which is now older than the evidence. The newer evidence is shown above - read it, then ask again.`
               : `Nothing was requested: ${capture.submitFailure.message}${
-                  capture.submitFailure.messageFor('url') !== null
-                    ? ` ${capture.submitFailure.messageFor('url')}`
+                  capture.submitFailure.messageFor('urls') !== null
+                    ? ` ${capture.submitFailure.messageFor('urls')}`
                     : ''
                 }${
                   capture.submitFailure.messageFor('viewports') !== null

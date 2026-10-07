@@ -1,6 +1,7 @@
 import { NarrativeMemoryPanel } from '../narrative-memory/NarrativeMemoryPanel';
 import { VoiceArea } from '../voice-profiles/VoiceArea';
 import { MilestoneList } from './MilestoneRows';
+import { WorkflowNext } from './WorkflowNext';
 
 /**
  * The Content area (PROJECT-AREA-IA-001): narrative, voice, generation,
@@ -21,10 +22,12 @@ export function ProjectContent({
   projectId,
   archived,
   onEditMilestone,
+  onNavigate,
 }: {
   readonly projectId: string;
   readonly archived: boolean;
   readonly onEditMilestone: (projectId: string, milestoneId: string) => void;
+  readonly onNavigate: (to: string) => void;
 }) {
   return (
     <>
@@ -53,7 +56,17 @@ export function ProjectContent({
         detail="content"
         showFilter={false}
         onEditMilestone={onEditMilestone}
+        onNavigate={onNavigate}
       />
+
+      {/*
+        WORKFLOW-WAYFINDING-001. The next step in the loop: an approved story
+        is ready to leave the product. The variant rows above already publish
+        in place through the delivered publish form — this step reaches the
+        Publish area for the journey, the export and the receipts, and adds
+        no second publish control. Navigation only — no request fires.
+      */}
+      <WorkflowNext projectId={projectId} current="content" onNavigate={onNavigate} />
     </>
   );
 }

@@ -2,6 +2,7 @@ import { GitHubCandidatePanel } from '../github-release-candidates/GitHubCandida
 import { GitHubConnectionPanel } from '../github-evidence/GitHubConnectionPanel';
 import { LocalRepositoryPanel } from '../local-git-evidence/LocalRepositoryPanel';
 import { MilestoneList } from './MilestoneRows';
+import { WorkflowNext } from './WorkflowNext';
 
 /**
  * The Evidence area (PROJECT-AREA-IA-001): manual evidence, syncs,
@@ -16,10 +17,12 @@ export function ProjectEvidence({
   projectId,
   archived,
   onEditMilestone,
+  onNavigate,
 }: {
   readonly projectId: string;
   readonly archived: boolean;
   readonly onEditMilestone: (projectId: string, milestoneId: string) => void;
+  readonly onNavigate: (to: string) => void;
 }) {
   return (
     <>
@@ -54,7 +57,7 @@ export function ProjectEvidence({
         scope it to. An archived project still shows what was proposed, read-only, because a
         candidate somebody did not act on is a fact about the repository and not about the project.
       */}
-      <GitHubCandidatePanel projectId={projectId} archived={archived} />
+      <GitHubCandidatePanel projectId={projectId} archived={archived} onNavigate={onNavigate} />
 
       <MilestoneList
         projectId={projectId}
@@ -62,7 +65,15 @@ export function ProjectEvidence({
         detail="evidence"
         showFilter={false}
         onEditMilestone={onEditMilestone}
+        onNavigate={onNavigate}
       />
+
+      {/*
+        WORKFLOW-WAYFINDING-001. The next step in the loop: screenshots are
+        candidates until curation selects them into the evidence above.
+        Navigation only — no request fires.
+      */}
+      <WorkflowNext projectId={projectId} current="evidence" onNavigate={onNavigate} />
     </>
   );
 }

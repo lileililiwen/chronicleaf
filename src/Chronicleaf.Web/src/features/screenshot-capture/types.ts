@@ -62,7 +62,8 @@ export interface CaptureAccepted {
 
 /** What the owner asked for, before it becomes a job. */
 export interface CaptureDraft {
-  readonly url: string;
+  /** The pages to photograph, one to three — the service's own bound, which the form enforces. */
+  readonly urls: readonly string[];
   readonly viewports: readonly string[];
   readonly waitSelector: string | null;
   readonly waitMs: number | null;

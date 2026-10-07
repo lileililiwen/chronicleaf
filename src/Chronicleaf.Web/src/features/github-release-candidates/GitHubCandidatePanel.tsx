@@ -1,6 +1,15 @@
 import { useId, useState } from 'react';
 
+import {
+  MilestoneApiError,
+  importCandidates,
+} from '../projects-and-milestones/api';
+import type {
+  MilestoneDraft,
+  MilestoneType,
+} from '../projects-and-milestones/types';
 import { candidateFailureLabel, candidateKindLabel, candidateKindSentence } from './types';
+import type { GitHubCandidate } from './types';
 import { useGitHubCandidates, useWebhookSecret } from './useGitHubReleaseCandidates';
 
 /**
@@ -9,12 +18,22 @@ import { useGitHubCandidates, useWebhookSecret } from './useGitHubReleaseCandida
  *
  * <b>Five things it deliberately does not do, each because the requirement says so.</b>
  *
- * - It has no confirm verb. There is no button here that turns a candidate into a milestone, no field for
- *   one, and no route this product exposes that could. Confirming a candidate is a human decision made
- *   elsewhere, and a panel with an "Accept" button on it would be a panel making a decision the owner did
- *   not make.
- * - It never says "added" or "recorded". Every row says the thing was <em>proposed</em>, because that is
- *   what happened: somebody published a release, and this server suggested it might be worth recording.
+ * <b>WORKFLOW-WAYFINDING-002: importing is proposing, not confirming.</b> Each row offers
+ * "Record as milestone", which calls the delivered import route and stores a
+ * candidate-status record the owner can edit and confirm. There is still no confirm verb
+ * here: confirming the imported record happens in Overview through the delivered confirm
+ * action, and the success notice points there. A panel that confirmed on import would be
+ * making the human decision the requirement reserves for the owner.
+ *
+ * - It has no confirm verb. "Record as milestone" stores a candidate-status record through
+ *   the delivered import route — proposing, not confirming — and confirming the
+ *   imported record is a human decision made in Overview through the delivered confirm
+ *   action. A panel with a button that confirmed would be a panel making a decision the
+ *   owner did not make.
+ * - It never says "added" for a proposal. Every row says the thing was <em>proposed</em>,
+ *   because that is what happened: somebody published a release, and this server suggested
+ *   it might be worth recording. A row that was imported says so beside the proposal,
+ *   naming the milestone it became rather than rewriting what the row is.
  * - It shows the source and the received instant, which is the design's own display requirement, and it
  *   shows the provider's source key so an owner can see that the same release delivered twice is one row.
  * - It publishes no secret and has no field to type one into. The webhook secret is stored through the
@@ -26,10 +45,12 @@ import { useGitHubCandidates, useWebhookSecret } from './useGitHubReleaseCandida
 export function GitHubCandidatePanel({
   projectId,
   archived,
+  onNavigate,
 }: {
   readonly projectId: string;
   /** An archived project cannot be asked to poll or subscribed; the server refuses both. */
   readonly archived: boolean;
+  readonly onNavigate: (to: string) => void;
 }) {
   const state = useGitHubCandidates(projectId);
   const secret = useWebhookSecret();
@@ -53,7 +74,17 @@ export function GitHubCandidatePanel({
       <p className="view__state" data-testid="github-candidate-framing">
         These are proposals, not Milestones. A tag, a release or a merged pull request on GitHub is
         suggested here so an owner can decide whether it is worth recording; confirming one is done
-        elsewhere, and nothing on this panel records anything by itself.
+        elsewhere, and nothing on this panel records anything by itself. Candidate sync and
+        scheduled sync run from the{' '}
+        <button
+          type="button"
+          className="link"
+          onClick={() => onNavigate(`/projects/${projectId}/automations`)}
+          data-testid="github-candidate-automations-link"
+        >
+          Automations area
+        </button>
+        , so new releases propose themselves instead of waiting to be asked for.
       </p>
 
       {state.loading ? (
@@ -68,8 +99,7 @@ export function GitHubCandidatePanel({
           <p className="empty__body" data-testid="github-candidate-no-connection-body">
             A candidate is something read from a repository, so there is nothing to read until this
             project names one. Connect a repository in the panel above and this one will have something to
-            propose — and connecting is also what unlocks candidate sync and scheduled sync in the
-            Automations area, so new releases propose themselves instead of waiting to be asked for.
+            propose.
           </p>
         </div>
       ) : (
@@ -221,6 +251,13 @@ export function GitHubCandidatePanel({
                 {`Source key ${candidate.sourceKey}.`}
                 {candidate.revision === null ? '' : ` Commit ${candidate.revision}.`}
               </p>
+              {archived ? null : (
+                <CandidateImport
+                  projectId={projectId}
+                  candidate={candidate}
+                  onNavigate={onNavigate}
+                />
+              )}
             </li>
           ))}
         </ul>
@@ -239,4 +276,152 @@ export function GitHubCandidatePanel({
       </p>
     </section>
   );
+}
+
+/**
+ * One row's "Record as milestone" control (WORKFLOW-WAYFINDING-002).
+ *
+ * The import stores a candidate-status milestone through the delivered import route: proposing,
+ * not confirming. The notice names what was stored (or replays the stored row on a second
+ * press, which the server answers without duplicating) and points at Overview, where the
+ * delivered confirm action makes the human decision. Failures render the server's own
+ * `code: message` with field errors named. Nothing fires on render: the only POST leaves
+ * from this button's press.
+ */
+function CandidateImport({
+  projectId,
+  candidate,
+  onNavigate,
+}: {
+  readonly projectId: string;
+  readonly candidate: GitHubCandidate;
+  readonly onNavigate: (to: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [stored, setStored] = useState<{ milestoneId: string; created: boolean } | null>(null);
+  const [failure, setFailure] = useState<MilestoneApiError | null>(null);
+
+  const record = async () => {
+    setBusy(true);
+    setFailure(null);
+
+    try {
+      const items = await importCandidates(projectId, 'github', [
+        { sourceKey: candidate.sourceKey, draft: draftFor(candidate) },
+      ]);
+      const outcome = items.find((item) => item.sourceKey === candidate.sourceKey) ?? items[0];
+
+      if (outcome === undefined) {
+        setFailure(
+          new MilestoneApiError(
+            { code: 'internal_error', message: 'The import answered with no row.', traceId: '' },
+            0,
+          ),
+        );
+      } else {
+        setStored({ milestoneId: outcome.milestoneId, created: outcome.created });
+      }
+    } catch (thrown) {
+      setFailure(
+        thrown instanceof MilestoneApiError
+          ? thrown
+          : new MilestoneApiError(
+              { code: 'internal_error', message: 'The import could not be recorded.', traceId: '' },
+              0,
+            ),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="view__actions" data-testid="github-candidate-import-wrap">
+      {stored === null ? (
+        <button
+          type="button"
+          className="action"
+          onClick={() => void record()}
+          disabled={busy}
+          data-testid="github-candidate-import"
+        >
+          {busy ? 'Recording…' : 'Record as milestone'}
+        </button>
+      ) : (
+        <p className="notice notice--ok" role="status" data-testid="github-candidate-imported">
+          {stored.created ? 'Recorded' : 'Already recorded'} “{candidate.title}” as a candidate
+          milestone. Confirm it in{' '}
+          <button
+            type="button"
+            className="link"
+            onClick={() => onNavigate(`/projects/${projectId}`)}
+            data-testid="github-candidate-import-overview"
+          >
+            Overview
+          </button>
+          .
+        </p>
+      )}
+
+      {failure ? (
+        <p className="notice notice--error" role="alert" data-testid="github-candidate-import-error">
+          {failure.code}: {failure.message}
+          {Object.entries(failure.fieldErrors).map(([field, messages]) => (
+            <span key={field} data-testid="github-candidate-import-field">
+              {' '}
+              {field}: {messages.join(' ')}
+            </span>
+          ))}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The milestone draft one candidate becomes.
+ *
+ * The mapping is fixed and stated here so an owner can see what the press will store: the
+ * kind decides the milestone type (a release or tag is a release, a merged pull request a
+ * feature, a closed issue a bugfix, a star threshold stars), the tag names the version when
+ * the row carries one, the received instant is when it happened as far as this product
+ * knows, and the notes carry the provenance (kind, source key, received instant, commit
+ * SHA) plus the honest statement that the record still needs a human decision. Lists stay
+ * empty: a proposal carries no limitations or next steps of its own.
+ */
+function draftFor(candidate: GitHubCandidate): MilestoneDraft {
+  const type = typeFor(candidate.kind);
+  const commit =
+    candidate.revision === null || candidate.revision.length === 0
+      ? ''
+      : `, commit ${candidate.revision}`;
+
+  return {
+    title: candidate.title,
+    version: candidate.tagName ?? '',
+    occurredAt: candidate.receivedAt,
+    type,
+    notes:
+      `Proposed from GitHub ${candidateKindLabel(candidate.kind).toLowerCase()} ` +
+      `"${candidate.title}" (source key ${candidate.sourceKey}, ` +
+      `received ${candidate.receivedAt}${commit}). Imported as ${type}; edit before confirming.`,
+    knownLimitations: [],
+    nextSteps: [],
+  };
+}
+
+function typeFor(kind: GitHubCandidate['kind']): MilestoneType {
+  switch (kind) {
+    case 'release':
+    case 'tag':
+      return 'release';
+    case 'pull-request':
+      return 'feature';
+    case 'issue':
+      return 'bugfix';
+    case 'star':
+      return 'stars';
+    default:
+      return 'custom';
+  }
 }

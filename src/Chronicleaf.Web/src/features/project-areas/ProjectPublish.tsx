@@ -1,6 +1,7 @@
 import { JourneyPanel } from '../journey-publish/JourneyPanel';
 import { PublicationPanel } from '../publications/PublicationPanel';
 import { ExportPanel } from '../static-blog-export/ExportPanel';
+import { WorkflowNext } from './WorkflowNext';
 
 /**
  * The Publish area (PROJECT-AREA-IA-001): journey projection and
@@ -11,7 +12,13 @@ import { ExportPanel } from '../static-blog-export/ExportPanel';
  * journey depicts approved entries other areas already produced.
  * Unpublished material never renders on the public page.
  */
-export function ProjectPublish({ projectId }: { readonly projectId: string }) {
+export function ProjectPublish({
+  projectId,
+  onNavigate,
+}: {
+  readonly projectId: string;
+  readonly onNavigate: (to: string) => void;
+}) {
   return (
     <>
       {/*
@@ -39,6 +46,13 @@ export function ProjectPublish({ projectId }: { readonly projectId: string }) {
         produced. Nothing exports by rendering.
       */}
       <ExportPanel projectId={projectId} />
+
+      {/*
+        WORKFLOW-WAYFINDING-001. The loop closes: published work stays
+        readable as history in the timeline. Navigation only — no request
+        fires.
+      */}
+      <WorkflowNext projectId={projectId} current="publish" onNavigate={onNavigate} />
     </>
   );
 }

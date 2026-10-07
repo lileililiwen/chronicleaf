@@ -95,6 +95,7 @@ adapter_panels_base_url="${CHRONICLEAF_ADAPTER_PANELS_BASE_URL:-http://127.0.0.1
 content_pack_base_url="${CHRONICLEAF_CONTENT_PACK_BASE_URL:-http://127.0.0.1:5105}"
 agency_base_url="${CHRONICLEAF_AGENCY_BASE_URL:-http://127.0.0.1:5106}"
 video_story_base_url="${CHRONICLEAF_VIDEO_STORY_BASE_URL:-http://127.0.0.1:5107}"
+wayfinding_base_url="${CHRONICLEAF_WAYFINDING_BASE_URL:-http://127.0.0.1:5108}"
 log_file="$repo_root/$publish_dir/server.log"
 evidence_log_file="$repo_root/$publish_dir/server-evidence.log"
 credentials_log_file="$repo_root/$publish_dir/server-credentials.log"
@@ -122,6 +123,7 @@ adapter_panels_log_file="$repo_root/$publish_dir/server-adapter-panels.log"
 content_pack_log_file="$repo_root/$publish_dir/server-content-pack.log"
 agency_log_file="$repo_root/$publish_dir/server-agency.log"
 video_story_log_file="$repo_root/$publish_dir/server-video-story.log"
+wayfinding_log_file="$repo_root/$publish_dir/server-wayfinding.log"
 key_file=""
 
 # The operator key for this run: 32 random bytes in a temporary file outside the repository and
@@ -164,7 +166,8 @@ cleanup() {
     "$repo_root/$publish_dir/access-token-adapter-panels" \
     "$repo_root/$publish_dir/access-token-content-pack" \
     "$repo_root/$publish_dir/access-token-agency" \
-    "$repo_root/$publish_dir/access-token-video-story"
+    "$repo_root/$publish_dir/access-token-video-story" \
+    "$repo_root/$publish_dir/access-token-wayfinding"
   # So is the encryption key: it is removed whether the run passed or failed.
   remove_key_file
   exit "$exit_status"
@@ -2362,6 +2365,123 @@ count_rows() {
 }
 
 # ---------------------------------------------------------------------------------------------
+# seed_workflow_wayfinding creates the project the wayfinding suite walks: one project, one
+# confirmed milestone with one manual evidence bundle, one GitHub connection row and two
+# GitHub candidate rows.
+#
+# Every step a browser could take goes through the running server's own routes with the real
+# access token and a real antiforgery value, so the project, the milestone, its confirmation
+# and its evidence are records the product itself created. Only the connection and candidate
+# rows are inserted directly, and that is stated rather than hidden: connecting describes
+# the repository over the real api.github.com transport (suite 12's prerequisite, stated
+# there), and a candidate is produced by a signed delivery whose HMAC is over bytes a server
+# received from GitHub, not over anything a page can hold. GithubReleaseCandidatesTests is
+# where real signed bodies go through the production comparison; what this seed does is put
+# the rows those flows would have written in front of the panel, so the browser assertions
+# are about the panel and the routes rather than about GitHub.
+#
+# The connection names the same real public repository suite 12 connects to, as plain text
+# with no transport behind it — which is exactly what the list, import and schedule routes
+# read. The schedule save the suite performs needs a readable connection, and this row is
+# what makes it readable without any outbound prerequisite.
+# ---------------------------------------------------------------------------------------------
+seed_workflow_wayfinding() {
+  local origin="$1"
+  local token="$2"
+  local cookie_jar
+  cookie_jar="$(mktemp -d)/cookies.txt"
+
+  local antiforgery
+  antiforgery="$(curl --silent --show-error --cookie-jar "$cookie_jar" --cookie "$cookie_jar" \
+    --data "{\"accessToken\":\"${token}\"}" \
+    -H 'Content-Type: application/json' \
+    "${origin}/api/session" >/dev/null && \
+    curl --silent --show-error --cookie-jar "$cookie_jar" --cookie "$cookie_jar" \
+    -H 'Accept: application/json' "${origin}/api/session/antiforgery" | jq -r '.token')"
+
+  if [ -z "$antiforgery" ] || [ "$antiforgery" = "null" ]; then
+    echo "the wayfinding seed could not read an antiforgery value from ${origin}" >&2
+    return 1
+  fi
+
+  local project_id
+  project_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"name":"Wayfinding","description":"Walking the loop end to end."}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/projects" | jq -r '.id')"
+
+  if [ -z "$project_id" ] || [ "$project_id" = "null" ]; then
+    echo "the wayfinding seed could not create its project" >&2
+    return 1
+  fi
+
+  # A manual milestone is confirmed by the act of saving it, so no confirm call is needed here.
+  local milestone_id
+  milestone_id="$(curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"title":"Wayfinding milestone","version":"0.1.0","occurredAt":"2026-10-01T09:00:00Z","type":"feature","notes":"Recorded by the e2e seed.","knownLimitations":[],"nextSteps":[]}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" \
+    "${origin}/api/projects/${project_id}/milestones" | jq -r '.id')"
+
+  if [ -z "$milestone_id" ] || [ "$milestone_id" = "null" ]; then
+    echo "the wayfinding seed could not create its milestone" >&2
+    return 1
+  fi
+
+  curl --silent --show-error --cookie "$cookie_jar" \
+    --data '{"notes":"The loop is walked end to end.","expectedRevision":0}' \
+    -H 'Content-Type: application/json' -H "Origin: ${origin}" \
+    -H "X-Chronicleaf-Antiforgery: ${antiforgery}" -H 'If-Match: 0' \
+    "${origin}/api/milestones/${milestone_id}/evidence/manual" >/dev/null
+
+  # `-i` is load-bearing: `docker exec` only forwards this heredoc to psql's stdin when it is
+  # asked to, and without it psql reads an empty script and exits 0 having inserted nothing.
+  # The rows are counted back below and the seed refuses to continue if they are not there.
+  docker exec -i "$postgres_container" psql --username=chronicleaf --dbname="$postgres_database" --quiet \
+    --set=ON_ERROR_STOP=1 >/dev/null <<SQL
+INSERT INTO github_connections
+    (id, scope_id, project_id, owner, repo, credential_ref, default_branch, repository_id,
+     created_at, updated_at)
+SELECT gen_random_uuid(), p.scope_id, p.id, 'octocat', 'Hello-World', NULL, 'main', NULL,
+       now(), now()
+FROM projects p
+WHERE p.id = '${project_id}';
+
+INSERT INTO github_candidates
+    (id, scope_id, connection_id, project_id, source_key, kind, title, revision, source,
+     delivery_id, received_at)
+SELECT gen_random_uuid(), p.scope_id, c.id, p.id, k.source_key, k.kind, k.title, k.revision, 'poll',
+       NULL, timestamptz '2026-09-30 08:00:00+00'
+FROM projects p
+JOIN github_connections c ON c.project_id = p.id
+CROSS JOIN (VALUES
+    ('release:9301', 'release', 'Fifth release',
+     '3333333333333333333333333333333333333333'),
+    ('event:pull_request:7001:2026-09-30T08:00:00.0000000+00:00', 'pull-request',
+     'Add the reproducible pipeline', '2026-09-30T08:00:00.0000000+00:00')
+) AS k(source_key, kind, title, revision)
+WHERE p.id = '${project_id}';
+SQL
+
+  # Read back what the database actually holds. A seed that reports success and stores no
+  # rows is worse than one that fails, so the counts below are the seed's own acceptance.
+  local connections
+  connections="$(count_rows "$postgres_container" "$postgres_database" "SELECT count(*) FROM github_connections WHERE project_id = '${project_id}'")"
+  if [ "$connections" != "1" ]; then
+    echo "the wayfinding seed stored ${connections} connections, expected 1" >&2
+    return 1
+  fi
+
+  local candidates
+  candidates="$(count_rows "$postgres_container" "$postgres_database" "SELECT count(*) FROM github_candidates WHERE project_id = '${project_id}'")"
+  if [ "$candidates" != "2" ]; then
+    echo "the wayfinding seed stored ${candidates} candidates, expected 2" >&2
+    return 1
+  fi
+}
+
+# ---------------------------------------------------------------------------------------------
 # Suite 1: the shell, the access boundary, the projects and milestones lifecycle, and the
 # background operations panel. Its project list must be empty when it starts, which is why this
 # suite has a database to itself.
@@ -2999,4 +3119,40 @@ seed_video_story_panel "$video_story_base_url" "$(cat "$repo_root/$publish_dir/a
 echo "==> npm run test:e2e (real browser against $video_story_base_url)"
 run_suite "$video_story_base_url" "$video_story_log_file" "$repo_root/$publish_dir/access-token-video-story" \
   tests/video-story-panel.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 28: workflow wayfinding. It needs one project with a confirmed milestone carrying
+# manual evidence, one GitHub connection and two GitHub candidates — and neither a
+# connection row nor a candidate row can be produced through the UI without reaching
+# GitHub (connecting describes the repository over the real transport; a candidate is
+# produced by a signed delivery a page cannot send), so its own installation, its own
+# database and its own published instance, for the same reason suites 2 to 27 each have one.
+#
+# Everything a browser could produce goes through the product's own routes (project,
+# milestone, manual evidence). Only the connection and candidate rows are inserted
+# directly, counted back afterwards, because no page can hold them: the connection names
+# a real public repository as plain text without describing it over any transport, and
+# the candidates are the rows two real deliveries would have written. Suite 12 covers
+# the real-transport connect; what this seed enables is the panel and the routes.
+# What a pass establishes is that every next-step and cross-link lands on its real area
+# route with no request fired by navigation; that a candidate row records a
+# candidate-status milestone through the delivered import route and replays without
+# duplicating; that the schedule form saves and is refused in the server's own words;
+# that one capture submission carries two pages the server judges as one job (which on
+# this host then fails capture_sandbox_unavailable, named by the panel); that the
+# dashboard crumbs reach Team/Tenancy while Settings lists neither, per the recorded
+# owner decision; and that nothing fires before its explicit control. It is NOT evidence
+# that a page was captured, that GitHub was reached, or that anything was sent anywhere.
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a twenty-eighth disposable PostgreSQL and published application at $wayfinding_base_url"
+start_suite wayfinding "$wayfinding_base_url" "$wayfinding_log_file" \
+  "$repo_root/$publish_dir/access-token-wayfinding"
+
+echo "==> seeding one project, one confirmed milestone with evidence, one connection and two candidates"
+seed_workflow_wayfinding "$wayfinding_base_url" "$(cat "$repo_root/$publish_dir/access-token-wayfinding")"
+
+echo "==> npm run test:e2e (real browser against $wayfinding_base_url)"
+run_suite "$wayfinding_base_url" "$wayfinding_log_file" "$repo_root/$publish_dir/access-token-wayfinding" \
+  tests/workflow-wayfinding.spec.ts
 stop_suite

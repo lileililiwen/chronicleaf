@@ -51,12 +51,14 @@ export function MilestoneList({
   detail,
   showFilter,
   onEditMilestone,
+  onNavigate,
 }: {
   readonly projectId: string;
   readonly archived: boolean;
   readonly detail: MilestoneDetail;
   readonly showFilter: boolean;
   readonly onEditMilestone: (projectId: string, milestoneId: string) => void;
+  readonly onNavigate: (to: string) => void;
 }) {
   const [status, setStatus] = useState<MilestoneStatus | 'all'>('all');
   const milestones = useMilestones(listMilestones, projectId, showFilter ? status : 'all');
@@ -153,6 +155,7 @@ export function MilestoneList({
               onEdit={() => onEditMilestone(projectId, milestone.id)}
               onConfirm={() => void act(milestone, 'confirm')}
               onDismiss={() => void act(milestone, 'dismiss')}
+              onNavigate={onNavigate}
             />
           ))}
         </ul>
@@ -169,6 +172,7 @@ function MilestoneRow({
   onEdit,
   onConfirm,
   onDismiss,
+  onNavigate,
 }: {
   readonly milestone: Milestone;
   readonly archived: boolean;
@@ -177,6 +181,7 @@ function MilestoneRow({
   readonly onEdit: () => void;
   readonly onConfirm: () => void;
   readonly onDismiss: () => void;
+  readonly onNavigate: (to: string) => void;
 }) {
   // How many collections this milestone has finished, and therefore how many times the evidence
   // panel above has been told to read the bundle again. The count lives here because this row is the
@@ -416,6 +421,40 @@ function MilestoneRow({
             confirmed={milestone.status === 'confirmed'}
           />
         </>
+      ) : null}
+
+      {/*
+        WORKFLOW-WAYFINDING-001. The workflow-order cross-links: an
+        Evidence row reaches the Evolution area where this milestone's
+        pages are photographed (captures stay candidates until curation
+        selects them), and an Evolution row reaches the Evidence area
+        where the choice is published into the bundle. Navigation only —
+        no request fires — so these render on archived rows too, unlike
+        the acting controls below which stay hidden there.
+      */}
+      {detail === 'evidence' ? (
+        <p className="view__state" data-testid="workflow-evidence-wrap">
+          <button
+            type="button"
+            className="link"
+            onClick={() => onNavigate(`/projects/${milestone.projectId}/evolution`)}
+            data-testid="workflow-evidence-to-evolution"
+          >
+            Request screenshots in Evolution
+          </button>
+        </p>
+      ) : null}
+      {detail === 'evolution' ? (
+        <p className="view__state" data-testid="workflow-evolution-wrap">
+          <button
+            type="button"
+            className="link"
+            onClick={() => onNavigate(`/projects/${milestone.projectId}/evidence`)}
+            data-testid="workflow-evolution-to-evidence"
+          >
+            Select into evidence in Evidence
+          </button>
+        </p>
       ) : null}
 
       {archived ? null : (

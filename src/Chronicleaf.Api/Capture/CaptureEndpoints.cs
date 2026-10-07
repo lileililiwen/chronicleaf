@@ -82,7 +82,7 @@ public static class CaptureEndpoints
                 owner,
                 milestoneId,
                 new ScreenshotCaptureRequest(
-                    [ParseUrl(body.Url)],
+                    ParseUrls(body),
                     ParseViewports(body.Viewports),
                     body.WaitSelector,
                     body.WaitMs ?? 0,
@@ -128,6 +128,52 @@ public static class CaptureEndpoints
         return Results.Json(new ScreenshotCandidateListResponse(
             [.. candidates.Select(ScreenshotCandidateResponse.From)],
             ScreenshotCandidateListResponse.MediaRoute));
+    }
+
+    /// <summary>
+    /// The pages a capture is asked for (WORKFLOW-WAYFINDING-004).
+    /// </summary>
+    /// <remarks>
+    /// Exactly one of the legacy single <c>url</c> and the additive <c>urls</c> must name a page:
+    /// naming both is refused rather than resolved in favour of one, because picking one silently
+    /// is how a page the owner asked for never gets photographed. An absent or all-blank
+    /// <c>urls</c> falls back to the single-<c>url</c> path untouched, so older callers behave
+    /// byte-identically. How many pages is too many stays the service's own decision (413); this
+    /// method only decides which field named them.
+    /// </remarks>
+    private static IReadOnlyList<Uri> ParseUrls(CaptureRequestBody body)
+    {
+        var named = body.Urls?.Where(url => !string.IsNullOrWhiteSpace(url)).ToList();
+
+        if (named is not { Count: > 0 })
+        {
+            return [ParseUrl(body.Url)];
+        }
+
+        if (!string.IsNullOrWhiteSpace(body.Url))
+        {
+            throw new ValidationFailedException(
+                "urls",
+                "Name one page in url or up to three pages in urls, not both.");
+        }
+
+        var parsed = new List<Uri>(named.Count);
+
+        for (var index = 0; index < named.Count; index++)
+        {
+            try
+            {
+                parsed.Add(ParseUrl(named[index]));
+            }
+            catch (ValidationFailedException)
+            {
+                throw new ValidationFailedException(
+                    "urls",
+                    $"urls[{index}]: name an absolute URL to capture.");
+            }
+        }
+
+        return parsed;
     }
 
     /// <summary>

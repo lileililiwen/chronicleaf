@@ -1,6 +1,7 @@
 import { EvolutionGifPanel } from '../evolution-gifs/EvolutionGifPanel';
 import { EvolutionImagePanel } from '../evolution-images/EvolutionImagePanel';
 import { MilestoneList } from './MilestoneRows';
+import { WorkflowNext } from './WorkflowNext';
 
 /**
  * The Evolution area (PROJECT-AREA-IA-001): rendered version
@@ -15,10 +16,12 @@ export function ProjectEvolution({
   projectId,
   archived,
   onEditMilestone,
+  onNavigate,
 }: {
   readonly projectId: string;
   readonly archived: boolean;
   readonly onEditMilestone: (projectId: string, milestoneId: string) => void;
+  readonly onNavigate: (to: string) => void;
 }) {
   return (
     <>
@@ -44,7 +47,15 @@ export function ProjectEvolution({
         detail="evolution"
         showFilter={false}
         onEditMilestone={onEditMilestone}
+        onNavigate={onNavigate}
       />
+
+      {/*
+        WORKFLOW-WAYFINDING-001. The next step in the loop: selected pictures
+        depict the story, and the story is written from evidence. Navigation
+        only — no request fires.
+      */}
+      <WorkflowNext projectId={projectId} current="evolution" onNavigate={onNavigate} />
     </>
   );
 }

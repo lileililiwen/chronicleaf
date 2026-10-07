@@ -1,5 +1,6 @@
 import { ProjectTimeline } from '../milestone-timeline/ProjectTimeline';
 import { MilestoneList } from './MilestoneRows';
+import { WorkflowNext } from './WorkflowNext';
 
 /**
  * The Overview area (PROJECT-AREA-IA-001): milestones + timeline excerpt.
@@ -14,10 +15,12 @@ export function ProjectOverview({
   projectId,
   archived,
   onEditMilestone,
+  onNavigate,
 }: {
   readonly projectId: string;
   readonly archived: boolean;
   readonly onEditMilestone: (projectId: string, milestoneId: string) => void;
+  readonly onNavigate: (to: string) => void;
 }) {
   return (
     <>
@@ -27,6 +30,7 @@ export function ProjectOverview({
         detail="none"
         showFilter
         onEditMilestone={onEditMilestone}
+        onNavigate={onNavigate}
       />
 
       {/*
@@ -34,6 +38,13 @@ export function ProjectOverview({
         record happened on. Selecting a row opens the milestone editor for that record.
       */}
       <ProjectTimeline projectId={projectId} onEditMilestone={onEditMilestone} />
+
+      {/*
+        WORKFLOW-WAYFINDING-001. The next step in the loop: a confirmed
+        milestone becomes history, and evidence is what a draft is written
+        from. Navigation only — no request fires.
+      */}
+      <WorkflowNext projectId={projectId} current="overview" onNavigate={onNavigate} />
     </>
   );
 }

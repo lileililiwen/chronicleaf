@@ -161,15 +161,35 @@ export function ProjectDetail({
       )}
 
       {record === null ? null : area === 'overview' ? (
-        <ProjectOverview projectId={record.id} archived={archived} onEditMilestone={onEditMilestone} />
+        <ProjectOverview
+          projectId={record.id}
+          archived={archived}
+          onEditMilestone={onEditMilestone}
+          onNavigate={onNavigate}
+        />
       ) : area === 'evidence' ? (
-        <ProjectEvidence projectId={record.id} archived={archived} onEditMilestone={onEditMilestone} />
+        <ProjectEvidence
+          projectId={record.id}
+          archived={archived}
+          onEditMilestone={onEditMilestone}
+          onNavigate={onNavigate}
+        />
       ) : area === 'content' ? (
-        <ProjectContent projectId={record.id} archived={archived} onEditMilestone={onEditMilestone} />
+        <ProjectContent
+          projectId={record.id}
+          archived={archived}
+          onEditMilestone={onEditMilestone}
+          onNavigate={onNavigate}
+        />
       ) : area === 'publish' ? (
-        <ProjectPublish projectId={record.id} />
+        <ProjectPublish projectId={record.id} onNavigate={onNavigate} />
       ) : area === 'evolution' ? (
-        <ProjectEvolution projectId={record.id} archived={archived} onEditMilestone={onEditMilestone} />
+        <ProjectEvolution
+          projectId={record.id}
+          archived={archived}
+          onEditMilestone={onEditMilestone}
+          onNavigate={onNavigate}
+        />
       ) : (
         <ProjectAutomations projectId={record.id} archived={archived} onNavigate={onNavigate} />
       )}

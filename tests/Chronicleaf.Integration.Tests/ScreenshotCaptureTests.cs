@@ -912,6 +912,143 @@ public sealed class ScreenshotCaptureTests(ChronicleafPostgresFixture postgres)
         Assert.Equal(0, await ChronicleafPostgresFixture.CountRowsAsync(host.Database, "operations"));
     }
 
+    // ===========================================================================================
+    // WORKFLOW-WAYFINDING-004: the additive multi-URL wire field.
+    // ===========================================================================================
+
+    [Fact]
+    public async Task WorkflowWayfinding_004_Success_two_urls_in_one_request_photograph_both_pages()
+    {
+        var scenario = await ScenarioAsync("cap_004_two_urls");
+        await using var host = scenario.Host;
+        using var owner = await OwnerClient.CreateAsync(host);
+
+        var fixture = await CreateMilestoneAsync(owner, "一次拍两页");
+        host.Provider.AnswerWithPng();
+
+        using var response = await PostCaptureUrlsAsync(
+            owner,
+            fixture.MilestoneId,
+            ["https://example.com/pricing", "https://example.com/tour"],
+            ["desktop"],
+            0);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+
+        var operationId = Guid.Parse(JsonDocument
+            .Parse(await response.Content.ReadAsStringAsync())
+            .RootElement.GetProperty("operationId").GetString()!);
+        await RunJobAsync(host, operationId);
+
+        var candidates = await ReadCandidatesAsync(owner, fixture.MilestoneId);
+
+        // One job, two pages: the wire field reaches the service's own page list, so both URLs are
+        // photographed rather than only the first.
+        Assert.Equal(2, candidates.Count);
+        Assert.Contains(candidates, candidate => candidate.SourceUrl == "https://example.com/pricing");
+        Assert.Contains(candidates, candidate => candidate.SourceUrl == "https://example.com/tour");
+        Assert.Equal("succeeded", await ReadOperationStatusAsync(owner, operationId));
+    }
+
+    [Fact]
+    public async Task WorkflowWayfinding_004_Failure_four_urls_are_refused_as_too_large_and_create_no_job()
+    {
+        var scenario = await ScenarioAsync("cap_004_url_bound");
+        await using var host = scenario.Host;
+        using var owner = await OwnerClient.CreateAsync(host);
+
+        var fixture = await CreateMilestoneAsync(owner, "超过地址上限");
+        host.Provider.AnswerWithPng();
+
+        using var response = await PostCaptureUrlsAsync(
+            owner,
+            fixture.MilestoneId,
+            [
+                "https://example.com/one",
+                "https://example.com/two",
+                "https://example.com/three",
+                "https://example.com/four",
+            ],
+            ["desktop"],
+            0);
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
+
+        Assert.Equal(0, await ChronicleafPostgresFixture.CountRowsAsync(host.Database, "operations"));
+    }
+
+    [Fact]
+    public async Task WorkflowWayfinding_004_Failure_url_and_urls_together_are_refused_naming_urls()
+    {
+        var scenario = await ScenarioAsync("cap_004_url_conflict");
+        await using var host = scenario.Host;
+        using var owner = await OwnerClient.CreateAsync(host);
+
+        var fixture = await CreateMilestoneAsync(owner, "地址字段冲突");
+
+        using var response = await owner.SendAsync(await owner.Post(
+            $"/api/milestones/{fixture.MilestoneId:D}/captures",
+            new
+            {
+                url = PublicUrl,
+                urls = new[] { "https://example.com/tour" },
+                viewports = new[] { "desktop" },
+                waitMs = 0,
+                fullPage = false,
+                expectedBundleRevision = 0,
+                idempotencyKey = $"cap-004-{Guid.NewGuid():N}",
+            },
+            0));
+
+        // Naming both is refused rather than resolved in favour of one, because picking one
+        // silently is how a page the owner asked for never gets photographed.
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal("validation_failed", await ReadCodeAsync(response));
+        Assert.Contains("urls", await ReadFieldNamesAsync(response));
+
+        Assert.Equal(0, await ChronicleafPostgresFixture.CountRowsAsync(host.Database, "operations"));
+    }
+
+    [Fact]
+    public async Task WorkflowWayfinding_004_Failure_a_malformed_urls_element_is_refused_naming_urls()
+    {
+        var scenario = await ScenarioAsync("cap_004_url_element");
+        await using var host = scenario.Host;
+        using var owner = await OwnerClient.CreateAsync(host);
+
+        var fixture = await CreateMilestoneAsync(owner, "地址元素无效");
+
+        using var response = await PostCaptureUrlsAsync(
+            owner,
+            fixture.MilestoneId,
+            ["https://example.com/pricing", "example.com/tour"],
+            ["desktop"],
+            0);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal("validation_failed", await ReadCodeAsync(response));
+        Assert.Contains("urls", await ReadFieldNamesAsync(response));
+
+        Assert.Equal(0, await ChronicleafPostgresFixture.CountRowsAsync(host.Database, "operations"));
+    }
+
+    [Fact]
+    public async Task WorkflowWayfinding_004_Boundary_absent_urls_keeps_the_single_url_path_identical()
+    {
+        var scenario = await ScenarioAsync("cap_004_legacy_url");
+        await using var host = scenario.Host;
+        using var owner = await OwnerClient.CreateAsync(host);
+
+        var fixture = await CreateMilestoneAsync(owner, "旧的单地址");
+        host.Provider.AnswerWithPng();
+
+        // No `urls` key at all: the legacy path answers 202 and photographs the one page, exactly
+        // as every earlier fact in this file proves.
+        var operationId = await RequestCaptureAsync(owner, fixture.MilestoneId, PublicUrl, ["desktop"], 0);
+        await RunJobAsync(host, operationId);
+
+        var candidate = Assert.Single(await ReadCandidatesAsync(owner, fixture.MilestoneId));
+        Assert.Equal(PublicUrl, candidate.SourceUrl);
+    }
+
     [Fact]
     public async Task A_capture_request_requires_the_evidence_revision_and_refuses_one_that_disagrees()
     {
@@ -1432,13 +1569,46 @@ public sealed class ScreenshotCaptureTests(ChronicleafPostgresFixture postgres)
             0));
     }
 
+    private static async Task<HttpResponseMessage> PostCaptureUrlsAsync(
+        OwnerClient owner,
+        Guid milestoneId,
+        IReadOnlyList<string> urls,
+        IReadOnlyList<string> viewports,
+        int waitMs)
+    {
+        return await owner.SendAsync(await owner.Post(
+            $"/api/milestones/{milestoneId:D}/captures",
+            new
+            {
+                urls,
+                viewports,
+                waitMs,
+                fullPage = false,
+                expectedBundleRevision = 0,
+                idempotencyKey = $"capture-{Guid.NewGuid():N}",
+            },
+            0));
+    }
+
+    private static async Task<IReadOnlyList<string>> ReadFieldNamesAsync(HttpResponseMessage response)
+    {
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        if (!document.RootElement.TryGetProperty("fieldErrors", out var fields) ||
+            fields.ValueKind != JsonValueKind.Object)
+        {
+            return [];
+        }
+
+        return [.. fields.EnumerateObject().Select(property => property.Name)];
+    }
+
     private static async Task<Guid> RequestCaptureAsync(
         OwnerClient owner,
         Guid milestoneId,
         string url,
         IReadOnlyList<string> viewports,
-        int waitMs)
-    {
+        int waitMs)    {
         using var response = await PostCaptureAsync(owner, milestoneId, url, viewports, waitMs);
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);

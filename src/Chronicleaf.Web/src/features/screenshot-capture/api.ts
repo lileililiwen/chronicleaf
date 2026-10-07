@@ -55,7 +55,7 @@ export async function requestCapture(
     {
       method: 'POST',
       body: {
-        url: draft.url.trim(),
+        urls: [...draft.urls],
         viewports: [...draft.viewports],
         waitSelector: emptyToNull(draft.waitSelector),
         waitMs: draft.waitMs,

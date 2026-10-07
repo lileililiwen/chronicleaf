@@ -124,9 +124,11 @@ public sealed record ScreenshotCandidateListResponse(
 /// </summary>
 /// <remarks>
 /// <para>
-/// The design's exact shape. <see cref="Url"/> is the one http or https URL to photograph and
+/// The design's exact shape. <see cref="Url"/> names the one http or https URL to photograph and
 /// <see cref="Viewports"/> names one or both of the two viewports, so a request for both is two
-/// candidates of the same page rather than two requests.
+/// candidates of the same page rather than two requests. <see cref="Urls"/> names up to three
+/// pages for one job instead; exactly one of <see cref="Url"/> and <see cref="Urls"/> must name
+/// a page, and the service's own three-page bound still decides how many is too many.
 /// </para>
 /// <para>
 /// <b>This is the only route in the repository whose body names a host the server will then
@@ -145,6 +147,7 @@ public sealed record ScreenshotCandidateListResponse(
 /// </remarks>
 public sealed record CaptureRequestBody(
     [property: JsonPropertyName("url")] string? Url,
+    [property: JsonPropertyName("urls")] IReadOnlyList<string>? Urls,
     [property: JsonPropertyName("viewports")] IReadOnlyList<string>? Viewports,
     [property: JsonPropertyName("waitSelector")] string? WaitSelector,
     [property: JsonPropertyName("waitMs")] int? WaitMs,
@@ -159,6 +162,7 @@ public sealed record CaptureRequestBody(
     /// </summary>
     public static CaptureRequestBody Empty { get; } = new(
         Url: null,
+        Urls: null,
         Viewports: null,
         WaitSelector: null,
         WaitMs: null,

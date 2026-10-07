@@ -9,6 +9,63 @@ archived and the two owner-BLOCKED changes are deferred to ROADMAP for later
 `hosted-managed-ai`: provider/model/quota/unit weights plus financial settlement policy — both
 packages parked intact in `openspec/deferred/`, nothing active remains).
 
+Next: `workflow-wayfinding` is archived
+(`0e4e178`, canonical spec `openspec/specs/workflow-wayfinding/spec.md`):
+wayfinding over delivered routes with one additive wire piece. `WorkflowNext`
+footers walk Overview → Evidence → Evolution → Content → Publish → Overview
+(real `areaPath` routes, no request fired), per-row Evidence ⇄ Evolution
+cross-links (`onNavigate` threaded through `MilestoneList`/`ProjectDetail`),
+and the candidate panel's Automations mention is now the real Automations
+route. Each GitHub candidate row offers "Record as milestone" over the
+delivered import route (source `github`, documented kind→type mapping:
+release/tag→release, pull-request→feature, issue→bugfix, star→stars,
+version=`tagName`, occurredAt=`receivedAt`, provenance notes); the stored
+record stays `candidate` and confirmation stays in Overview, so the panel's
+deliberate no-confirm boundary holds and its doc comment now says so.
+Capture takes up to three pages in one submission through the additive
+`urls` wire field (exactly one of `url`/`urls`, 422 naming `urls`, the
+three-page bound service-owned 413, legacy single-`url` path byte-identical).
+Deliberately not built: the schedule create/edit form (delivered by
+`PROJECT-AREA-IA-002` + `ScheduleSection`, regression-proven here) and any
+Team/Tenancy surface change (owner decision 2026-10-07 stands: Settings lists
+session internals + credentials ONLY per `SettingsPage.tsx`/`ProjectArea.tsx`,
+dashboard crumbs link Team/Tenancy — both halves suite-pinned).
+Per-entity CRUD: milestone Create=POST manual/import (201, idempotent replay
+200)/Read=list+get/Update=PATCH+confirm/dismiss/Delete=none by design
+(history not erasable); candidate rows Create=poll/delivery, Read=list,
+Update/Delete=none → named future package `github-candidate-retirement`;
+schedule Create=PUT If-Match 0/Read=GET/Update=PUT CAS/Delete=disable via
+`enabled:false` by design; capture Create=POST 202/Read=list+operation/
+Update/Delete=N/A by design (jobs immutable, selection owned by curation);
+wayfinding state N/A (stateless links, no API). Other holes named upstream,
+untouched: `publication-history`, `export-history`,
+`content-asset-retirement`, `agency-client-recovery`,
+`agency-report-history`, `publisher-options-binding`. Verification found four
+real defects, none worked around: the `urls`+`url` conflict and malformed
+`urls` element needed explicit 422s (found writing the new facts); the
+Automations link first sat in the no-connection branch a seeded connection
+never renders (moved to the always-rendered framing paragraph, caught by
+suite 28); test 1 navigated twice without asserting the middle landing
+(asserts added, caught by suite 28); the first full-gate attempt died
+silently starting suite 23 with zero log evidence on a healthy daemon
+(recorded as environment flake — the re-run below is fully green).
+Evidence, all run by the implementer rather than taken on report: full
+`ScreenshotCaptureTests` 57/57 (52 existing + 5 new `urls` wire facts:
+two-URL 202 photographing both, four-URL 413 with no job, `url`+`urls` 422
+naming `urls`, malformed element 422 naming `urls`, legacy path identical);
+`npm ci`, `tsc --noEmit`, `vite build` green; `bash scripts/e2e.sh` exit 0
+with 126/126 Playwright across all 28 database-isolated browser suites
+(suite 28 is the new `workflow-wayfinding` 5/5 on its own PostgreSQL at port
+5108 — loop walk with zero POSTs fired by navigation, import 201 + replay
+200 reading `candidate` in Overview, schedule save + `validation_failed`
+refusal verbatim, two-page 202 with the `urls` body followed to the host's
+`capture_sandbox_unavailable`, dashboard crumbs to Team/Tenancy with
+Settings listing neither); `git diff --check` clean; name preflight exit 0;
+`openspec validate --all --strict --no-interactive` 62/62 before and after
+the archive, which used no `--skip-specs`. No `current_spec` remains: the
+two owner-BLOCKED changes stay deferred to ROADMAP. Deployment stays
+`deployable: false`; there is no remote, no push and no publication.
+
 | # | Change | Implementation commit | Canonical spec |
 |---|---|---|---|
 | 1 | `community-foundation` | `ee1da62` | `openspec/specs/runtime-shell/spec.md` |

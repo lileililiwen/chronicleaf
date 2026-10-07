@@ -4,9 +4,10 @@
 
 Fifty-two changes implemented, verified and archived, each with exactly two commits (implementation/
 tests/archive, then this HANDOFF-only pointer). No `current_spec` remains: every drainable change is
-archived and the two still-active changes are owner-BLOCKED and held, never selected
+archived and the two owner-BLOCKED changes are deferred to ROADMAP for later
 (`semantic-narrative-retrieval`: demand plus embedding model/provider/dimension and consent policy;
-`hosted-managed-ai`: provider/model/quota/unit weights plus financial settlement policy).
+`hosted-managed-ai`: provider/model/quota/unit weights plus financial settlement policy — both
+packages parked intact in `openspec/deferred/`, nothing active remains).
 
 | # | Change | Implementation commit | Canonical spec |
 |---|---|---|---|

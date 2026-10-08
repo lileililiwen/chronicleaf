@@ -38,7 +38,7 @@ export function CredentialVaultPanel() {
   const isCleared = (provider: CredentialProvider): boolean => cleared[provider] === true;
 
   return (
-    <section className="view" data-testid="credential-vault">
+    <section className="view" data-testid="credential-vault" aria-busy={credentials.loading}>
       <h1 className="view__heading">Provider credentials</h1>
 
       <p className="view__state" data-testid="credential-vault-intro">

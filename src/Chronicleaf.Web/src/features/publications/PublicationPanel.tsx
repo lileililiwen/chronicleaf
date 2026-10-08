@@ -172,7 +172,7 @@ export function PublicationPanel({ projectId }: { readonly projectId: string }) 
     });
 
   return (
-    <section className="view" aria-label="Publications" data-testid="publication-panel">
+    <section className="view" aria-label="Publications" data-testid="publication-panel" aria-busy={milestones === null}>
       {/* WEB-A11Y-ROLES-001. Project-level panels are h2 sections under the view h1. */}
       <h2 className="view__heading" data-testid="publication-heading">
         Publications

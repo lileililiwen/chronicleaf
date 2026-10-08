@@ -62,7 +62,7 @@ export function GitHubCandidatePanel({
   const shown = state.candidates.length;
 
   return (
-    <section className="evidence" data-testid="github-candidate-panel">
+    <section className="evidence" data-testid="github-candidate-panel" aria-busy={state.loading}>
       {/* WEB-A11Y-ROLES-001. Project-level panels are h2 sections under the view h1. */}
       <h2 className="evidence__heading">Milestone candidates from GitHub</h2>
 

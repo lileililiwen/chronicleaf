@@ -382,10 +382,21 @@ function CandidateView({
         </span>
       </p>
 
+      {/*
+        WEB-PERF-001 (web-perf-and-animation). The box precedes the bytes:
+        explicit dimensions from the payload reserve the layout box before
+        the picture lands, lazy loading keeps below-the-fold candidates off
+        the critical path, and async decoding keeps decode off the main
+        thread.
+      */}
       <img
         className="capture__image"
         src={source}
         alt={`The page at ${candidate.finalUrl}, captured at ${candidate.viewport} width`}
+        width={candidate.width}
+        height={candidate.height}
+        loading="lazy"
+        decoding="async"
         data-testid="capture-candidate-image"
       />
 

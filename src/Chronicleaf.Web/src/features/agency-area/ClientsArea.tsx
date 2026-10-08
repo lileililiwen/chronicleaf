@@ -39,7 +39,7 @@ export function ClientsArea({ onNavigate }: { readonly onNavigate: (to: string) 
   }, [load]);
 
   return (
-    <section className="view" data-testid="clients">
+    <section className="view" data-testid="clients" aria-busy={loading}>
       <p className="view__crumbs">
         <button
           type="button"

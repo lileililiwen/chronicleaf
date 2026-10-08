@@ -1,3 +1,16 @@
+/*
+ * WEB-PERF-004 (web-perf-and-animation). Owners who ask the OS for reduced
+ * motion get effectively none: every transition in this sheet collapses to
+ * 0.01ms while every end state (colors, borders, focus rings) still applies.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /**
  * The delivered class vocabulary, now bound to the token set in tokens.css.
  *
@@ -116,6 +129,11 @@ body {
   font: inherit;
   font-size: var(--font-size-body);
   cursor: pointer;
+  /* WEB-PERF-002 (web-perf-and-animation). One shared 120ms color
+     transition: a literal, not a token — timing is not a visual role, and a
+     single-valued timing token would be ceremony. Outline stays instant so
+     the focus ring never lags behind focus. */
+  transition: color 120ms, background-color 120ms, border-color 120ms;
 }
 
 .nav__item:hover:not(:disabled) {
@@ -409,6 +427,7 @@ body {
   font: inherit;
   font-size: var(--font-size-body);
   cursor: pointer;
+  transition: color 120ms, background-color 120ms, border-color 120ms;
 }
 
 .action:hover:not(:disabled) {
@@ -458,6 +477,7 @@ body {
 button.link {
   min-block-size: var(--space-7);
   padding: var(--space-1) var(--space-4px);
+  transition: color 120ms, background-color 120ms, border-color 120ms;
 }
 
 .empty {
@@ -525,6 +545,7 @@ button.link {
   border-radius: var(--radius-pill);
   font-size: var(--font-size-badge);
   text-transform: lowercase;
+  transition: color 120ms, background-color 120ms, border-color 120ms;
 }
 
 .badge--ok {
@@ -558,6 +579,7 @@ button.link {
   font: inherit;
   font-size: var(--font-size-small);
   cursor: pointer;
+  transition: color 120ms, background-color 120ms, border-color 120ms;
 }
 
 .filter--active {

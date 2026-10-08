@@ -94,7 +94,11 @@ export function MilestoneList({
   };
 
   return (
-    <>
+    // WEB-PERF-003 (web-perf-and-animation). The list owns no section of its
+    // own — it renders a fragment — so the container signal needs one. This
+    // wrapper carries the busy state and nothing else: no class, no heading,
+    // no moved DOM.
+    <section data-testid="milestone-list-panel" aria-busy={milestones.loading}>
       {actionNotice ? (
         <p className="notice notice--ok" role="status" data-testid="project-notice">
           {actionNotice}
@@ -160,7 +164,7 @@ export function MilestoneList({
           ))}
         </ul>
       )}
-    </>
+    </section>
   );
 }
 

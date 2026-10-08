@@ -103,7 +103,7 @@ export function ProjectTimeline({
   };
 
   return (
-    <section className="timeline" aria-label="Project timeline" data-testid="project-timeline">
+    <section className="timeline" aria-label="Project timeline" data-testid="project-timeline" aria-busy={loading}>
       {/* WEB-A11Y-ROLES-001. The timeline is an h2 section under the view h1. */}
       <h2 className="timeline__heading" data-testid="timeline-heading">
         Timeline

@@ -75,7 +75,7 @@ export function GroundedMarkdownDraftPanel({
     !drafts.busy && effectiveProvider !== '' && effectiveModel !== '' && selected.length > 0;
 
   return (
-    <section className="evidence" data-testid="draft-panel">
+    <section className="evidence" data-testid="draft-panel" aria-busy={drafts.reading}>
       {/* WEB-A11Y-ROLES-001. Detail panels are h3 under the h2 row title. */}
       <h3 className="evidence__heading" data-testid="draft-heading">
         Draft

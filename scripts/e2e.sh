@@ -97,6 +97,7 @@ agency_base_url="${CHRONICLEAF_AGENCY_BASE_URL:-http://127.0.0.1:5106}"
 video_story_base_url="${CHRONICLEAF_VIDEO_STORY_BASE_URL:-http://127.0.0.1:5107}"
 wayfinding_base_url="${CHRONICLEAF_WAYFINDING_BASE_URL:-http://127.0.0.1:5108}"
 a11y_roles_base_url="${CHRONICLEAF_A11Y_ROLES_BASE_URL:-http://127.0.0.1:5109}"
+responsive_base_url="${CHRONICLEAF_RESPONSIVE_BASE_URL:-http://127.0.0.1:5110}"
 log_file="$repo_root/$publish_dir/server.log"
 evidence_log_file="$repo_root/$publish_dir/server-evidence.log"
 credentials_log_file="$repo_root/$publish_dir/server-credentials.log"
@@ -126,6 +127,7 @@ agency_log_file="$repo_root/$publish_dir/server-agency.log"
 video_story_log_file="$repo_root/$publish_dir/server-video-story.log"
 wayfinding_log_file="$repo_root/$publish_dir/server-wayfinding.log"
 a11y_roles_log_file="$repo_root/$publish_dir/server-a11y-roles.log"
+responsive_log_file="$repo_root/$publish_dir/server-responsive.log"
 key_file=""
 
 # The operator key for this run: 32 random bytes in a temporary file outside the repository and
@@ -170,7 +172,8 @@ cleanup() {
     "$repo_root/$publish_dir/access-token-agency" \
     "$repo_root/$publish_dir/access-token-video-story" \
     "$repo_root/$publish_dir/access-token-wayfinding" \
-    "$repo_root/$publish_dir/access-token-a11y-roles"
+    "$repo_root/$publish_dir/access-token-a11y-roles" \
+    "$repo_root/$publish_dir/access-token-responsive"
   # So is the encryption key: it is removed whether the run passed or failed.
   remove_key_file
   exit "$exit_status"
@@ -3176,4 +3179,20 @@ start_suite a11y_roles "$a11y_roles_base_url" "$a11y_roles_log_file" \
 echo "==> npm run test:e2e (real browser against $a11y_roles_base_url)"
 run_suite "$a11y_roles_base_url" "$a11y_roles_log_file" "$repo_root/$publish_dir/access-token-a11y-roles" \
   tests/a11y-roles.spec.ts
+stop_suite
+
+# ---------------------------------------------------------------------------------------------
+# Suite 30: web responsive shell. It creates projects by clicking, and a
+# project cannot be removed once it exists - so it runs against its own installation and
+# its own published instance rather than against the one suite 1 asserts empty, for the same
+# reason suites 2 to 29 each have one. No seed: every record below is created by the same
+# clicks an owner would make, and viewports are set per test (360/720/960/1280px).
+# ---------------------------------------------------------------------------------------------
+echo "==> starting a thirtieth disposable PostgreSQL and published application at $responsive_base_url"
+start_suite responsive "$responsive_base_url" "$responsive_log_file" \
+  "$repo_root/$publish_dir/access-token-responsive"
+
+echo "==> npm run test:e2e (real browser against $responsive_base_url)"
+run_suite "$responsive_base_url" "$responsive_log_file" "$repo_root/$publish_dir/access-token-responsive" \
+  tests/responsive-shell.spec.ts
 stop_suite

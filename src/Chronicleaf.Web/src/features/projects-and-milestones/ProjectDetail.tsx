@@ -10,7 +10,7 @@ import { ProjectEvidence } from '../project-areas/ProjectEvidence';
 import { ProjectEvolution } from '../project-areas/ProjectEvolution';
 import { ProjectOverview } from '../project-areas/ProjectOverview';
 import { ProjectPublish } from '../project-areas/ProjectPublish';
-import type { ProjectAreaId } from '../project-areas/areas';
+import { PROJECT_AREAS, type ProjectAreaId } from '../project-areas/areas';
 
 /**
  * One project, six addresses (PROJECT-AREA-IA-001).
@@ -61,6 +61,7 @@ export function ProjectDetail({
 
   const record: Project | null = project.data;
   const archived = record?.archivedAt !== null && record?.archivedAt !== undefined;
+  const areaLabel = PROJECT_AREAS.find((entry) => entry.id === area)?.label ?? area;
 
   const archive = async () => {
     if (record === null) {
@@ -84,10 +85,21 @@ export function ProjectDetail({
 
   return (
     <section className="view" data-testid="project-detail">
-      <p className="view__crumbs">
+      {/*
+        WEB-RESP-006. The chain names where the reader is: Projects › the
+        stored project name › the area label, above the h1 in the delivered
+        .view__crumbs paragraph. The Projects crumb keeps its testid and
+        navigates back; the name is an ellipsis until the record loads, never
+        a placeholder.
+      */}
+      <p className="view__crumbs" data-testid="project-crumbs">
         <button type="button" className="link" onClick={onBack} data-testid="project-back">
-          ← Projects
+          Projects
         </button>
+        <span aria-hidden="true"> › </span>
+        <span data-testid="project-crumb-name">{record?.name ?? '…'}</span>
+        <span aria-hidden="true"> › </span>
+        <span data-testid="project-crumb-area">{areaLabel}</span>
       </p>
 
       {project.loading || record === null ? (

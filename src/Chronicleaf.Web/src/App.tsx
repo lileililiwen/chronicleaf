@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import { useOwnerSession } from './features/community-access/useOwnerSession';
 import type { OwnerSessionState } from './features/community-access/useOwnerSession';
 import { SessionGate } from './features/community-access/Settings/SessionGate';
@@ -113,11 +115,18 @@ function SignedInApp() {
 }
 
 /**
- * PRODUCT-SHELL-UX-001. One shell, one nav, one header per page.
+ * PRODUCT-SHELL-UX-001, WEB-RESP-001, WEB-RESP-005. One shell, one nav, one
+ * header per page.
  *
  * The brand mark links to the dashboard; every product area is one nav step
  * away from every other, so no page is reachable only through a back-link.
  * Each view renders its own h1 — the shell never repeats a global heading.
+ *
+ * WEB-RESP-001: at <=720px the nav collapses behind one Menu disclosure
+ * (CSS hides the row and shows the button; the state below opens the same
+ * six entries as a vertical list). Choosing an entry navigates and closes
+ * the list. WEB-RESP-005: the signed-in session bar lives in the header as
+ * one compact row — never at the bottom of the page.
  */
 function ProductShell({ session }: { readonly session: OwnerSessionState }) {
   // The one route reader for the signed-in product. It is owned here and
@@ -125,32 +134,49 @@ function ProductShell({ session }: { readonly session: OwnerSessionState }) {
   // which path the owner is on.
   const route: Route = useRoute();
   const { path, navigate } = route;
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const go = (to: string) => {
+    setMenuOpen(false);
+    navigate(to);
+  };
 
   return (
     <div className="shell shell--app" data-testid="app-shell">
       <SkipLink />
       <div className="app">
         <header className="app__header">
-          <button type="button" className="app__brand" onClick={() => navigate('/')} data-testid="brand-home">
+          <button type="button" className="app__brand" onClick={() => go('/')} data-testid="brand-home">
             {BRAND}
           </button>
           <p className="app__tagline" data-testid="tagline">
             {TAGLINE}
           </p>
-          <nav className="nav" aria-label="Product" data-testid="app-nav">
+          <button
+            type="button"
+            className="nav-menu"
+            aria-expanded={menuOpen ? 'true' : 'false'}
+            aria-controls="app-nav"
+            onClick={() => setMenuOpen((open) => !open)}
+            data-testid="nav-menu"
+          >
+            Menu
+          </button>
+          <nav id="app-nav" className={menuOpen ? 'nav nav--open' : 'nav'} aria-label="Product" data-testid="app-nav">
             {NAV_ENTRIES.map((entry) => (
               <button
                 key={entry.path}
                 type="button"
                 className={navClass(path, entry.path)}
                 aria-current={isActive(path, entry.path) ? 'page' : undefined}
-                onClick={() => navigate(entry.path)}
+                onClick={() => go(entry.path)}
                 data-testid={entry.testid}
               >
                 {entry.label}
               </button>
             ))}
           </nav>
+          <SessionGate session={session} onSettings={() => go('/settings')} />
         </header>
 
         {/*
@@ -167,17 +193,6 @@ function ProductShell({ session }: { readonly session: OwnerSessionState }) {
         >
           <ProjectArea route={route} session={session} />
         </main>
-
-        {/*
-          The signed-in session bar: sign-out lives here, on every product page,
-          while session internals (actor, idle timeout, lifetime) render only
-          under /settings. See SessionGate. It is hidden on /settings itself,
-          where the settings page owns the session display and the bar would
-          duplicate its heading and sign-out.
-        */}
-        {path === '/settings' ? null : (
-          <SessionGate session={session} onSettings={() => navigate('/settings')} />
-        )}
       </div>
     </div>
   );

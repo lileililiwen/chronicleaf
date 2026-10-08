@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
-import { MilestoneApiError, createMilestone, updateMilestone } from './api';
+import { MilestoneApiError, createMilestone, getProject, updateMilestone } from './api';
+import { useProject } from './useRecords';
 import { MILESTONE_TYPES, type Milestone, type MilestoneDraft, type MilestoneType } from './types';
 
 /**
@@ -20,12 +21,15 @@ export function MilestoneEditor({
   milestone,
   onSaved,
   onCancel,
+  onNavigate,
 }: {
   readonly projectId: string;
   /** `null` creates a milestone; a milestone edits it. */
   readonly milestone: Milestone | null;
   readonly onSaved: () => void;
   readonly onCancel: () => void;
+  /** WEB-RESP-006: the Projects crumb navigates through the shell's route reader. */
+  readonly onNavigate: (to: string) => void;
 }) {
   const [title, setTitle] = useState(milestone?.title ?? '');
   const [type, setType] = useState<MilestoneType>((milestone?.type as MilestoneType) ?? 'feature');
@@ -37,6 +41,8 @@ export function MilestoneEditor({
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<MilestoneApiError | null>(null);
   const [conflict, setConflict] = useState<string | null>(null);
+  // WEB-RESP-006: the stored project name for the crumb chain above the h1.
+  const project = useProject(getProject, projectId);
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -86,6 +92,20 @@ export function MilestoneEditor({
 
   return (
     <section className="view" data-testid={milestone === null ? 'milestone-create' : 'milestone-edit'}>
+      {/*
+        WEB-RESP-006. The chain names where the reader is: Projects › the
+        stored project name › Milestone, above the h1 in the delivered
+        .view__crumbs paragraph.
+      */}
+      <p className="view__crumbs" data-testid="milestone-crumbs">
+        <button type="button" className="link" onClick={() => onNavigate('/projects')} data-testid="milestone-projects">
+          Projects
+        </button>
+        <span aria-hidden="true"> › </span>
+        <span data-testid="milestone-crumb-name">{project.data?.name ?? '…'}</span>
+        <span aria-hidden="true"> › </span>
+        <span data-testid="milestone-crumb-area">Milestone</span>
+      </p>
       <h1 className="view__heading">{milestone === null ? 'New milestone' : `Edit ${milestone.title}`}</h1>
 
       <p className="view__hint" data-testid="milestone-editor-hint">

@@ -162,6 +162,7 @@ export function ProjectArea({ route, session }: { readonly route: Route; readonl
           milestone={null}
           onSaved={() => navigate(`/projects/${projectId}`)}
           onCancel={() => navigate(`/projects/${projectId}`)}
+          onNavigate={navigate}
         />
       );
     }
@@ -432,6 +433,7 @@ function MilestoneEditRoute({
       milestone={milestone.data}
       onSaved={() => onNavigate(`/projects/${projectId}`)}
       onCancel={() => onNavigate(`/projects/${projectId}`)}
+      onNavigate={onNavigate}
     />
   );
 }

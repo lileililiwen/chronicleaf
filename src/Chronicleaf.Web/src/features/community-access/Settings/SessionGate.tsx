@@ -18,11 +18,14 @@ import type { OwnerSessionState } from '../useOwnerSession';
  * Two components each asking the server for their own session would each be handed their own
  * antiforgery value, and the second would invalidate the first - so one reader, one value.
  *
- * PRODUCT-SHELL-UX-001: the signed-in view is a sign-out control only.
- * Session internals (actor identity, idle timeout, lifetime) render only
- * under `/settings`, never here and never on a product page — so a routine
- * capture of this bar shows no session value. The details link is handed in
- * by the shell, which owns the one route reader.
+ * PRODUCT-SHELL-UX-001, WEB-RESP-005: the signed-in view is a compact
+ * header row. Session internals (actor identity, idle timeout, lifetime)
+ * render only under `/settings`, never here and never on a product page —
+ * so a routine capture of this bar shows no session value. The heading and
+ * the three session testids survive the move into the header verbatim, and
+ * the actor renders as the settings-page label, never as a raw UUID dump.
+ * The details link is handed in by the shell, which owns the one route
+ * reader.
  */
 export function SessionGate({
   session: state,
@@ -73,35 +76,33 @@ export function SessionGate({
 
   if (status === 'signed-in' && session) {
     return (
-      <section className="session" data-testid="session-gate">
-        <h2 className="session__heading" data-testid="session-heading">
+      <section className="session-bar" aria-label="Owner session" data-testid="session-gate">
+        <h2 className="session-bar__heading" data-testid="session-heading">
           Owner session
         </h2>
-        <p className="session__state" data-testid="session-signed-in">
-          Signed in as this installation&apos;s owner.
-        </p>
-        <p className="session__actions">
+        <span className="session-bar__actor" data-testid="session-actor">
+          This installation&apos;s owner
+        </span>
+        <button
+          type="button"
+          className="session__action"
+          data-testid="session-sign-out"
+          onClick={() => {
+            void signOut();
+          }}
+        >
+          Sign out
+        </button>
+        {onSettings ? (
           <button
             type="button"
-            className="session__action"
-            data-testid="session-sign-out"
-            onClick={() => {
-              void signOut();
-            }}
+            className="link"
+            data-testid="session-details"
+            onClick={onSettings}
           >
-            Sign out
+            Session details
           </button>
-          {onSettings ? (
-            <button
-              type="button"
-              className="link"
-              data-testid="session-details"
-              onClick={onSettings}
-            >
-              Session details
-            </button>
-          ) : null}
-        </p>
+        ) : null}
         <p className="notice--error" role="alert" data-testid="session-error">
           {error ?? ''}
         </p>

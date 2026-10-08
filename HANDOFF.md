@@ -9,8 +9,56 @@ archived and the two owner-BLOCKED changes are deferred to ROADMAP for later
 `hosted-managed-ai`: provider/model/quota/unit weights plus financial settlement policy — both
 packages parked intact in `openspec/deferred/`, nothing active remains).
 
-Next: `current_spec` is `web-responsive-shell`, the next package in drain order after
-`web-accessibility-roles`.
+Next: `current_spec` is `web-token-sweep`, the next package in drain order after
+`web-responsive-shell`.
+
+Next: `web-responsive-shell` is archived
+(`dce359f`, canonical spec `openspec/specs/web-responsive-shell/spec.md`):
+six closed responsive gaps on the Web client, frontend-only, no backend byte
+changed. At `<=720px` the six-entry top nav collapses behind one `Menu`
+disclosure (`data-testid="nav-menu"`, `aria-expanded` +
+`aria-controls="app-nav"`, `aria-current` kept) opening the same six entries
+as a vertical overlay that navigates and closes, while the project sub-nav
+scrolls on one row (`nowrap` + `overflow-x: auto`); exactly three media
+queries (`480px`/`720px`/`960px`) retune nav, product header, timeline and
+milestone rows with no new layout system; at `<=480px` `.shell__panel`
+padding `3rem → 1.5rem`, `.session__input` `min-width: 16rem → 0` with
+`width: 100%`, `.session__form` `end → stretch`; `.app__header` is
+`position: sticky` `top: 0` with the shell background, z-index and kept
+border; the signed-in session bar moves from the bottom of every product
+page into the header as one compact row (`Owner session` `h2`, actor label,
+sign-out, details link — all testids verbatim, bottom placement deleted with
+its `/settings` exception); at `>=960px` `.cards` reads
+`auto-fit minmax(20rem,1fr)` with cards staying `button`s and deep-links
+staying siblings; every project-area view and the milestone editor carries
+`Projects › <name> › <area>` above the `h1` in `.view__crumbs` (the
+`Projects` crumb keeps `project-back`; the editor gains an `onNavigate`
+prop). The new `tests/responsive-shell.spec.ts` runs as its own e2e group
+(suite 30, own disposable PostgreSQL on port `5110`, no seed). Verification
+found three real defects, none worked around: the suite helper created
+projects without signing in first (signed-in added to `createProject`, found
+when two tests timed out on `project-name-input`); the cards test asserted
+exactly two cards while sibling tests share the installation (now waits for
+`nth(1)` and asserts `>= 2`, found when the count read 3); and the
+idempotent sign-in returned before first paint (now waits for the token
+input or the `Owner session` heading, found when the menu assertion ran
+against the signed-out shell). Evidence, all run by the implementer rather
+than taken on report:
+`node scripts/check-openspec-change-names.mjs` exit 0,
+`openspec validate --all --strict --no-interactive` 65/65 before and after
+the archive, which used no `--skip-specs`; `npm ci`,
+`tsc --noEmit` exit 0, `vite build` exit 0 (chunk-size warning only);
+the new suite 30 green 8/8 on two consecutive runs against the real
+published app with a real PostgreSQL (menu operable at 360, present at 720,
+hidden at 1280, sub-nav single-row scroll, sticky header computed position,
+session bar inside header, two-column cards at 1280, crumb chains on all
+six areas plus the editor). Full `CHRONICLEAF_E2E=1 bash scripts/verify.sh`
+is deferred to the end of the batch per the batch plan and was NOT run
+here; no claim is made about the other 29 suites beyond their selectors
+and testids surviving verbatim. `git diff --check` clean. No
+secret-bearing captures; dist/test-results artifacts never committed.
+Deployment stays `deployable: false`; there is no remote, no push and no
+publication.
 
 Next: `web-accessibility-roles` is archived
 (`31b146b`, canonical spec `openspec/specs/web-accessibility-roles/spec.md`):
@@ -230,6 +278,7 @@ two owner-BLOCKED changes stay deferred to ROADMAP. Deployment stays
 | 57 | `content-pack-panels` | `b7d1dd7` | `openspec/specs/content-pack-panels/spec.md` |
 | 58 | `web-accessibility-core` | `cdac4a7` | `openspec/specs/web-accessibility-core/spec.md` |
 | 59 | `web-accessibility-roles` | `31b146b` | `openspec/specs/web-accessibility-roles/spec.md` |
+| 60 | `web-responsive-shell` | `dce359f` | `openspec/specs/web-responsive-shell/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)

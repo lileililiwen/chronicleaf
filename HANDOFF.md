@@ -9,8 +9,47 @@ archived and the two owner-BLOCKED changes are deferred to ROADMAP for later
 `hosted-managed-ai`: provider/model/quota/unit weights plus financial settlement policy — both
 packages parked intact in `openspec/deferred/`, nothing active remains).
 
-Next: `current_spec` is `web-perf-and-animation`, the next package in drain order after
-`web-form-feedback`.
+Next: `web-perf-and-animation` is archived
+(`d90ca3d`, canonical spec `openspec/specs/web-perf-and-animation/spec.md`):
+four closed performance-and-animation gaps on the Web client, frontend-only,
+no backend byte changed. The `ScreenshotCapturePanel` candidate `<img>` now
+carries `width`/`height` from the delivered `candidate.width`/
+`candidate.height` plus `loading="lazy"` `decoding="async"`, so candidate
+lists populate without layout shift; `.action`, `.nav__item`, `.filter`,
+`.badge` and `button.link` share
+`transition: color 120ms, background-color 120ms, border-color 120ms` (the
+120ms stays a literal by owner decision — timing is not a visual role, so no
+timing token was added; the focus outline is deliberately excluded and stays
+instant); every list-owning root section reports `aria-busy={loading}` while
+loading (`MilestoneList` wraps its fragment in one additive
+`milestone-list-panel` section, the other seven on their existing roots with
+their own flags — the `web-accessibility-core` `aria-live` paragraphs are
+untouched); and `styles.css` opens with a `prefers-reduced-motion: reduce`
+guard collapsing `transition-duration` to `0.01ms !important` on all
+elements and pseudo-elements (end states still apply; `0.01ms` rather than
+`0ms` for shipped `transitionend` behavior). Verification found two real
+defects, none worked around: computed `transition-duration` reads
+`0.12s, 0.12s, 0.12s` (one entry per transitioned property, not one string)
+and LightningCSS minifies `0.01ms` to `.01ms` in the built CSS — both
+oracles now assert the normalized forms alongside the authored literals.
+Evidence, all run by the implementer rather than taken on report:
+`node scripts/check-openspec-change-names.mjs` exit 0,
+`openspec validate --all --strict --no-interactive` 68/68 with no
+`--skip-specs`; `npm ci`, `tsc --noEmit` exit 0, `vite build` exit 0
+(chunk-size warning only); `npx playwright test
+tests/perf-animation.spec.ts` 6/6 standalone (Vite dev server plus
+route-mocked `/api/*`, no database: payload-equal image dimensions +
+lazy/async attributes, 120ms shorthand on all five selectors + computed
+`0.12s` × 3 on sampled controls, `aria-busy="true"` while gated fetches
+are held and `"false"` once settled on milestone/operations/clients
+containers, guard comment + rule in source and `prefers-reduced-motion` +
+`.01ms` in every built `dist` asset); `tests/token-sweep.spec.ts` still
+5/5 over the touched CSS. Full `CHRONICLEAF_E2E=1 bash scripts/verify.sh`
+is deferred to the end of the batch per the batch plan and was NOT run
+here; no claim is made about the other suites beyond their selectors and
+testids surviving verbatim. `git diff --check` clean. No secret-bearing
+captures; dist/test-results artifacts never committed. Deployment stays
+`deployable: false`; there is no remote, no push and no publication.
 
 Next: `web-form-feedback` is archived
 (`617c44d`, canonical spec `openspec/specs/web-form-feedback/spec.md`):
@@ -376,6 +415,7 @@ two owner-BLOCKED changes stay deferred to ROADMAP. Deployment stays
 | 60 | `web-responsive-shell` | `dce359f` | `openspec/specs/web-responsive-shell/spec.md` |
 | 61 | `web-token-sweep` | `f07b60c` | `openspec/specs/web-token-sweep/spec.md` |
 | 62 | `web-form-feedback` | `617c44d` | `openspec/specs/web-form-feedback/spec.md` |
+| 63 | `web-perf-and-animation` | `d90ca3d` | `openspec/specs/web-perf-and-animation/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)

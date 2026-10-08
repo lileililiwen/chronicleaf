@@ -101,7 +101,7 @@ export function EvolutionImagePanel({ projectId }: { readonly projectId: string 
       </p>
 
       {loading ? (
-        <p className="view__state" data-testid="evolution-image-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="evolution-image-loading">
           Reading this project&apos;s comparisons…
         </p>
       ) : items.length === 0 && failure === null ? (

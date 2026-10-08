@@ -158,7 +158,7 @@ export function GenerationPreviewPanel({
       </h5>
 
       {flow.evidenceBusy ? (
-        <p className="view__state" data-testid="generation-evidence-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="generation-evidence-loading">
           Reading the evidence for this milestone…
         </p>
       ) : null}

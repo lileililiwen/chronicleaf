@@ -102,7 +102,7 @@ export function SessionGate({
             </button>
           ) : null}
         </p>
-        <p className="session__error" role="alert" data-testid="session-error">
+        <p className="notice--error" role="alert" data-testid="session-error">
           {error ?? ''}
         </p>
       </section>
@@ -143,7 +143,7 @@ export function SessionGate({
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
-      <p className="session__error" role="alert" data-testid="session-error">
+      <p className="notice--error" role="alert" data-testid="session-error">
         {error ?? ''}
       </p>
     </section>

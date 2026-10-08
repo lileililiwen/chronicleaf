@@ -124,7 +124,7 @@ export function ClientDetail({
 
   if (loading) {
     return (
-      <p className="view__state" data-testid="client-loading">
+      <p className="view__state" aria-live="polite" aria-busy="true" data-testid="client-loading">
         Loading this client…
       </p>
     );
@@ -151,7 +151,7 @@ export function ClientDetail({
 
   if (client === null) {
     return (
-      <p className="view__state" data-testid="client-loading">
+      <p className="view__state" aria-live="polite" aria-busy="true" data-testid="client-loading">
         Loading this client…
       </p>
     );

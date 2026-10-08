@@ -125,7 +125,7 @@ export function MilestoneList({
       ) : null}
 
       {milestones.loading ? (
-        <p className="view__state" data-testid="milestones-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="milestones-loading">
           Loading milestones…
         </p>
       ) : milestones.failure ? (

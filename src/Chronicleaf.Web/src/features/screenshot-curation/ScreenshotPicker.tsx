@@ -189,11 +189,11 @@ export function ScreenshotPicker({
       </h4>
 
       {reading && pictures.length === 0 ? (
-        <p className="view__state" data-testid="curation-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="curation-loading">
           Reading what was chosen…
         </p>
       ) : readFailure !== null && pictures.length === 0 ? (
-        <p className="session__error" data-testid="curation-failed">
+        <p className="notice--error" role="alert" data-testid="curation-failed">
           The curated screenshots for this milestone could not be read: {readFailure}
         </p>
       ) : pictures.length === 0 ? (
@@ -285,7 +285,7 @@ export function ScreenshotPicker({
       ) : null}
 
       {failure !== null ? (
-        <p className="session__error" data-testid="curation-request-failed">
+        <p className="notice--error" role="alert" data-testid="curation-request-failed">
           {failure.isRevisionConflict
             ? `Nothing was changed: somebody else moved this first, so this was decided against revision ${bundleRevision}, which is no longer current. The list above is what the server holds now - read it, then decide again.`
             : failedAction !== null

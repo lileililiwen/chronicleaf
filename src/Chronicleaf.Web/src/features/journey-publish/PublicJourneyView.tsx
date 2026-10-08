@@ -52,7 +52,7 @@ export function PublicJourneyView({ slug }: { readonly slug: string }) {
   if (loading) {
     return (
       <section className="view" data-testid="public-journey">
-        <p className="view__state" data-testid="public-journey-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="public-journey-loading">
           Reading this journey…
         </p>
       </section>

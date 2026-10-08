@@ -57,7 +57,7 @@ export function VoiceArea({ projectId }: { readonly projectId: string }) {
       {open ? (
         <div className="voice-panels" data-testid="voice-panels">
           {catalogue.loading ? (
-            <p className="view__state" data-testid="voice-catalogue-loading">
+            <p className="view__state" aria-live="polite" aria-busy="true" data-testid="voice-catalogue-loading">
               Loading the voice presets…
             </p>
           ) : catalogue.failure !== null ? (
@@ -118,7 +118,7 @@ function DraftList({
           {failure.message}
         </p>
       ) : loading && page === null ? (
-        <p className="view__state" data-testid="voice-drafts-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="voice-drafts-loading">
           Loading this project's drafts…
         </p>
       ) : (page ?? { items: [], nextCursor: null, pageSize: 0 }).items.length === 0 ? (
@@ -188,7 +188,7 @@ function VoiceDraftView({
 
   if (draft.loading || draft.draft === null) {
     return (
-      <p className="view__state" data-testid="voice-draft-loading">
+      <p className="view__state" aria-live="polite" aria-busy="true" data-testid="voice-draft-loading">
         Loading this draft…
       </p>
     );

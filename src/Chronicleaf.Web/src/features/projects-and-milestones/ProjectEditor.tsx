@@ -82,11 +82,17 @@ export function ProjectEditor({
             value={name}
             maxLength={120}
             required
+            aria-invalid={failure?.messageFor('name') ? 'true' : undefined}
+            aria-describedby={failure?.messageFor('name') ? 'project-name-error' : undefined}
             onChange={(event) => setName(event.target.value)}
             data-testid="project-name-input"
           />
           {failure?.messageFor('name') ? (
-            <p className="form__error" data-testid="project-name-error">
+            <p
+              className="form__error"
+              id="project-name-error"
+              data-testid="project-name-error"
+            >
               {failure.messageFor('name')}
             </p>
           ) : null}
@@ -119,6 +125,8 @@ export function ProjectEditor({
             type="url"
             placeholder="https://"
             value={projectUrl}
+            aria-invalid={failure?.messageFor('projectUrl') ? 'true' : undefined}
+            aria-describedby={failure?.messageFor('projectUrl') ? 'project-url-error' : undefined}
             onChange={(event) => setProjectUrl(event.target.value)}
             data-testid="project-url-input"
           />
@@ -126,7 +134,11 @@ export function ProjectEditor({
             Stored as you type it. Chronicleaf never opens this address itself.
           </p>
           {failure?.messageFor('projectUrl') ? (
-            <p className="form__error" data-testid="project-url-error">
+            <p
+              className="form__error"
+              id="project-url-error"
+              data-testid="project-url-error"
+            >
               {failure.messageFor('projectUrl')}
             </p>
           ) : null}

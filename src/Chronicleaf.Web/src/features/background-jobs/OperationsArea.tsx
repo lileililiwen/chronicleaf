@@ -111,7 +111,7 @@ function OperationDetail({
 
   if (operation.loading || operation.data === null) {
     return (
-      <p className="view__state" data-testid="operation-loading">
+      <p className="view__state" aria-live="polite" aria-busy="true" data-testid="operation-loading">
         Loading this background job…
       </p>
     );

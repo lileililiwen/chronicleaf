@@ -269,7 +269,7 @@ export function ExportPanel({ projectId }: { readonly projectId: string }) {
 
       <h4 className="view__heading">Select approved assets</h4>
       {milestones === null ? (
-        <p className="view__state" data-testid="static-blog-export-milestones-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="static-blog-export-milestones-loading">
           Reading milestones…
         </p>
       ) : milestones.length === 0 ? (

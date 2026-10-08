@@ -92,11 +92,11 @@ export function ScreenshotCapturePanel({
       </h4>
 
       {capture.reading && capture.candidates.length === 0 ? (
-        <p className="view__state" data-testid="capture-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="capture-loading">
           Reading what was captured…
         </p>
       ) : capture.readFailure !== null && capture.candidates.length === 0 ? (
-        <p className="session__error" data-testid="capture-failed">
+        <p className="notice--error" role="alert" data-testid="capture-failed">
           The captured screenshots for this milestone could not be read: {capture.readFailure}
         </p>
       ) : capture.candidates.length === 0 ? (
@@ -157,6 +157,8 @@ export function ScreenshotCapturePanel({
             className="session__input"
             type="url"
             value={url}
+            aria-invalid={capture.submitFailure?.messageFor('urls') ? 'true' : undefined}
+            aria-describedby={capture.submitFailure?.messageFor('urls') ? 'capture-urls-error' : undefined}
             onChange={(event) => setUrl(event.target.value)}
             placeholder="https://example.com/pricing"
             data-testid="capture-url"
@@ -169,6 +171,8 @@ export function ScreenshotCapturePanel({
             className="session__input"
             type="url"
             value={url2}
+            aria-invalid={capture.submitFailure?.messageFor('urls') ? 'true' : undefined}
+            aria-describedby={capture.submitFailure?.messageFor('urls') ? 'capture-urls-error' : undefined}
             onChange={(event) => setUrl2(event.target.value)}
             placeholder="https://example.com/tour"
             data-testid="capture-url-2"
@@ -181,13 +185,15 @@ export function ScreenshotCapturePanel({
             className="session__input"
             type="url"
             value={url3}
+            aria-invalid={capture.submitFailure?.messageFor('urls') ? 'true' : undefined}
+            aria-describedby={capture.submitFailure?.messageFor('urls') ? 'capture-urls-error' : undefined}
             onChange={(event) => setUrl3(event.target.value)}
             placeholder="https://example.com/changelog"
             data-testid="capture-url-3"
           />
           {capture.submitFailure?.messageFor('urls') !== null &&
           capture.submitFailure?.messageFor('urls') !== undefined ? (
-            <p className="session__error" data-testid="capture-urls-error">
+            <p className="notice--error" role="alert" id="capture-urls-error" data-testid="capture-urls-error">
               {capture.submitFailure.messageFor('urls')}
             </p>
           ) : null}
@@ -275,7 +281,7 @@ export function ScreenshotCapturePanel({
       ) : null}
 
       {capture.progressFailure !== null ? (
-        <p className="session__error" data-testid="capture-progress-failed">
+        <p className="notice--error" role="alert" data-testid="capture-progress-failed">
           The job was accepted but this panel lost sight of it: {capture.progressFailure}
         </p>
       ) : null}
@@ -300,7 +306,7 @@ export function ScreenshotCapturePanel({
       ) : null}
 
       {targetBlocked ? (
-        <p className="session__error" data-testid="capture-target-blocked">
+        <p className="notice--error" role="alert" data-testid="capture-target-blocked">
           The job refused this destination with <code>{CAPTURE_JOB_CODES.targetBlocked}</code> and no
           browser was started for it. Captures may only go to public pages, so a private, local or
           cloud-metadata address is never visited. The URL policy does not say which of those it was -
@@ -322,7 +328,7 @@ export function ScreenshotCapturePanel({
       {/* A request refused before a job existed. The destination refusal says what was refused and
           stops: the server's message names no host and no range on purpose. */}
       {capture.submitFailure !== null ? (
-        <p className="session__error" data-testid="capture-request-failed">
+        <p className="notice--error" role="alert" data-testid="capture-request-failed">
           {capture.submitFailure.isTargetBlocked
             ? 'Nothing was requested: the server refused this destination before a job was created, so no browser was ever started for it. Captures may only go to public pages. The refusal deliberately does not say which address it was - naming it would confirm what this machine can reach, which is the information the policy withholds.'
             : capture.submitFailure.isRevisionConflict

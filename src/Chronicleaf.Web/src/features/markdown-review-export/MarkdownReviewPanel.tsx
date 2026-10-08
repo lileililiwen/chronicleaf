@@ -209,11 +209,11 @@ export function MarkdownReviewPanel({
       </p>
 
       {reading && draft === null ? (
-        <p className="view__state" data-testid="review-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="review-loading">
           Reading the review for {milestoneTitle}…
         </p>
       ) : readFailure !== null && draft === null ? (
-        <p className="session__error" data-testid="review-failed">
+        <p className="notice--error" role="alert" data-testid="review-failed">
           The review for this milestone could not be read: {readFailure}
         </p>
       ) : draft === null || revision === null ? (
@@ -328,7 +328,7 @@ export function MarkdownReviewPanel({
               </div>
 
               {saveFailure !== null ? (
-                <p className="session__error" data-testid="review-save-failed">
+                <p className="notice--error" role="alert" data-testid="review-save-failed">
                   {describeFailure(saveFailure)}
                 </p>
               ) : null}
@@ -387,7 +387,7 @@ export function MarkdownReviewPanel({
           ) : null}
 
           {approveFailure !== null ? (
-            <p className="session__error" data-testid="review-approve-failed">
+            <p className="notice--error" role="alert" data-testid="review-approve-failed">
               {describeFailure(approveFailure)}
             </p>
           ) : null}
@@ -421,7 +421,7 @@ export function MarkdownReviewPanel({
           </div>
 
           {exportFailure !== null ? (
-            <p className="session__error" data-testid="review-export-failed">
+            <p className="notice--error" role="alert" data-testid="review-export-failed">
               {describeFailure(exportFailure)}
             </p>
           ) : null}

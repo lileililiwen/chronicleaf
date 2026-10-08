@@ -36,7 +36,7 @@ export function TimelinePage({ onNavigate }: { readonly onNavigate: (to: string)
       ) : null}
 
       {projects.loading ? (
-        <p className="view__state" data-testid="timeline-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="timeline-loading">
           Loading projects…
         </p>
       ) : items.length === 0 ? (

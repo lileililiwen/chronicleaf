@@ -36,7 +36,7 @@ export function Dashboard({
       <h1 className="view__heading">Dashboard</h1>
 
       {loading ? (
-        <p className="view__state" data-testid="dashboard-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="dashboard-loading">
           Loading your projects…
         </p>
       ) : items.length === 0 ? (

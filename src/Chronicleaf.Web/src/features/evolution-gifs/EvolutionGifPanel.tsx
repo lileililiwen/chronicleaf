@@ -103,7 +103,7 @@ export function EvolutionGifPanel({ projectId }: { readonly projectId: string })
       </p>
 
       {loading ? (
-        <p className="view__state" data-testid="evolution-gif-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="evolution-gif-loading">
           Reading this project&apos;s animations…
         </p>
       ) : items.length === 0 && failure === null ? (

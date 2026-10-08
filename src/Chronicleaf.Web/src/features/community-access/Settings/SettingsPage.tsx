@@ -30,7 +30,7 @@ export function SettingsPage({
         <h1 className="view__heading" data-testid="settings-heading">
           Settings
         </h1>
-        <p className="view__state" data-testid="settings-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="settings-loading">
           Reading this installation&apos;s session…
         </p>
       </section>

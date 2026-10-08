@@ -119,7 +119,7 @@ export function ProjectTimeline({
       </label>
 
       {loading ? (
-        <p className="view__state" data-testid="timeline-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="timeline-loading">
           Loading the timeline…
         </p>
       ) : failure ? (

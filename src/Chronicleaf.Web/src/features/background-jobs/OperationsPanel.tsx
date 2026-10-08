@@ -127,7 +127,7 @@ export function OperationsPanel({
       </div>
 
       {loading && operations.length === 0 ? (
-        <p className="view__state" data-testid="operations-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="operations-loading">
           Loading background jobs…
         </p>
       ) : visible.length === 0 ? (

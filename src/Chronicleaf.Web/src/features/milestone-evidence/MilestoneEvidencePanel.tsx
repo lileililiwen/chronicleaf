@@ -124,11 +124,11 @@ export function MilestoneEvidencePanel({
       </h4>
 
       {evidence.loading && evidence.data === null ? (
-        <p className="view__state" data-testid="evidence-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="evidence-loading">
           Reading what was collected…
         </p>
       ) : evidence.failure !== null && evidence.data === null ? (
-        <p className="session__error" data-testid="evidence-failed">
+        <p className="notice--error" role="alert" data-testid="evidence-failed">
           The evidence for this milestone could not be read: {evidence.failure.message}
         </p>
       ) : !hasEvidence ? (
@@ -220,7 +220,7 @@ export function MilestoneEvidencePanel({
           ) : null}
 
           {appendFailure !== null ? (
-            <p className="session__error" data-testid="evidence-append-failed">
+            <p className="notice--error" role="alert" data-testid="evidence-append-failed">
               {appendFailure.isRevisionConflict
                 ? 'Nothing was added: somebody else added evidence to this milestone first, so this was written against an older revision. The newer evidence is shown below - read it, then add your note again.'
                 : `Nothing was added: ${appendFailure.message}`}

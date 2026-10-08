@@ -255,7 +255,7 @@ export function PublicationPanel({ projectId }: { readonly projectId: string }) 
 
       <h4 className="view__heading">Publish an asset</h4>
       {milestones === null ? (
-        <p className="view__state" data-testid="publication-milestones-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="publication-milestones-loading">
           Reading milestones…
         </p>
       ) : milestones.length === 0 ? (

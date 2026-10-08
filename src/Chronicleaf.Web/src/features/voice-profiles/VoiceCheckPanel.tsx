@@ -44,7 +44,12 @@ export function VoiceCheckPanel({
       <h3 className="view__heading" data-testid="voice-check-heading">
         Check a draft against this voice
       </h3>
-      <p className="view__state" data-testid="voice-check-state">
+      <p
+        className="view__state"
+        aria-live="polite"
+        aria-busy={profile === null}
+        data-testid="voice-check-state"
+      >
         {profile === null
           ? 'Loading this project’s voice…'
           : `Checked against ${profile.presetId}${profile.stored ? '' : ' (the defaults)'}. Emoji is ${

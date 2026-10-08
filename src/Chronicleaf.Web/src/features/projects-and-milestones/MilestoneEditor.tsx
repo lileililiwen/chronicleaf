@@ -106,6 +106,8 @@ export function MilestoneEditor({
             value={title}
             maxLength={160}
             required
+            aria-invalid={hasField(failure, 'title') ? 'true' : undefined}
+            aria-describedby={hasField(failure, 'title') ? 'milestone-title-error' : undefined}
             onChange={(event) => setTitle(event.target.value)}
             data-testid="milestone-title-input"
           />
@@ -122,6 +124,8 @@ export function MilestoneEditor({
               id="milestone-type"
               name="type"
               value={type}
+              aria-invalid={hasField(failure, 'type') ? 'true' : undefined}
+              aria-describedby={hasField(failure, 'type') ? 'milestone-type-error' : undefined}
               onChange={(event) => setType(event.target.value as MilestoneType)}
               data-testid="milestone-type-input"
             >
@@ -145,6 +149,8 @@ export function MilestoneEditor({
               value={version}
               maxLength={80}
               placeholder="v1.0.0"
+              aria-invalid={hasField(failure, 'version') ? 'true' : undefined}
+              aria-describedby={hasField(failure, 'version') ? 'milestone-version-error' : undefined}
               onChange={(event) => setVersion(event.target.value)}
               data-testid="milestone-version-input"
             />
@@ -163,6 +169,8 @@ export function MilestoneEditor({
             type="datetime-local"
             value={occurredAt}
             required
+            aria-invalid={hasField(failure, 'occurredAt') ? 'true' : undefined}
+            aria-describedby={hasField(failure, 'occurredAt') ? 'milestone-occurred-at-error' : undefined}
             onChange={(event) => setOccurredAt(event.target.value)}
             data-testid="milestone-occurred-at-input"
           />
@@ -181,6 +189,8 @@ export function MilestoneEditor({
             rows={4}
             maxLength={20000}
             value={notes}
+            aria-invalid={hasField(failure, 'notes') ? 'true' : undefined}
+            aria-describedby={hasField(failure, 'notes') ? 'milestone-notes-error' : undefined}
             onChange={(event) => setNotes(event.target.value)}
             data-testid="milestone-notes-input"
           />
@@ -198,6 +208,8 @@ export function MilestoneEditor({
             rows={3}
             value={knownLimitations}
             placeholder="One per line"
+            aria-invalid={hasField(failure, 'knownLimitations') ? 'true' : undefined}
+            aria-describedby={hasField(failure, 'knownLimitations') ? 'milestone-limitations-error' : undefined}
             onChange={(event) => setKnownLimitations(event.target.value)}
             data-testid="milestone-limitations-input"
           />
@@ -216,6 +228,8 @@ export function MilestoneEditor({
             rows={3}
             value={nextSteps}
             placeholder="One per line"
+            aria-invalid={hasField(failure, 'nextSteps') ? 'true' : undefined}
+            aria-describedby={hasField(failure, 'nextSteps') ? 'milestone-next-steps-error' : undefined}
             onChange={(event) => setNextSteps(event.target.value)}
             data-testid="milestone-next-steps-input"
           />
@@ -259,10 +273,15 @@ function FieldError({
   const message = failure?.messageFor(field);
 
   return message ? (
-    <p className="form__error" data-testid={testId}>
+    <p className="form__error" id={testId} data-testid={testId}>
       {message}
     </p>
   ) : null;
+}
+
+/** True when the failure carries a message for the named field. */
+function hasField(failure: MilestoneApiError | null, field: string): boolean {
+  return failure?.messageFor(field) !== undefined;
 }
 
 function toEntries(value: string): string[] {

@@ -56,11 +56,11 @@ export function LocalRepositoryPanel({
       <h4 className="evidence__heading">Local repository this project collects from</h4>
 
       {catalog.loading && catalog.catalog === null ? (
-        <p className="view__state" data-testid="local-catalog-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="local-catalog-loading">
           Reading the roots this installation collects from…
         </p>
       ) : catalog.failure !== null ? (
-        <p className="session__error" data-testid="local-catalog-failed">
+        <p className="notice--error" role="alert" data-testid="local-catalog-failed">
           The registered roots could not be read: {catalog.failure.message}
         </p>
       ) : catalog.unavailable ? (
@@ -88,11 +88,11 @@ export function LocalRepositoryPanel({
       ) : null}
 
       {registration.loading && stored === null && !catalog.unavailable ? (
-        <p className="view__state" data-testid="local-repository-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="local-repository-loading">
           Reading what this project collects from…
         </p>
       ) : registration.failure !== null ? (
-        <p className="session__error" data-testid="local-repository-failed">
+        <p className="notice--error" role="alert" data-testid="local-repository-failed">
           The local repository could not be read: {registration.failure.message}
         </p>
       ) : stored === null && registration.missing ? (

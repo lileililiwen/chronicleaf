@@ -212,7 +212,7 @@ export function JourneyPanel({ projectId }: { readonly projectId: string }) {
       </p>
 
       {loading ? (
-        <p className="view__state" data-testid="journey-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="journey-loading">
           Reading this project&apos;s journey…
         </p>
       ) : stored === null && failure === null ? (
@@ -249,7 +249,7 @@ export function JourneyPanel({ projectId }: { readonly projectId: string }) {
 
       <h4 className="view__heading">Preview a selection</h4>
       {milestones === null ? (
-        <p className="view__state" data-testid="journey-milestones-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="journey-milestones-loading">
           Reading milestones…
         </p>
       ) : milestones.length === 0 ? (

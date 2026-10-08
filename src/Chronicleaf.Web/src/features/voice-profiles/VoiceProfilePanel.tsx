@@ -75,7 +75,7 @@ export function VoiceProfilePanel({
 
   if (profile.loading || profile.profile === null) {
     return (
-      <p className="view__state" data-testid="voice-profile-loading">
+      <p className="view__state" aria-live="polite" aria-busy="true" data-testid="voice-profile-loading">
         Loading this project's voice…
       </p>
     );

@@ -88,11 +88,11 @@ export function GroundedMarkdownDraftPanel({
       </p>
 
       {drafts.reading && drafts.asset === null ? (
-        <p className="view__state" data-testid="draft-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="draft-loading">
           Reading the draft for {milestoneTitle}…
         </p>
       ) : drafts.readFailure !== null && drafts.asset === null ? (
-        <p className="session__error" data-testid="draft-failed">
+        <p className="notice--error" role="alert" data-testid="draft-failed">
           The draft for this milestone could not be read: {drafts.readFailure}
         </p>
       ) : drafts.asset === null ? (
@@ -215,7 +215,7 @@ export function GroundedMarkdownDraftPanel({
       ) : null}
 
       {drafts.progressFailure !== null ? (
-        <p className="session__error" data-testid="draft-progress-failed">
+        <p className="notice--error" role="alert" data-testid="draft-progress-failed">
           The request was accepted but this panel lost sight of the job: {drafts.progressFailure}
         </p>
       ) : null}
@@ -241,7 +241,7 @@ export function GroundedMarkdownDraftPanel({
       ) : null}
 
       {drafts.requestFailure !== null ? (
-        <p className="session__error" data-testid="draft-request-failed">
+        <p className="notice--error" role="alert" data-testid="draft-request-failed">
           {drafts.requestFailure.isMilestoneNotConfirmed
             ? 'Nothing was requested: a draft is only written for a confirmed milestone, and this one is not. Confirm it and ask again.'
             : drafts.requestFailure.isNoGrounding

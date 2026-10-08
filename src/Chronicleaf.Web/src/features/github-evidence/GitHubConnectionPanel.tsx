@@ -98,11 +98,11 @@ export function GitHubConnectionPanel({
       <h4 className="evidence__heading">Repository this project collects from</h4>
 
       {connection.loading && connected === null ? (
-        <p className="view__state" data-testid="github-connection-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="github-connection-loading">
           Reading what this project collects from…
         </p>
       ) : connection.failure !== null ? (
-        <p className="session__error" data-testid="github-connection-failed">
+        <p className="notice--error" role="alert" data-testid="github-connection-failed">
           The repository connection could not be read: {connection.failure.message}
         </p>
       ) : connected === null ? (

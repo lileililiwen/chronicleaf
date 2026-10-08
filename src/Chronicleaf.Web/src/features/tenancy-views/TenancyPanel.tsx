@@ -111,7 +111,7 @@ export function TenancyPanel() {
       </p>
 
       {loading ? (
-        <p className="view__state" data-testid="tenancy-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="tenancy-loading">
           Reading this caller&apos;s tenants…
         </p>
       ) : failure && tenants.length === 0 ? (

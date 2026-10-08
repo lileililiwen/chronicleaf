@@ -45,13 +45,13 @@ export function CredentialVaultPanel() {
       </p>
 
       {credentials.loading ? (
-        <p className="view__state" data-testid="credential-vault-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="credential-vault-loading">
           Reading what is configured…
         </p>
       ) : null}
 
       {credentials.failure !== null ? (
-        <p className="view__state view__state--error" data-testid="credential-vault-load-failure">
+        <p className="view__state notice--error" role="alert" data-testid="credential-vault-load-failure">
           {credentials.failure.message} ({credentials.failure.code})
         </p>
       ) : null}
@@ -126,6 +126,8 @@ export function CredentialVaultPanel() {
                   spellCheck={false}
                   placeholder={providerHint(provider)}
                   value={draftFor(provider)}
+                  aria-invalid={refusal !== null ? 'true' : undefined}
+                  aria-describedby={refusal !== null ? `credential-${provider}-failure` : undefined}
                   onChange={(event) =>
                     setDrafts((current) => ({ ...current, [provider]: event.target.value }))
                   }
@@ -173,7 +175,8 @@ export function CredentialVaultPanel() {
 
               {refusal !== null ? (
                 <p
-                  className="view__state view__state--error"
+                  className="view__state notice--error" role="alert"
+                  id={`credential-${provider}-failure`}
                   data-testid={`credential-${provider}-failure`}
                 >
                   {refusal.message} ({refusal.code})

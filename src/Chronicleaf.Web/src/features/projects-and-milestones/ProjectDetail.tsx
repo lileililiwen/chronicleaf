@@ -91,7 +91,7 @@ export function ProjectDetail({
       </p>
 
       {project.loading || record === null ? (
-        <p className="view__state" data-testid="project-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="project-loading">
           Loading this project…
         </p>
       ) : (

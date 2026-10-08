@@ -57,7 +57,7 @@ export function ClientsArea({ onNavigate }: { readonly onNavigate: (to: string) 
       ) : null}
 
       {loading ? (
-        <p className="view__state" data-testid="clients-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="clients-loading">
           Loading clients…
         </p>
       ) : clients !== null && clients.length === 0 && !creating ? (

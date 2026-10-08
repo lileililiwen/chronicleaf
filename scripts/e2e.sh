@@ -2499,7 +2499,8 @@ run_suite "$base_url" "$log_file" "$repo_root/$publish_dir/access-token" \
   tests/background-jobs.spec.ts \
   tests/community-access.spec.ts \
   tests/projects-and-milestones.spec.ts \
-  tests/product-shell-ux.spec.ts
+  tests/product-shell-ux.spec.ts \
+  tests/a11y-core.spec.ts
 stop_suite
 
 # ---------------------------------------------------------------------------------------------

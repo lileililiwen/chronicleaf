@@ -36,8 +36,9 @@ export function App() {
 
   if (journeySlug !== null) {
     return (
-      <main className="shell" data-testid="app-shell">
-        <section className="shell__panel">
+      <div className="shell" data-testid="app-shell">
+        <SkipLink />
+        <main id="main" className="shell__panel" tabIndex={-1} data-testid="app-main">
           <h1 className="shell__brand" data-testid="brand">
             {BRAND}
           </h1>
@@ -45,8 +46,8 @@ export function App() {
             {TAGLINE}
           </p>
           <PublicJourneyView slug={journeySlug} />
-        </section>
-      </main>
+        </main>
+      </div>
     );
   }
 
@@ -72,8 +73,9 @@ function SignedInApp() {
 
   if (session.status === 'loading') {
     return (
-      <main className="shell" data-testid="app-shell">
-        <section className="shell__panel">
+      <div className="shell" data-testid="app-shell">
+        <SkipLink />
+        <main id="main" className="shell__panel" tabIndex={-1} data-testid="app-main">
           <h1 className="shell__brand" data-testid="brand">
             {BRAND}
           </h1>
@@ -81,15 +83,16 @@ function SignedInApp() {
             {TAGLINE}
           </p>
           <SessionGate session={session} />
-        </section>
-      </main>
+        </main>
+      </div>
     );
   }
 
   if (session.status === 'signed-out') {
     return (
-      <main className="shell" data-testid="app-shell">
-        <section className="shell__panel">
+      <div className="shell" data-testid="app-shell">
+        <SkipLink />
+        <main id="main" className="shell__panel" tabIndex={-1} data-testid="app-main">
           <h1 className="shell__brand" data-testid="brand">
             {BRAND}
           </h1>
@@ -101,8 +104,8 @@ function SignedInApp() {
             the browser's own, so this component is a form and a state, never a credential store.
           */}
           <SessionGate session={session} />
-        </section>
-      </main>
+        </main>
+      </div>
     );
   }
 
@@ -125,6 +128,7 @@ function ProductShell({ session }: { readonly session: OwnerSessionState }) {
 
   return (
     <div className="shell shell--app" data-testid="app-shell">
+      <SkipLink />
       <div className="app">
         <header className="app__header">
           <button type="button" className="app__brand" onClick={() => navigate('/')} data-testid="brand-home">
@@ -152,10 +156,17 @@ function ProductShell({ session }: { readonly session: OwnerSessionState }) {
         {/*
           PROJECTS-AND-MILESTONES-001/002. The product is behind the session gate on purpose: these
           routes are private, so a browser without a session sees the sign-in form and nothing else.
+          WEB-A11Y-CORE-002: the product area is the single <main id="main"> landmark the skip link
+          targets; the chrome (nav, header, footer) stays outside.
         */}
-        <div className="product" data-testid="product-area">
+        <main
+          id="main"
+          className="product"
+          tabIndex={-1}
+          data-testid="product-area"
+        >
           <ProjectArea route={route} session={session} />
-        </div>
+        </main>
 
         {/*
           The signed-in session bar: sign-out lives here, on every product page,
@@ -169,6 +180,20 @@ function ProductShell({ session }: { readonly session: OwnerSessionState }) {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * WEB-A11Y-CORE-001. The skip link is the first focusable element of every
+ * shell. Visually hidden until focused; targets the single <main id="main">
+ * landmark. The text is exactly "Skip to main content" so a screen reader
+ * announces it verbatim.
+ */
+function SkipLink() {
+  return (
+    <a className="skip-link" href="#main" data-testid="skip-link">
+      Skip to main content
+    </a>
   );
 }
 

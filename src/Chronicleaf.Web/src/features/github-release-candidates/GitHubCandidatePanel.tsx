@@ -88,7 +88,7 @@ export function GitHubCandidatePanel({
       </p>
 
       {state.loading ? (
-        <p className="view__state" data-testid="github-candidate-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="github-candidate-loading">
           Reading the candidates this project has…
         </p>
       ) : state.connectionMissing ? (
@@ -192,7 +192,7 @@ export function GitHubCandidatePanel({
       ) : null}
 
       {failure !== null ? (
-        <p className="session__error" data-testid="github-candidate-failed">
+        <p className="notice--error" role="alert" data-testid="github-candidate-failed">
           {candidateFailureLabel(failure.code)}
         </p>
       ) : null}

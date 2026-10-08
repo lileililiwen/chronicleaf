@@ -290,7 +290,7 @@ function ProjectsRoute({ onNavigate }: { readonly onNavigate: (to: string) => vo
       ) : null}
 
       {projects.loading ? (
-        <p className="view__state" data-testid="projects-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="projects-loading">
           Loading projects…
         </p>
       ) : items.length === 0 ? (
@@ -370,7 +370,7 @@ function ProjectEditRoute({
 
   if (project.loading || project.data === null) {
     return (
-      <p className="view__state" data-testid="project-loading">
+      <p className="view__state" aria-live="polite" aria-busy="true" data-testid="project-loading">
         Loading this project…
       </p>
     );
@@ -420,7 +420,7 @@ function MilestoneEditRoute({
 
   if (milestone.loading || milestone.data === null) {
     return (
-      <p className="view__state" data-testid="milestone-loading">
+      <p className="view__state" aria-live="polite" aria-busy="true" data-testid="milestone-loading">
         Loading this milestone…
       </p>
     );

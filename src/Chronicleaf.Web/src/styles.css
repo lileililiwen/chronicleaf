@@ -713,6 +713,39 @@ body {
   color: var(--shell-muted);
 }
 
+/* WEB-A11Y-CORE-001: the skip link is the first focusable element of every
+   shell. Visually hidden until focused; targets the single <main id="main">
+   landmark. Same gold focus ring the rest of the design uses. */
+.skip-link {
+  position: absolute;
+  top: 0;
+  left: -9999px;
+  z-index: 1000;
+  padding: 0.625rem 0.9375rem;
+  border: 2px solid var(--shell-accent);
+  border-radius: 0.5rem;
+  background: var(--shell-surface);
+  color: var(--shell-accent);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  left: 1rem;
+  top: 1rem;
+  outline: 2px solid var(--shell-accent);
+  outline-offset: 2px;
+}
+
+/* WEB-A11Y-CORE-002: <main id="main"> carries tabindex="-1" so the skip link
+   can programmatically move focus into it without putting it in the tab
+   order. Visually unchanged from the prior <div class="product"> treatment. */
+main:focus {
+  outline: none;
+}
+
 /* BACKGROUND-JOBS-001/002: the operations panel. The record list reuses the delivered card rhythm
    rather than a parallel set of styles, so an operation reads as the same kind of thing as a project
    row: the same surface, the same spacing, the same badge. */

@@ -108,7 +108,7 @@ function ConnectionSection({
       <h2 className="section__heading">GitHub connection</h2>
 
       {loading ? (
-        <p className="view__state" data-testid="automations-connection-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="automations-connection-loading">
           Reading the connection…
         </p>
       ) : failure ? (
@@ -251,7 +251,7 @@ function CandidateSyncSection({
       <h2 className="section__heading">Candidate sync</h2>
 
       {loading ? (
-        <p className="view__state" data-testid="automations-sync-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="automations-sync-loading">
           Reading the recent sync runs…
         </p>
       ) : failure && last === null && accepted === null ? (
@@ -422,7 +422,7 @@ function ScheduleSection({
       <h2 className="section__heading">Scheduled sync</h2>
 
       {loading ? (
-        <p className="view__state" data-testid="automations-schedule-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="automations-schedule-loading">
           Reading the schedule…
         </p>
       ) : (
@@ -566,7 +566,7 @@ function WebhookSection({
       <h2 className="section__heading">Webhook</h2>
 
       {loading ? (
-        <p className="view__state" data-testid="automations-webhook-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="automations-webhook-loading">
           Reading the webhook subscription…
         </p>
       ) : failure ? (
@@ -660,7 +660,7 @@ function RecentJobsSection({
       <h2 className="section__heading">Recent jobs</h2>
 
       {loading ? (
-        <p className="view__state" data-testid="automations-jobs-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="automations-jobs-loading">
           Reading the recent jobs…
         </p>
       ) : failure ? (
@@ -755,7 +755,7 @@ function PublishHistorySection() {
       </p>
 
       {loading ? (
-        <p className="view__state" data-testid="automations-publish-loading">
+        <p className="view__state" aria-live="polite" aria-busy="true" data-testid="automations-publish-loading">
           Reading the publish jobs…
         </p>
       ) : failure ? (

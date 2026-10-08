@@ -9,6 +9,50 @@ archived and the two owner-BLOCKED changes are deferred to ROADMAP for later
 `hosted-managed-ai`: provider/model/quota/unit weights plus financial settlement policy — both
 packages parked intact in `openspec/deferred/`, nothing active remains).
 
+Next: `current_spec` is `web-accessibility-roles`, the next package in drain order after
+`web-accessibility-core`.
+
+Next: `web-accessibility-core` is archived
+(`cdac4a7`, canonical spec `openspec/specs/web-accessibility-core/spec.md`):
+five closed a11y gaps on the Web client, frontend-only, no backend byte
+changed. A visible-on-focus skip link ("Skip to main content", gold
+`var(--shell-accent)` focus ring) is the first focusable element of every
+shell (signed-out, signed-in loading, signed-in ready, public journey);
+`<main id="main" tabindex="-1">` wraps the signed-in product area
+(`div.product` promoted), the signed-out card content and the journey view;
+every "Loading…" `<p>` (17 renders across 15 panels) carries
+`aria-live="polite"` with `aria-busy` on the enclosing section; every
+`.session__error` / `.view__state--error` JSX site is renamed to
+`.notice--error` with `role="alert"` (legacy CSS rules kept for a later
+`web-token-sweep`, every `data-testid` preserved); per-field wiring
+(`aria-invalid="true"` + `aria-describedby` to a stable error `id`,
+absent-when-valid) covers MilestoneEditor (7 fields), ProjectEditor (2
+fields), ScreenshotCapturePanel (`urls`) and CredentialVaultPanel
+(per-provider refusal) — the only panels with `FieldError`-style siblings;
+remaining panels carry form-level notices only and have no field to wire.
+`@axe-core/playwright` 4.10.2 is a devDependency, never in the production
+bundle. Evidence, all run by the implementer rather than taken on report:
+`node scripts/check-openspec-change-names.mjs` exit 0,
+`openspec validate --all --strict --no-interactive` 63/63 before and after
+the archive, which used no `--skip-specs`; `npm ci`, `tsc --noEmit` exit 0,
+`vite build` exit 0 (chunk-size warning only); `CHRONICLEAF_E2E=1 bash
+scripts/verify.sh` exit 0 with `set -o pipefail` (full log at
+`/home/paul/verify-a11y.log`): platform-feed + cold-restore stages, all
+dotnet filter stages green (each asserted to select ≥1 test; the
+"no test matches in Api.Tests.dll" note per stage is benign — the filter
+still selects solution-wide and the run passes), frontend install/build,
+bundle lint, 133/133 Playwright across 28 database-isolated suites
+(suite 1: 36 = 4 shell + 5 jobs + 5 access + 7 projects + 8 product-shell-ux
++ 7 new `a11y-core`: skip-link first-focusable on every shell, first-Tab
+reaches `main#main`, `main#main tabindex=-1` per page, loading `aria-live`
++ `aria-busy`, no legacy error class per nav page, field wiring
+absent-when-valid, plus 5 axe-core smokes with zero critical/serious).
+`dotnet build` 0 errors, same 2 pre-existing warnings as HEAD (CS0649
+ScreenshotCandidate, CS0618 HasCheckConstraint). `git diff --check` clean.
+No secret-bearing captures; dist/test-results artifacts never committed.
+Deployment stays `deployable: false`; there is no remote, no push and no
+publication.
+
 Next: `workflow-wayfinding` is archived
 (`0e4e178`, canonical spec `openspec/specs/workflow-wayfinding/spec.md`):
 wayfinding over delivered routes with one additive wire piece. `WorkflowNext`
@@ -125,6 +169,7 @@ two owner-BLOCKED changes stay deferred to ROADMAP. Deployment stays
 | 55 | `static-blog-export-ui` | `39b5b9f` | `openspec/specs/static-blog-export-ui/spec.md` |
 | 56 | `publisher-adapter-panels` | `13b2cb8` | `openspec/specs/publisher-adapter-panels/spec.md` |
 | 57 | `content-pack-panels` | `b7d1dd7` | `openspec/specs/content-pack-panels/spec.md` |
+| 58 | `web-accessibility-core` | `cdac4a7` | `openspec/specs/web-accessibility-core/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)

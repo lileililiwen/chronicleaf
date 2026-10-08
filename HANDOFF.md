@@ -9,6 +9,53 @@ archived and the two owner-BLOCKED changes are deferred to ROADMAP for later
 `hosted-managed-ai`: provider/model/quota/unit weights plus financial settlement policy — both
 packages parked intact in `openspec/deferred/`, nothing active remains).
 
+Next: `verify-gate-adoption` is archived
+(`4ac2e08`, canonical spec `openspec/specs/verify-gate-adoption/spec.md`):
+gate infrastructure, no product byte changed (no C#, no TSX). The sibling
+driftwatchdog `driftwatch gate` runner is adopted as chronicleaf's
+verification entry point (reconnaissance decision ADOPT; nothing copied,
+forked, or edited under the sibling): one manifest
+`.ai-gate/gate.yaml` (`runtime: driftwatchdog`, project-defined
+`chronicleaf-gate` profile, six bound checks, `blocking: [FAIL,
+REVIEW_REQUIRED]`) replaces the 902-line `verify.sh` stage list. The ~27
+filtered `dotnet test` stages plus their `--list-tests` guards (≈54 dotnet
+invocations) collapse to ONE `dotnet build` then ONE unfiltered
+`dotnet test --no-build` (`scripts/gate/dotnet-tests.sh`); per-package
+attribution is preserved by parsing the single run's `Failed
+<class>.<test>` lines per test-class
+(`scripts/gate/attribute-dotnet-failures.sh`, generic grouping, no
+hardcoded map — a single unfiltered run cannot silently select nothing, so
+the `assert_filter_matches` failure class is gone by structure).
+`platform-feed`, `web-scaffolding-lint`, `npm ci` + `tsc --noEmit` + `vite
+build`, and the e2e browser suites (`CHRONICLEAF_E2E=1` path kept) are wired
+in as checks; the one new `frontend-depth` check runs token-sweep,
+form-feedback and perf-animation standalone plus a new axe-core full WCAG
+pass per top-level nav page
+(`tests/frontend-depth-axe.spec.ts`: six `NAV_ENTRIES` pages, vite dev with
+route-mocked `/api/*`, empty collections, unconfigured providers, zero
+critical/serious per page), and proves a11y-core, a11y-roles and
+responsive-shell are wired into `scripts/e2e.sh` `run_suite` blocks by grep
+oracle rather than re-driving the e2e harness. `scripts/verify.sh` stays as
+a thin wrapper (`exec driftwatchdog gate`, header rewritten; HANDOFF and
+`.project.json` keep referencing it). `CHRONICLEAF_SKIP_DB_TESTS` is
+retired with a loud error — partial coverage can no longer report green.
+Evidence, all run by the implementer rather than taken on report:
+`driftwatchdog gate --dry-run` exit 0 resolving all six checks with no
+`UNBOUND` (nothing executed, nothing persisted);
+`node scripts/check-openspec-change-names.mjs` exit 0,
+`openspec validate --all --strict --no-interactive` 69/69 with no
+`--skip-specs`; `npm ci`, `tsc --noEmit` exit 0, `vite build` exit 0
+(chunk-size warning only); `dotnet build` 0 errors, same pre-existing
+warnings as HEAD; `bash scripts/gate/test-gate-adoption.sh` 3/3 green
+(dry-run plan, seeded two-class attribution exact + clean log pass,
+wrapper nonzero propagation via stubbed runner); `git diff --check` clean.
+LIGHT verification only: the full `CHRONICLEAF_E2E=1` gate was NOT run here
+and runs once at the end of the batch by the coordinator via the new
+runner; no claim is made about e2e suites beyond their selectors, testids,
+and `run_suite` wiring surviving verbatim. No `current_spec` remains: the
+batch is still complete — this change is gate infrastructure. Deployment
+stays `deployable: false`; there is no remote, no push and no publication.
+
 Next: `web-perf-and-animation` is archived
 (`d90ca3d`, canonical spec `openspec/specs/web-perf-and-animation/spec.md`):
 four closed performance-and-animation gaps on the Web client, frontend-only,
@@ -416,6 +463,7 @@ two owner-BLOCKED changes stay deferred to ROADMAP. Deployment stays
 | 61 | `web-token-sweep` | `f07b60c` | `openspec/specs/web-token-sweep/spec.md` |
 | 62 | `web-form-feedback` | `617c44d` | `openspec/specs/web-form-feedback/spec.md` |
 | 63 | `web-perf-and-animation` | `d90ca3d` | `openspec/specs/web-perf-and-animation/spec.md` |
+| 64 | `verify-gate-adoption` | `4ac2e08` | `openspec/specs/verify-gate-adoption/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)

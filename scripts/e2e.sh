@@ -14,7 +14,7 @@
 # The plaintext token is written to a file inside the publish directory, is never echoed, and is
 # handed to the fixtures through the environment.
 #
-# Eleven fixture groups run, each against its own published instance and its own disposable database,
+# Thirty fixture groups run, each against its own published instance and its own database,
 # because one of them asserts something another one changes. tests/projects-and-milestones.spec.ts
 # states that its installation starts with an empty project list - that is the claim it is making
 # about a new installation - and a project cannot be removed once it exists, because archiving is
@@ -37,7 +37,7 @@
 # false on the next run, because a credential cannot be un-stored through the UI either. It is also
 # the only suite that creates a milestone with recorded evidence, and an evidence bundle is append-only,
 # so sharing a database with any other suite would put a second bundle where one suite expects one.
-# Ten databases is the smallest way to keep each claim honest, and it means no group is run against
+# Thirty databases is the smallest way to keep each claim honest, and it means no group is run against
 # state another one left behind.
 # A sixth is what the GitHub fixture needs, for the same reason again: it asserts that a project starts
 # with no repository connected, and a connection cannot be removed through the UI - there is no delete
@@ -60,6 +60,12 @@
 # A tenth is what the timeline fixture needs, for the same reason again: it records milestones into
 # a project, and a project cannot be removed once it exists - so it reads its own installation
 # rather than the one any other suite asserted empty.
+# PG-ADOPT-004: the thirty databases above are TEMPLATE clones of ONE migrated seed database
+# in ONE shared postgres container (start_shared_postgres + clone_suite_database), and the
+# thirty suites run N-way parallel (CHRONICLEAF_E2E_JOBS, default 4) with per-suite logs and
+# aggregated failure reporting. Isolation is unchanged — own database, own server, own port,
+# own token per suite — and Playwright keeps workers: 1 inside each suite, because intra-suite
+# parallelism would break empty-state claims sharing one database.
 # The credential vault reads a real operator key from a real file, generated for this run only, in a
 # temporary directory that is removed when the run ends. The key is never written into the repository,
 # into the published output or into a container image, is never echoed, and is passed to the
@@ -148,20 +154,40 @@ remove_key_file() {
 # The image is pinned; a floating tag would make this run unreproducible.
 postgres_image="postgres:17.6-alpine"
 
+# PG-ADOPT-004: ONE postgres container serves the whole run. Per-suite databases are
+# TEMPLATE clones of a single migrated seed database, so per-suite isolation (own DB,
+# own server, own port, own token) is unchanged while container boot and migration replay
+# happen exactly once. Suite functions run in background subshells; each sets its own
+# server_pid there, so the only cross-suite globals below are read-only after boot.
 server_pid=""
+shared_postgres_container=""
+shared_postgres_port=""
+seed_database="chronicleaf_e2e_seed"
+
+# Read-only alias for the seed functions (seed_operations, seed_*_rows), which address
+# the container by name: there is only one container now, so the name never changes.
 postgres_container=""
+# The suite's own database name, set by start_suite in each suite's subshell for the seeds
+# that address the database by global name. Never set at top level: parallel suites must
+# never share it.
 postgres_database=""
 
 cleanup() {
   local exit_status=$?
   stop_suite
+  if [ -n "$shared_postgres_container" ]; then
+    docker rm --force --volumes "$shared_postgres_container" >/dev/null 2>&1 || true
+    shared_postgres_container=""
+  fi
   # The tokens are secrets for the lifetime of this run and must not survive it.
   rm -f "$repo_root/$publish_dir/access-token" "$repo_root/$publish_dir/access-token-evidence" \
     "$repo_root/$publish_dir/access-token-credentials" "$repo_root/$publish_dir/access-token-voice" \
     "$repo_root/$publish_dir/access-token-generation" "$repo_root/$publish_dir/access-token-github" \
     "$repo_root/$publish_dir/access-token-capture" "$repo_root/$publish_dir/access-token-drafts" \
     "$repo_root/$publish_dir/access-token-curation" "$repo_root/$publish_dir/access-token-timeline" \
-    "$repo_root/$publish_dir/access-token-review" "$repo_root/$publish_dir/access-token-team" \
+    "$repo_root/$publish_dir/access-token-review" "$repo_root/$publish_dir/access-token-candidates" \
+    "$repo_root/$publish_dir/access-token-narrative" "$repo_root/$publish_dir/access-token-variants" \
+    "$repo_root/$publish_dir/access-token-team" \
     "$repo_root/$publish_dir/access-token-tenancy" "$repo_root/$publish_dir/access-token-evolution" \
     "$repo_root/$publish_dir/access-token-gif" "$repo_root/$publish_dir/access-token-publication" \
     "$repo_root/$publish_dir/access-token-journey" "$repo_root/$publish_dir/access-token-area" \
@@ -192,17 +218,14 @@ require_docker() {
 }
 require_docker
 
-# Stops the server and removes the container of whichever suite is running.
+# Stops the server of whichever suite is running in this subshell. The shared container
+# is removed only by cleanup at the end of the run, never per suite.
 stop_suite() {
   if [ -n "$server_pid" ] && kill -0 "$server_pid" 2>/dev/null; then
     kill "$server_pid" 2>/dev/null || true
     wait "$server_pid" 2>/dev/null || true
   fi
   server_pid=""
-  if [ -n "$postgres_container" ]; then
-    docker rm --force --volumes "$postgres_container" >/dev/null 2>&1 || true
-    postgres_container=""
-  fi
 }
 
 # start_suite <suffix> <origin> <log> <token file> [extra server env]
@@ -212,10 +235,87 @@ stop_suite() {
 # transport registered and a dispatch loop silenced; every other suite passes nothing and the
 # server starts exactly as before.
 #
-# Brings up a disposable PostgreSQL, applies the committed migrations, provisions the single
+# start_shared_postgres
+#
+# Boots the ONE postgres container for the whole run and migrates the seed template
+# database exactly once. Every suite clones that template (clone_suite_database),
+# so container boot and migration replay happen once per run, not once per suite.
+start_shared_postgres() {
+  local container="chronicleaf-e2e-postgres-shared-$$"
+
+  # Published for the seeds that write rows directly, under the same global name the
+  # seeds have always used: there is only one container now, so the name never changes.
+  shared_postgres_container="$container"
+  postgres_container="$container"
+
+  docker run --detach --rm \
+    --name "$container" \
+    --env POSTGRES_DB="$seed_database" \
+    --env POSTGRES_USER=chronicleaf \
+    --env POSTGRES_PASSWORD=chronicleaf-e2e \
+    --publish 127.0.0.1::5432 \
+    "$postgres_image" >/dev/null
+
+  shared_postgres_port="$(docker port "$container" 5432/tcp | head -n 1 | sed 's/.*://')"
+  if [ -z "$shared_postgres_port" ]; then
+    echo "the shared PostgreSQL did not publish a port:" >&2
+    docker logs "$container" >&2 || true
+    return 1
+  fi
+
+  for _ in $(seq 1 60); do
+    if docker exec "$container" pg_isready --username=chronicleaf --dbname="$seed_database" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+  done
+
+  (
+    cd "$repo_root"
+    ConnectionStrings__Chronicleaf="Host=127.0.0.1;Port=${shared_postgres_port};Database=${seed_database};Username=chronicleaf;Password=chronicleaf-e2e;Timeout=5;Command Timeout=10" \
+    Chronicleaf__AccessTokenHash="$(head -c 64 /dev/zero | tr '\0' '0' | sha256sum | cut -d' ' -f1)" \
+      dotnet ef database update \
+        --project src/Chronicleaf.Infrastructure \
+        --startup-project src/Chronicleaf.Api \
+        --no-build >/dev/null
+  )
+}
+
+# clone_suite_database <suffix>
+#
+# Clones the migrated seed template into the suite's own database and provisions the
+# singleton installation there — the same database the old per-suite migrate + INSERT
+# produced, without replaying migrations. Per-suite database names are unchanged.
+clone_suite_database() {
+  local suffix="$1"
+  local database_name="chronicleaf_e2e_${suffix}"
+
+  # CREATE DATABASE ... TEMPLATE refuses to run against a template with open
+  # connections, and the seed migration above has exited, so no connection is open.
+  docker exec "$shared_postgres_container" psql --username=chronicleaf --dbname=postgres --quiet --set=ON_ERROR_STOP=1 \
+    --command "CREATE DATABASE \"${database_name}\" TEMPLATE \"${seed_database}\";" >/dev/null
+
+  # The singleton installation is operator-provisioned state, not something a visitor may claim.
+  local installation_id
+  installation_id="$(cat /proc/sys/kernel/random/uuid)"
+  docker exec "$shared_postgres_container" psql --username=chronicleaf --dbname="$database_name" --quiet --set=ON_ERROR_STOP=1 \
+    --command "INSERT INTO installation (id, schema_version, created_at)
+               VALUES ('${installation_id}', 1, now())
+               ON CONFLICT (id) DO NOTHING;" >/dev/null
+}
+
+# start_suite <suffix> <origin> <log> <token file> [extra server env]
+#
+# The optional fifth argument is space-separated KEY=value pairs (values carry no spaces)
+# appended to the server's environment. It exists for the suite whose installation needs a
+# transport registered and a dispatch loop silenced; every other suite passes nothing and the
+# server starts exactly as before.
+#
+# Clones the suite's database from the shared seed template, provisions the single
 # installation, and starts the published application against it with a real access token hash and
-# the origin the browser will actually use. The plaintext token is returned on stdout and never
-# echoed.
+# the origin the browser will actually use. The plaintext token is written to the token file,
+# never echoed. server_pid is set in the caller's (suite-subshell) scope so stop_suite and
+# the RETURN trap stop exactly this suite's server.
 start_suite() {
   local suffix="$1"
   local origin="$2"
@@ -223,56 +323,15 @@ start_suite() {
   local token_path="$4"
   local extra_env="${5:-}"
   local database_name="chronicleaf_e2e_${suffix}"
-  local container="chronicleaf-e2e-postgres-${suffix}-$$"
-  local port=""
 
-  # Both are published for the seeds that write rows directly: a suite that inserts its own fixture
-  # has to be able to read the rows back out of the same container it wrote them into, and a container
-  # name passed as an argument through three functions is a name a later edit will get wrong.
-  postgres_container="$container"
+  clone_suite_database "$suffix"
+
+  # Published for the seeds that address the suite database by global name (the github
+  # candidate seed and its row counters): suite-subshell scoped, so parallel suites
+  # never share it.
   postgres_database="$database_name"
 
-  docker run --detach --rm \
-    --name "$container" \
-    --env POSTGRES_DB="$database_name" \
-    --env POSTGRES_USER=chronicleaf \
-    --env POSTGRES_PASSWORD=chronicleaf-e2e \
-    --publish 127.0.0.1::5432 \
-    "$postgres_image" >/dev/null
-
-  port="$(docker port "$container" 5432/tcp | head -n 1 | sed 's/.*://')"
-  if [ -z "$port" ]; then
-    echo "the disposable PostgreSQL did not publish a port:" >&2
-    docker logs "$container" >&2 || true
-    return 1
-  fi
-
-  for _ in $(seq 1 60); do
-    if docker exec "$container" pg_isready --username=chronicleaf --dbname="$database_name" >/dev/null 2>&1; then
-      break
-    fi
-    sleep 1
-  done
-
-  local connection_string="Host=127.0.0.1;Port=${port};Database=${database_name};Username=chronicleaf;Password=chronicleaf-e2e;Timeout=5;Command Timeout=10"
-
-  (
-    cd "$repo_root"
-    ConnectionStrings__Chronicleaf="$connection_string" \
-    Chronicleaf__AccessTokenHash="$(head -c 64 /dev/zero | tr '\0' '0' | sha256sum | cut -d' ' -f1)" \
-      dotnet ef database update \
-        --project src/Chronicleaf.Infrastructure \
-        --startup-project src/Chronicleaf.Api \
-        --no-build >/dev/null
-  )
-
-  # The singleton installation is operator-provisioned state, not something a visitor may claim.
-  local installation_id
-  installation_id="$(cat /proc/sys/kernel/random/uuid)"
-  docker exec "$container" psql --username=chronicleaf --dbname="$database_name" --quiet --set=ON_ERROR_STOP=1 \
-    --command "INSERT INTO installation (id, schema_version, created_at)
-               VALUES ('${installation_id}', 1, now())
-               ON CONFLICT (id) DO NOTHING;" >/dev/null
+  local connection_string="Host=127.0.0.1;Port=${shared_postgres_port};Database=${database_name};Username=chronicleaf;Password=chronicleaf-e2e;Timeout=5;Command Timeout=10"
 
   # A token for this run only: 32 random bytes, hashed for the server and kept for the fixtures.
   local access_token access_token_hash
@@ -344,6 +403,10 @@ bash "$repo_root/scripts/publish.sh" "$publish_dir" Release
 # The vault's key is generated here, before any application is started, so every suite is configured
 # the same way a deployment configures it.
 create_key_file
+
+# The single shared PostgreSQL and its migrated seed template: every suite below clones it.
+echo "==> starting the one shared PostgreSQL and migrating the seed template"
+start_shared_postgres
 
 # ---------------------------------------------------------------------------------------------
 # The operations panel can only report operations that exist, and the only honest way to give the
@@ -2492,48 +2555,60 @@ SQL
 # background operations panel. Its project list must be empty when it starts, which is why this
 # suite has a database to itself.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting the disposable PostgreSQL and published application at $base_url"
-start_suite core "$base_url" "$log_file" "$repo_root/$publish_dir/access-token"
-core_installation="$(docker exec "$postgres_container" psql --username=chronicleaf --dbname=chronicleaf_e2e_core --quiet --tuples-only --no-align --command 'SELECT id FROM installation LIMIT 1')"
+suite_core() (
+  trap 'stop_suite' RETURN
+  echo "==> starting the published application on a template-cloned database at $base_url"
+  start_suite core "$base_url" "$log_file" "$repo_root/$publish_dir/access-token"
+  core_installation="$(docker exec "$postgres_container" psql --username=chronicleaf --dbname=chronicleaf_e2e_core --quiet --tuples-only --no-align --command 'SELECT id FROM installation LIMIT 1')"
 
-echo "==> recording the background operations the panel fixture reads"
-seed_operations "$postgres_container" chronicleaf_e2e_core "$core_installation"
+  echo "==> recording the background operations the panel fixture reads"
+  seed_operations "$postgres_container" chronicleaf_e2e_core "$core_installation"
 
-echo "==> npm run test:e2e (real browser against $base_url)"
-run_suite "$base_url" "$log_file" "$repo_root/$publish_dir/access-token" \
-  e2e/shell.spec.ts \
-  tests/background-jobs.spec.ts \
-  tests/community-access.spec.ts \
-  tests/projects-and-milestones.spec.ts \
-  tests/product-shell-ux.spec.ts \
-  tests/a11y-core.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $base_url)"
+  run_suite "$base_url" "$log_file" "$repo_root/$publish_dir/access-token" \
+    e2e/shell.spec.ts \
+    tests/background-jobs.spec.ts \
+    tests/community-access.spec.ts \
+    tests/projects-and-milestones.spec.ts \
+    tests/product-shell-ux.spec.ts \
+    tests/a11y-core.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 2: the milestone evidence view. It needs a milestone, and a milestone needs a project, and
 # a project is never removed - so it runs against its own installation and its own published
 # instance rather than against the one above.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a second disposable PostgreSQL and published application at $evidence_base_url"
-start_suite evidence "$evidence_base_url" "$evidence_log_file" "$repo_root/$publish_dir/access-token-evidence"
+suite_evidence() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a second published application on a template-cloned database at $evidence_base_url"
+  start_suite evidence "$evidence_base_url" "$evidence_log_file" "$repo_root/$publish_dir/access-token-evidence"
 
-echo "==> npm run test:e2e (real browser against $evidence_base_url)"
-run_suite "$evidence_base_url" "$evidence_log_file" "$repo_root/$publish_dir/access-token-evidence" \
-  tests/milestone-evidence.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $evidence_base_url)"
+  run_suite "$evidence_base_url" "$evidence_log_file" "$repo_root/$publish_dir/access-token-evidence" \
+    tests/milestone-evidence.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 3: the credential settings surface. It asserts that a new installation reads as
 # unconfigured for every provider, and a stored credential cannot be un-stored by the UI, so it needs
 # its own installation and its own published instance.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a third disposable PostgreSQL and published application at $credentials_base_url"
-start_suite credentials "$credentials_base_url" "$credentials_log_file" "$repo_root/$publish_dir/access-token-credentials"
+suite_credentials() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a third published application on a template-cloned database at $credentials_base_url"
+  start_suite credentials "$credentials_base_url" "$credentials_log_file" "$repo_root/$publish_dir/access-token-credentials"
 
-echo "==> npm run test:e2e (real browser against $credentials_base_url)"
-run_suite "$credentials_base_url" "$credentials_log_file" "$repo_root/$publish_dir/access-token-credentials" \
-  tests/credential-vault.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $credentials_base_url)"
+  run_suite "$credentials_base_url" "$credentials_log_file" "$repo_root/$publish_dir/access-token-credentials" \
+    tests/credential-vault.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 4: the writing voice. It asserts that a project starts on the design's defaults, and it then
@@ -2541,13 +2616,17 @@ stop_suite
 # UI. It therefore needs its own installation and its own published instance, and it is the fourth
 # suite for exactly the reason suite 1 is the first.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a fourth disposable PostgreSQL and published application at $voice_base_url"
-start_suite voice "$voice_base_url" "$voice_log_file" "$repo_root/$publish_dir/access-token-voice"
+suite_voice() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a fourth published application on a template-cloned database at $voice_base_url"
+  start_suite voice "$voice_base_url" "$voice_log_file" "$repo_root/$publish_dir/access-token-voice"
 
-echo "==> npm run test:e2e (real browser against $voice_base_url)"
-run_suite "$voice_base_url" "$voice_log_file" "$repo_root/$publish_dir/access-token-voice" \
-  tests/voice-profiles.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $voice_base_url)"
+  run_suite "$voice_base_url" "$voice_log_file" "$repo_root/$publish_dir/access-token-voice" \
+    tests/voice-profiles.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 5: the bounded generation surface. It asserts that a new installation reads as unconfigured
@@ -2555,13 +2634,17 @@ stop_suite
 # refused before a snapshot is frozen - all of which a stored credential or an earlier run of this
 # suite itself would make false. Its own installation, its own database and its own published instance.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a fifth disposable PostgreSQL and published application at $generation_base_url"
-start_suite generation "$generation_base_url" "$generation_log_file" "$repo_root/$publish_dir/access-token-generation"
+suite_generation() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a fifth published application on a template-cloned database at $generation_base_url"
+  start_suite generation "$generation_base_url" "$generation_log_file" "$repo_root/$publish_dir/access-token-generation"
 
-echo "==> npm run test:e2e (real browser against $generation_base_url)"
-run_suite "$generation_base_url" "$generation_log_file" "$repo_root/$publish_dir/access-token-generation" \
-  tests/llm-provider-contract.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $generation_base_url)"
+  run_suite "$generation_base_url" "$generation_log_file" "$repo_root/$publish_dir/access-token-generation" \
+    tests/llm-provider-contract.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 6: the GitHub repository connection and the collection a milestone asks it for. It needs a
@@ -2577,13 +2660,17 @@ stop_suite
 # is recorded as a prerequisite failure rather than quietly passed - and it is never replaced by a stub
 # handler, because a fake GitHub would let a pass stand in for a result only a real one can give.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a sixth disposable PostgreSQL and published application at $github_base_url"
-start_suite github "$github_base_url" "$github_log_file" "$repo_root/$publish_dir/access-token-github"
+suite_github() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a sixth published application on a template-cloned database at $github_base_url"
+  start_suite github "$github_base_url" "$github_log_file" "$repo_root/$publish_dir/access-token-github"
 
-echo "==> npm run test:e2e (real browser against $github_base_url)"
-run_suite "$github_base_url" "$github_log_file" "$repo_root/$publish_dir/access-token-github" \
-  tests/github-evidence.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $github_base_url)"
+  run_suite "$github_base_url" "$github_log_file" "$repo_root/$publish_dir/access-token-github" \
+    tests/github-evidence.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 7: bounded screenshot capture for a milestone. It creates a project and a milestone and then
@@ -2608,13 +2695,17 @@ stop_suite
 # capture being attempted. Nothing here is seeded and nothing is faked - the candidate rows, the job
 # and its stored failure code are all written by the real server and read back through its own routes.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a seventh disposable PostgreSQL and published application at $capture_base_url"
-start_suite capture "$capture_base_url" "$capture_log_file" "$repo_root/$publish_dir/access-token-capture"
+suite_capture() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a seventh published application on a template-cloned database at $capture_base_url"
+  start_suite capture "$capture_base_url" "$capture_log_file" "$repo_root/$publish_dir/access-token-capture"
 
-echo "==> npm run test:e2e (real browser against $capture_base_url)"
-run_suite "$capture_base_url" "$capture_log_file" "$repo_root/$publish_dir/access-token-capture" \
-  tests/screenshot-capture.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $capture_base_url)"
+  run_suite "$capture_base_url" "$capture_log_file" "$repo_root/$publish_dir/access-token-capture" \
+    tests/screenshot-capture.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 8: the grounded-draft surface. It needs a milestone the browser can read, and it needs one
@@ -2636,16 +2727,20 @@ stop_suite
 # that a draft was generated on this host. The .NET suite is where a real answer flows through both
 # generation phases.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting an eighth disposable PostgreSQL and published application at $drafts_base_url"
-start_suite drafts "$drafts_base_url" "$drafts_log_file" "$repo_root/$publish_dir/access-token-drafts"
+suite_drafts() (
+  trap 'stop_suite' RETURN
+  echo "==> starting an eighth published application on a template-cloned database at $drafts_base_url"
+  start_suite drafts "$drafts_base_url" "$drafts_log_file" "$repo_root/$publish_dir/access-token-drafts"
 
-echo "==> recording the project, evidence and stored draft the panel reads"
-seed_grounded_draft "$drafts_base_url" "$(cat "$repo_root/$publish_dir/access-token-drafts")"
+  echo "==> recording the project, evidence and stored draft the panel reads"
+  seed_grounded_draft "$drafts_base_url" "$(cat "$repo_root/$publish_dir/access-token-drafts")"
 
-echo "==> npm run test:e2e (real browser against $drafts_base_url)"
-run_suite "$drafts_base_url" "$drafts_log_file" "$repo_root/$publish_dir/access-token-drafts" \
-  tests/grounded-markdown-drafts.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $drafts_base_url)"
+  run_suite "$drafts_base_url" "$drafts_log_file" "$repo_root/$publish_dir/access-token-drafts" \
+    tests/grounded-markdown-drafts.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 9: the screenshot picker. It needs a milestone the browser can choose from, and it needs
@@ -2664,16 +2759,20 @@ stop_suite
 # a screenshot was captured on this host. The .NET suite is where candidates are produced by real
 # capture jobs behind the delivered provider seam.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a ninth disposable PostgreSQL and published application at $curation_base_url"
-start_suite curation "$curation_base_url" "$curation_log_file" "$repo_root/$publish_dir/access-token-curation"
+suite_curation() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a ninth published application on a template-cloned database at $curation_base_url"
+  start_suite curation "$curation_base_url" "$curation_log_file" "$repo_root/$publish_dir/access-token-curation"
 
-echo "==> recording the project, evidence, media and offered candidates the picker reads"
-seed_curation "$curation_base_url" "$(cat "$repo_root/$publish_dir/access-token-curation")"
+  echo "==> recording the project, evidence, media and offered candidates the picker reads"
+  seed_curation "$curation_base_url" "$(cat "$repo_root/$publish_dir/access-token-curation")"
 
-echo "==> npm run test:e2e (real browser against $curation_base_url)"
-run_suite "$curation_base_url" "$curation_log_file" "$repo_root/$publish_dir/access-token-curation" \
-  tests/screenshot-curation.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $curation_base_url)"
+  run_suite "$curation_base_url" "$curation_log_file" "$repo_root/$publish_dir/access-token-curation" \
+    tests/screenshot-curation.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 10: the private timeline. It needs a project with milestones it recorded itself, and a
@@ -2688,13 +2787,17 @@ stop_suite
 # when shown, and opens a row's own milestone editor - and that the server says the same thing
 # the panel does.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a tenth disposable PostgreSQL and published application at $timeline_base_url"
-start_suite timeline "$timeline_base_url" "$timeline_log_file" "$repo_root/$publish_dir/access-token-timeline"
+suite_timeline() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a tenth published application on a template-cloned database at $timeline_base_url"
+  start_suite timeline "$timeline_base_url" "$timeline_log_file" "$repo_root/$publish_dir/access-token-timeline"
 
-echo "==> npm run test:e2e (real browser against $timeline_base_url)"
-run_suite "$timeline_base_url" "$timeline_log_file" "$repo_root/$publish_dir/access-token-timeline" \
-  tests/milestone-timeline.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $timeline_base_url)"
+  run_suite "$timeline_base_url" "$timeline_log_file" "$repo_root/$publish_dir/access-token-timeline" \
+    tests/milestone-timeline.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 11: human review. It needs a milestone with a stored draft the browser can edit, approve
@@ -2716,16 +2819,20 @@ stop_suite
 # generated on this host. The .NET suite is where a real provider answer flows through
 # generation into review.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting an eleventh disposable PostgreSQL and published application at $review_base_url"
-start_suite review "$review_base_url" "$review_log_file" "$repo_root/$publish_dir/access-token-review"
+suite_review() (
+  trap 'stop_suite' RETURN
+  echo "==> starting an eleventh published application on a template-cloned database at $review_base_url"
+  start_suite review "$review_base_url" "$review_log_file" "$repo_root/$publish_dir/access-token-review"
 
-echo "==> recording the project, evidence and stored drafts the review panel reads"
-seed_review "$review_base_url" "$(cat "$repo_root/$publish_dir/access-token-review")"
+  echo "==> recording the project, evidence and stored drafts the review panel reads"
+  seed_review "$review_base_url" "$(cat "$repo_root/$publish_dir/access-token-review")"
 
-echo "==> npm run test:e2e (real browser against $review_base_url)"
-run_suite "$review_base_url" "$review_log_file" "$repo_root/$publish_dir/access-token-review" \
-  tests/markdown-review-export.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $review_base_url)"
+  run_suite "$review_base_url" "$review_log_file" "$repo_root/$publish_dir/access-token-review" \
+    tests/markdown-review-export.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 12: the tag- and event-derived Milestone candidates. It needs a project with a repository
@@ -2742,16 +2849,20 @@ stop_suite
 # the page rather than as the page. It is NOT evidence that GitHub sent a delivery, that a poll read a
 # repository, or that a candidate can be recorded - and the last of those is asserted negatively.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a twelfth disposable PostgreSQL and published application at $candidates_base_url"
-start_suite candidates "$candidates_base_url" "$candidates_log_file" "$repo_root/$publish_dir/access-token-candidates"
+suite_candidates() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a twelfth published application on a template-cloned database at $candidates_base_url"
+  start_suite candidates "$candidates_base_url" "$candidates_log_file" "$repo_root/$publish_dir/access-token-candidates"
 
-echo "==> recording the project, connection, secret, subscription and candidates the panel reads"
-seed_candidates "$candidates_base_url" "$(cat "$repo_root/$publish_dir/access-token-candidates")"
+  echo "==> recording the project, connection, secret, subscription and candidates the panel reads"
+  seed_candidates "$candidates_base_url" "$(cat "$repo_root/$publish_dir/access-token-candidates")"
 
-echo "==> npm run test:e2e (real browser against $candidates_base_url)"
-run_suite "$candidates_base_url" "$candidates_log_file" "$repo_root/$publish_dir/access-token-candidates" \
-  tests/github-release-candidates.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $candidates_base_url)"
+  run_suite "$candidates_base_url" "$candidates_log_file" "$repo_root/$publish_dir/access-token-candidates" \
+    tests/github-release-candidates.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 13: the project narrative. It needs a project it records history into, and neither a
@@ -2770,13 +2881,17 @@ stop_suite
 # deterministic and reaches no provider, and a summary is an arrangement of attributed sources
 # rather than generated prose.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a thirteenth disposable PostgreSQL and published application at $narrative_base_url"
-start_suite narrative "$narrative_base_url" "$narrative_log_file" "$repo_root/$publish_dir/access-token-narrative"
+suite_narrative() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a thirteenth published application on a template-cloned database at $narrative_base_url"
+  start_suite narrative "$narrative_base_url" "$narrative_log_file" "$repo_root/$publish_dir/access-token-narrative"
 
-echo "==> npm run test:e2e (real browser against $narrative_base_url)"
-run_suite "$narrative_base_url" "$narrative_log_file" "$repo_root/$publish_dir/access-token-narrative" \
-  tests/narrative-memory.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $narrative_base_url)"
+  run_suite "$narrative_base_url" "$narrative_log_file" "$repo_root/$publish_dir/access-token-narrative" \
+    tests/narrative-memory.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 14: reusable content formats. It needs a milestone with an approved story the browser
@@ -2792,16 +2907,20 @@ stop_suite
 # It is NOT evidence that a draft was generated on this host: the approved story is seeded, and
 # the .NET suite is where a real provider answer flows through generation into a variant's source.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a fourteenth disposable PostgreSQL and published application at $variants_base_url"
-start_suite variants "$variants_base_url" "$variants_log_file" "$repo_root/$publish_dir/access-token-variants"
+suite_variants() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a fourteenth published application on a template-cloned database at $variants_base_url"
+  start_suite variants "$variants_base_url" "$variants_log_file" "$repo_root/$publish_dir/access-token-variants"
 
-echo "==> recording the project, evidence, approved story and approval the variant panel reads"
-seed_variants "$variants_base_url" "$(cat "$repo_root/$publish_dir/access-token-variants")"
+  echo "==> recording the project, evidence, approved story and approval the variant panel reads"
+  seed_variants "$variants_base_url" "$(cat "$repo_root/$publish_dir/access-token-variants")"
 
-echo "==> npm run test:e2e (real browser against $variants_base_url)"
-run_suite "$variants_base_url" "$variants_log_file" "$repo_root/$publish_dir/access-token-variants" \
-  tests/content-asset-variants.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $variants_base_url)"
+  run_suite "$variants_base_url" "$variants_log_file" "$repo_root/$publish_dir/access-token-variants" \
+    tests/content-asset-variants.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 15: team invitations and members. It needs a signed-in owner on an installation that
@@ -2816,13 +2935,17 @@ stop_suite
 # grant was stored on this host: this installation is Community single-tenant, and the .NET
 # suite is where the Hosted flows are proven.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a fifteenth disposable PostgreSQL and published application at $team_base_url"
-start_suite team "$team_base_url" "$team_log_file" "$repo_root/$publish_dir/access-token-team"
+suite_team() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a fifteenth published application on a template-cloned database at $team_base_url"
+  start_suite team "$team_base_url" "$team_log_file" "$repo_root/$publish_dir/access-token-team"
 
-echo "==> npm run test:e2e (real browser against $team_base_url)"
-run_suite "$team_base_url" "$team_log_file" "$repo_root/$publish_dir/access-token-team" \
-  tests/team-panels.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $team_base_url)"
+  run_suite "$team_base_url" "$team_log_file" "$repo_root/$publish_dir/access-token-team" \
+    tests/team-panels.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 16: hosted tenancy. It needs a signed-in caller whose tenants the views list, and a
@@ -2836,13 +2959,17 @@ stop_suite
 # evidence that a tenant was created, selected or imported on this host, and the .NET suite
 # is where the Hosted flows are proven.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a sixteenth disposable PostgreSQL and published application at $tenancy_base_url"
-start_suite tenancy "$tenancy_base_url" "$tenancy_log_file" "$repo_root/$publish_dir/access-token-tenancy"
+suite_tenancy() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a sixteenth published application on a template-cloned database at $tenancy_base_url"
+  start_suite tenancy "$tenancy_base_url" "$tenancy_log_file" "$repo_root/$publish_dir/access-token-tenancy"
 
-echo "==> npm run test:e2e (real browser against $tenancy_base_url)"
-run_suite "$tenancy_base_url" "$tenancy_log_file" "$repo_root/$publish_dir/access-token-tenancy" \
-  tests/tenancy-views.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $tenancy_base_url)"
+  run_suite "$tenancy_base_url" "$tenancy_log_file" "$repo_root/$publish_dir/access-token-tenancy" \
+    tests/tenancy-views.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 17: evolution images. It needs a project the browser records itself, and a project
@@ -2856,13 +2983,17 @@ stop_suite
 # pictures. It is NOT evidence that a comparison depicts real screenshots on this host: no
 # candidate exists here.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a seventeenth disposable PostgreSQL and published application at $evolution_base_url"
-start_suite evolution "$evolution_base_url" "$evolution_log_file" "$repo_root/$publish_dir/access-token-evolution"
+suite_evolution() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a seventeenth published application on a template-cloned database at $evolution_base_url"
+  start_suite evolution "$evolution_base_url" "$evolution_log_file" "$repo_root/$publish_dir/access-token-evolution"
 
-echo "==> npm run test:e2e (real browser against $evolution_base_url)"
-run_suite "$evolution_base_url" "$evolution_log_file" "$repo_root/$publish_dir/access-token-evolution" \
-  tests/evolution-images.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $evolution_base_url)"
+  run_suite "$evolution_base_url" "$evolution_log_file" "$repo_root/$publish_dir/access-token-evolution" \
+    tests/evolution-images.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 18: evolution GIFs. It needs a project the browser records itself, and a project
@@ -2876,13 +3007,17 @@ stop_suite
 # client-side animation. It is NOT evidence that an animation depicts real screenshots on
 # this host: no candidate exists here.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting an eighteenth disposable PostgreSQL and published application at $gif_base_url"
-start_suite gif "$gif_base_url" "$gif_log_file" "$repo_root/$publish_dir/access-token-gif"
+suite_gif() (
+  trap 'stop_suite' RETURN
+  echo "==> starting an eighteenth published application on a template-cloned database at $gif_base_url"
+  start_suite gif "$gif_base_url" "$gif_log_file" "$repo_root/$publish_dir/access-token-gif"
 
-echo "==> npm run test:e2e (real browser against $gif_base_url)"
-run_suite "$gif_base_url" "$gif_log_file" "$repo_root/$publish_dir/access-token-gif" \
-  tests/evolution-gifs.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $gif_base_url)"
+  run_suite "$gif_base_url" "$gif_log_file" "$repo_root/$publish_dir/access-token-gif" \
+    tests/evolution-gifs.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 19: publications. It needs a project the browser records itself, and a project
@@ -2895,13 +3030,17 @@ stop_suite
 # stores and that a preview authorizes nothing. It is NOT evidence that anything was sent
 # anywhere: no publish is attempted here and no transport is contacted.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a nineteenth disposable PostgreSQL and published application at $publication_base_url"
-start_suite publication "$publication_base_url" "$publication_log_file" "$repo_root/$publish_dir/access-token-publication"
+suite_publication() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a nineteenth published application on a template-cloned database at $publication_base_url"
+  start_suite publication "$publication_base_url" "$publication_log_file" "$repo_root/$publish_dir/access-token-publication"
 
-echo "==> npm run test:e2e (real browser against $publication_base_url)"
-run_suite "$publication_base_url" "$publication_log_file" "$repo_root/$publish_dir/access-token-publication" \
-  tests/publications.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $publication_base_url)"
+  run_suite "$publication_base_url" "$publication_log_file" "$repo_root/$publish_dir/access-token-publication" \
+    tests/publications.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 20: journey publish and the public view. It needs a project the browser records
@@ -2916,13 +3055,17 @@ stop_suite
 # public view shows only what the projection route returns. It is NOT evidence that a
 # journey was published on this host: nothing here is approved, so nothing can be.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a twentieth disposable PostgreSQL and published application at $journey_base_url"
-start_suite journey "$journey_base_url" "$journey_log_file" "$repo_root/$publish_dir/access-token-journey"
+suite_journey() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a twentieth published application on a template-cloned database at $journey_base_url"
+  start_suite journey "$journey_base_url" "$journey_log_file" "$repo_root/$publish_dir/access-token-journey"
 
-echo "==> npm run test:e2e (real browser against $journey_base_url)"
-run_suite "$journey_base_url" "$journey_log_file" "$repo_root/$publish_dir/access-token-journey" \
-  tests/journey-publish.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $journey_base_url)"
+  run_suite "$journey_base_url" "$journey_log_file" "$repo_root/$publish_dir/access-token-journey" \
+    tests/journey-publish.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 21: project area information architecture. It creates its own project by name and
@@ -2930,13 +3073,17 @@ stop_suite
 # published instance rather than against the one the projects-and-milestones suite started
 # empty - otherwise the first group's empty-state assertions would already see a project.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a twenty-first disposable PostgreSQL and published application at $area_base_url"
-start_suite area "$area_base_url" "$area_log_file" "$repo_root/$publish_dir/access-token-area"
+suite_area() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a twenty-first published application on a template-cloned database at $area_base_url"
+  start_suite area "$area_base_url" "$area_log_file" "$repo_root/$publish_dir/access-token-area"
 
-echo "==> npm run test:e2e (real browser against $area_base_url)"
-run_suite "$area_base_url" "$area_log_file" "$repo_root/$publish_dir/access-token-area" \
-  tests/project-area-ia.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $area_base_url)"
+  run_suite "$area_base_url" "$area_log_file" "$repo_root/$publish_dir/access-token-area" \
+    tests/project-area-ia.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 22: publish from variant. It needs a project with an approved story, a sealed
@@ -2955,18 +3102,22 @@ stop_suite
 # repository is a name, not a destination), and the dispatch-to-terminal half is the
 # .NET suite's claim, not this one's.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a twenty-second disposable PostgreSQL and published application at $publish_variant_base_url"
-start_suite publish_variant "$publish_variant_base_url" "$publish_variant_log_file" \
-  "$repo_root/$publish_dir/access-token-publish-variant" \
-  "Chronicleaf__Operations__Enabled=false Chronicleaf__GitHubPages__RepositoryOwner=e2e-owner Chronicleaf__GitHubPages__RepositoryName=e2e-docs Chronicleaf__GitHubPages__Branch=main"
+suite_publish_variant() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a twenty-second published application on a template-cloned database at $publish_variant_base_url"
+  start_suite publish_variant "$publish_variant_base_url" "$publish_variant_log_file" \
+    "$repo_root/$publish_dir/access-token-publish-variant" \
+    "Chronicleaf__Operations__Enabled=false Chronicleaf__GitHubPages__RepositoryOwner=e2e-owner Chronicleaf__GitHubPages__RepositoryName=e2e-docs Chronicleaf__GitHubPages__Branch=main"
 
-echo "==> seeding one approved story and one sealed publisher credential"
-seed_publish_variant "$publish_variant_base_url" "$(cat "$repo_root/$publish_dir/access-token-publish-variant")"
+  echo "==> seeding one approved story and one sealed publisher credential"
+  seed_publish_variant "$publish_variant_base_url" "$(cat "$repo_root/$publish_dir/access-token-publish-variant")"
 
-echo "==> npm run test:e2e (real browser against $publish_variant_base_url)"
-run_suite "$publish_variant_base_url" "$publish_variant_log_file" "$repo_root/$publish_dir/access-token-publish-variant" \
-  tests/publish-from-variant.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $publish_variant_base_url)"
+  run_suite "$publish_variant_base_url" "$publish_variant_log_file" "$repo_root/$publish_dir/access-token-publish-variant" \
+    tests/publish-from-variant.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 23: static blog export UI. It needs a project with one approved story and one
@@ -2985,17 +3136,21 @@ stop_suite
 # owner acted. It is NOT evidence that the archive renders any particular page: the bytes
 # inside the ZIP are the .NET suite's claim, not this one's.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a twenty-third disposable PostgreSQL and published application at $static_blog_export_base_url"
-start_suite static_blog_export "$static_blog_export_base_url" "$static_blog_export_log_file" \
-  "$repo_root/$publish_dir/access-token-static-blog-export"
+suite_static_blog_export() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a twenty-third published application on a template-cloned database at $static_blog_export_base_url"
+  start_suite static_blog_export "$static_blog_export_base_url" "$static_blog_export_log_file" \
+    "$repo_root/$publish_dir/access-token-static-blog-export"
 
-echo "==> seeding one approved story and one never-approved story"
-seed_static_blog_export "$static_blog_export_base_url" "$(cat "$repo_root/$publish_dir/access-token-static-blog-export")"
+  echo "==> seeding one approved story and one never-approved story"
+  seed_static_blog_export "$static_blog_export_base_url" "$(cat "$repo_root/$publish_dir/access-token-static-blog-export")"
 
-echo "==> npm run test:e2e (real browser against $static_blog_export_base_url)"
-run_suite "$static_blog_export_base_url" "$static_blog_export_log_file" "$repo_root/$publish_dir/access-token-static-blog-export" \
-  tests/static-blog-export-ui.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $static_blog_export_base_url)"
+  run_suite "$static_blog_export_base_url" "$static_blog_export_log_file" "$repo_root/$publish_dir/access-token-static-blog-export" \
+    tests/static-blog-export-ui.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 24: publisher adapter panels. It needs a project with an approved story, a sealed
@@ -3015,18 +3170,22 @@ stop_suite
 # configured origin is a name, not a destination), and the dispatch-to-terminal half is the
 # .NET suites' claim, not this one's.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a twenty-fourth disposable PostgreSQL and published application at $adapter_panels_base_url"
-start_suite adapter_panels "$adapter_panels_base_url" "$adapter_panels_log_file" \
-  "$repo_root/$publish_dir/access-token-adapter-panels" \
-  "Chronicleaf__Operations__Enabled=false Chronicleaf__GitHubPages__RepositoryOwner=e2e-owner Chronicleaf__GitHubPages__RepositoryName=e2e-docs Chronicleaf__GitHubPages__Branch=main Chronicleaf__DevTo__Tags=e2e,chronicleaf Chronicleaf__Hashnode__PublicationId=e2e-publication-01 Chronicleaf__Ghost__Origin=https://ghost.example.invalid Chronicleaf__Ghost__ApiVersion=v5.0 Chronicleaf__Ghost__Tags=e2e Chronicleaf__WordPress__Origin=https://wp.example.invalid Chronicleaf__WordPress__Username=e2euser Chronicleaf__CustomBlog__Origin=https://blog.example.invalid Chronicleaf__CustomBlog__Formats=markdown"
+suite_adapter_panels() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a twenty-fourth published application on a template-cloned database at $adapter_panels_base_url"
+  start_suite adapter_panels "$adapter_panels_base_url" "$adapter_panels_log_file" \
+    "$repo_root/$publish_dir/access-token-adapter-panels" \
+    "Chronicleaf__Operations__Enabled=false Chronicleaf__GitHubPages__RepositoryOwner=e2e-owner Chronicleaf__GitHubPages__RepositoryName=e2e-docs Chronicleaf__GitHubPages__Branch=main Chronicleaf__DevTo__Tags=e2e,chronicleaf Chronicleaf__Hashnode__PublicationId=e2e-publication-01 Chronicleaf__Ghost__Origin=https://ghost.example.invalid Chronicleaf__Ghost__ApiVersion=v5.0 Chronicleaf__Ghost__Tags=e2e Chronicleaf__WordPress__Origin=https://wp.example.invalid Chronicleaf__WordPress__Username=e2euser Chronicleaf__CustomBlog__Origin=https://blog.example.invalid Chronicleaf__CustomBlog__Formats=markdown"
 
-echo "==> seeding one approved story and one sealed publisher credential"
-seed_publish_variant "$adapter_panels_base_url" "$(cat "$repo_root/$publish_dir/access-token-adapter-panels")" "chronicleaf_e2e_adapter_panels"
+  echo "==> seeding one approved story and one sealed publisher credential"
+  seed_publish_variant "$adapter_panels_base_url" "$(cat "$repo_root/$publish_dir/access-token-adapter-panels")" "chronicleaf_e2e_adapter_panels"
 
-echo "==> npm run test:e2e (real browser against $adapter_panels_base_url)"
-run_suite "$adapter_panels_base_url" "$adapter_panels_log_file" "$repo_root/$publish_dir/access-token-adapter-panels" \
-  tests/publisher-adapter-panels.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $adapter_panels_base_url)"
+  run_suite "$adapter_panels_base_url" "$adapter_panels_log_file" "$repo_root/$publish_dir/access-token-adapter-panels" \
+    tests/publisher-adapter-panels.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 25: content pack panels. It needs a project with one approved story and one bare
@@ -3046,17 +3205,21 @@ stop_suite
 # to any pack host: no transport exists, and the suite asserts no request ever aims
 # at one.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a twenty-fifth disposable PostgreSQL and published application at $content_pack_base_url"
-start_suite content_pack "$content_pack_base_url" "$content_pack_log_file" \
-  "$repo_root/$publish_dir/access-token-content-pack"
+suite_content_pack() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a twenty-fifth published application on a template-cloned database at $content_pack_base_url"
+  start_suite content_pack "$content_pack_base_url" "$content_pack_log_file" \
+    "$repo_root/$publish_dir/access-token-content-pack"
 
-echo "==> seeding one approved story and one bare milestone"
-seed_content_pack_panels "$content_pack_base_url" "$(cat "$repo_root/$publish_dir/access-token-content-pack")"
+  echo "==> seeding one approved story and one bare milestone"
+  seed_content_pack_panels "$content_pack_base_url" "$(cat "$repo_root/$publish_dir/access-token-content-pack")"
 
-echo "==> npm run test:e2e (real browser against $content_pack_base_url)"
-run_suite "$content_pack_base_url" "$content_pack_log_file" "$repo_root/$publish_dir/access-token-content-pack" \
-  tests/content-pack-panels.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $content_pack_base_url)"
+  run_suite "$content_pack_base_url" "$content_pack_log_file" "$repo_root/$publish_dir/access-token-content-pack" \
+    tests/content-pack-panels.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 26: agency area. It needs Client A with two in-window evidenced
@@ -3081,17 +3244,21 @@ stop_suite
 # control and no request ever leaves loopback. It is NOT evidence of any
 # portal, invoicing or email behavior: no such route or control exists.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a twenty-sixth disposable PostgreSQL and published application at $agency_base_url"
-start_suite agency "$agency_base_url" "$agency_log_file" \
-  "$repo_root/$publish_dir/access-token-agency"
+suite_agency() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a twenty-sixth published application on a template-cloned database at $agency_base_url"
+  start_suite agency "$agency_base_url" "$agency_log_file" \
+    "$repo_root/$publish_dir/access-token-agency"
 
-echo "==> seeding Client A (two evidenced projects), Client B (one project), one archived client"
-seed_agency_area "$agency_base_url" "$(cat "$repo_root/$publish_dir/access-token-agency")"
+  echo "==> seeding Client A (two evidenced projects), Client B (one project), one archived client"
+  seed_agency_area "$agency_base_url" "$(cat "$repo_root/$publish_dir/access-token-agency")"
 
-echo "==> npm run test:e2e (real browser against $agency_base_url)"
-run_suite "$agency_base_url" "$agency_log_file" "$repo_root/$publish_dir/access-token-agency" \
-  tests/agency-area-ui.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $agency_base_url)"
+  run_suite "$agency_base_url" "$agency_log_file" "$repo_root/$publish_dir/access-token-agency" \
+    tests/agency-area-ui.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 27: the video storyboard. It needs a project with a confirmed milestone
@@ -3116,17 +3283,21 @@ stop_suite
 # renderer, encoder or transport exists, and the suite asserts no request
 # ever aims at one.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a twenty-seventh disposable PostgreSQL and published application at $video_story_base_url"
-start_suite video_story "$video_story_base_url" "$video_story_log_file" \
-  "$repo_root/$publish_dir/access-token-video-story"
+suite_video_story() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a twenty-seventh published application on a template-cloned database at $video_story_base_url"
+  start_suite video_story "$video_story_base_url" "$video_story_log_file" \
+    "$repo_root/$publish_dir/access-token-video-story"
 
-echo "==> seeding one approved story with one selected screenshot, plus one bare milestone"
-seed_video_story_panel "$video_story_base_url" "$(cat "$repo_root/$publish_dir/access-token-video-story")"
+  echo "==> seeding one approved story with one selected screenshot, plus one bare milestone"
+  seed_video_story_panel "$video_story_base_url" "$(cat "$repo_root/$publish_dir/access-token-video-story")"
 
-echo "==> npm run test:e2e (real browser against $video_story_base_url)"
-run_suite "$video_story_base_url" "$video_story_log_file" "$repo_root/$publish_dir/access-token-video-story" \
-  tests/video-story-panel.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $video_story_base_url)"
+  run_suite "$video_story_base_url" "$video_story_log_file" "$repo_root/$publish_dir/access-token-video-story" \
+    tests/video-story-panel.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 28: workflow wayfinding. It needs one project with a confirmed milestone carrying
@@ -3152,17 +3323,21 @@ stop_suite
 # owner decision; and that nothing fires before its explicit control. It is NOT evidence
 # that a page was captured, that GitHub was reached, or that anything was sent anywhere.
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a twenty-eighth disposable PostgreSQL and published application at $wayfinding_base_url"
-start_suite wayfinding "$wayfinding_base_url" "$wayfinding_log_file" \
-  "$repo_root/$publish_dir/access-token-wayfinding"
+suite_wayfinding() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a twenty-eighth published application on a template-cloned database at $wayfinding_base_url"
+  start_suite wayfinding "$wayfinding_base_url" "$wayfinding_log_file" \
+    "$repo_root/$publish_dir/access-token-wayfinding"
 
-echo "==> seeding one project, one confirmed milestone with evidence, one connection and two candidates"
-seed_workflow_wayfinding "$wayfinding_base_url" "$(cat "$repo_root/$publish_dir/access-token-wayfinding")"
+  echo "==> seeding one project, one confirmed milestone with evidence, one connection and two candidates"
+  seed_workflow_wayfinding "$wayfinding_base_url" "$(cat "$repo_root/$publish_dir/access-token-wayfinding")"
 
-echo "==> npm run test:e2e (real browser against $wayfinding_base_url)"
-run_suite "$wayfinding_base_url" "$wayfinding_log_file" "$repo_root/$publish_dir/access-token-wayfinding" \
-  tests/workflow-wayfinding.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $wayfinding_base_url)"
+  run_suite "$wayfinding_base_url" "$wayfinding_log_file" "$repo_root/$publish_dir/access-token-wayfinding" \
+    tests/workflow-wayfinding.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 29: web accessibility roles. It creates projects and confirmed milestones by clicking,
@@ -3172,14 +3347,18 @@ stop_suite
 # clicks an owner would make, and the operations and clients pages are asserted in their
 # honest empty states (filters render with no rows).
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a twenty-ninth disposable PostgreSQL and published application at $a11y_roles_base_url"
-start_suite a11y_roles "$a11y_roles_base_url" "$a11y_roles_log_file" \
-  "$repo_root/$publish_dir/access-token-a11y-roles"
+suite_a11y_roles() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a twenty-ninth published application on a template-cloned database at $a11y_roles_base_url"
+  start_suite a11y_roles "$a11y_roles_base_url" "$a11y_roles_log_file" \
+    "$repo_root/$publish_dir/access-token-a11y-roles"
 
-echo "==> npm run test:e2e (real browser against $a11y_roles_base_url)"
-run_suite "$a11y_roles_base_url" "$a11y_roles_log_file" "$repo_root/$publish_dir/access-token-a11y-roles" \
-  tests/a11y-roles.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $a11y_roles_base_url)"
+  run_suite "$a11y_roles_base_url" "$a11y_roles_log_file" "$repo_root/$publish_dir/access-token-a11y-roles" \
+    tests/a11y-roles.spec.ts
+  stop_suite
+)
+
 
 # ---------------------------------------------------------------------------------------------
 # Suite 30: web responsive shell. It creates projects by clicking, and a
@@ -3188,11 +3367,93 @@ stop_suite
 # reason suites 2 to 29 each have one. No seed: every record below is created by the same
 # clicks an owner would make, and viewports are set per test (360/720/960/1280px).
 # ---------------------------------------------------------------------------------------------
-echo "==> starting a thirtieth disposable PostgreSQL and published application at $responsive_base_url"
-start_suite responsive "$responsive_base_url" "$responsive_log_file" \
-  "$repo_root/$publish_dir/access-token-responsive"
+suite_responsive() (
+  trap 'stop_suite' RETURN
+  echo "==> starting a thirtieth published application on a template-cloned database at $responsive_base_url"
+  start_suite responsive "$responsive_base_url" "$responsive_log_file" \
+    "$repo_root/$publish_dir/access-token-responsive"
 
-echo "==> npm run test:e2e (real browser against $responsive_base_url)"
-run_suite "$responsive_base_url" "$responsive_log_file" "$repo_root/$publish_dir/access-token-responsive" \
-  tests/responsive-shell.spec.ts
-stop_suite
+  echo "==> npm run test:e2e (real browser against $responsive_base_url)"
+  run_suite "$responsive_base_url" "$responsive_log_file" "$repo_root/$publish_dir/access-token-responsive" \
+    tests/responsive-shell.spec.ts
+  stop_suite
+)
+
+
+
+# ---------------------------------------------------------------------------------------------
+# Parallel runner (PG-ADOPT-004). Each suite above owns its database (a TEMPLATE clone of the
+# shared seed), its server, its port, and its token/log files, and runs in its own subshell —
+# so suites run N-way parallel without sharing mutable state. Playwright keeps workers: 1
+# INSIDE each suite: intra-suite parallelism would break empty-state claims sharing one DB,
+# so that knob is a boundary, not a tuning parameter. A failed suite never stops the others:
+# statuses land in per-suite files and the aggregate names every failed suite at the end.
+# ---------------------------------------------------------------------------------------------
+CHRONICLEAF_E2E_JOBS="${CHRONICLEAF_E2E_JOBS:-4}"
+
+SUITES=(
+  suite_core
+  suite_evidence
+  suite_credentials
+  suite_voice
+  suite_generation
+  suite_github
+  suite_capture
+  suite_drafts
+  suite_curation
+  suite_timeline
+  suite_review
+  suite_candidates
+  suite_narrative
+  suite_variants
+  suite_team
+  suite_tenancy
+  suite_evolution
+  suite_gif
+  suite_publication
+  suite_journey
+  suite_area
+  suite_publish_variant
+  suite_static_blog_export
+  suite_adapter_panels
+  suite_content_pack
+  suite_agency
+  suite_video_story
+  suite_wayfinding
+  suite_a11y_roles
+  suite_responsive
+)
+
+status_dir="$(mktemp -d)"
+
+for suite in "${SUITES[@]}"; do
+  echo "==> [${suite#suite_}] starting (log: $publish_dir/playwright-${suite#suite_}.log)"
+  ( "$suite" >"$repo_root/$publish_dir/playwright-${suite#suite_}.log" 2>&1; echo "$?" >"$status_dir/$suite" ) &
+  while [ "$(jobs -rp | wc -l)" -ge "$CHRONICLEAF_E2E_JOBS" ]; do
+    wait -n || true
+  done
+done
+wait || true
+
+failures=0
+failed_suites=()
+for suite in "${SUITES[@]}"; do
+  code="$(cat "$status_dir/$suite" 2>/dev/null || echo MISSING)"
+  if [ "$code" != "0" ]; then
+    failures=$((failures + 1))
+    failed_suites+=("${suite#suite_}(${code})")
+  fi
+done
+rm -rf "$status_dir"
+
+if [ "$failures" -gt 0 ]; then
+  echo "FAILED: $failures of ${#SUITES[@]} suite(s) failed: ${failed_suites[*]}" >&2
+  echo "per-suite logs are in $publish_dir/playwright-<suite>.log and server-<suite>.log:" >&2
+  for failed in "${failed_suites[@]}"; do
+    name="${failed%%(*}"
+    echo "----- tail of playwright-${name}.log -----" >&2
+    tail -n 30 "$repo_root/$publish_dir/playwright-${name}.log" >&2 || true
+  done
+  exit 1
+fi
+echo "all ${#SUITES[@]} e2e suites green (jobs=$CHRONICLEAF_E2E_JOBS, one shared PostgreSQL, per-suite TEMPLATE clones)"

@@ -41,6 +41,7 @@ expected=(
   "Platform.Storage.S3"
   "Platform.Jobs"
   "Platform.Jobs.Hangfire"
+  "Platform.Persistence.Postgres.Testing"
 )
 
 fail() {
@@ -84,6 +85,15 @@ for package in Platform.Storage Platform.Storage.Local Platform.Storage.S3 Platf
   echo "    ${package} is pinned at ${referenced}"
 done
 
+# The shared postgres test server is test-support by its own contract: only the integration
+# test project may name it, pinned at the exact feed version like every other platform package.
+integration_tests="tests/Chronicleaf.Integration.Tests/Chronicleaf.Integration.Tests.csproj"
+testing_referenced="$(sed -n 's|.*Include="Platform.Persistence.Postgres.Testing" Version="\([^"]*\)".*|\1|p' "$integration_tests")"
+[ -n "$testing_referenced" ] || fail "${integration_tests} does not reference Platform.Persistence.Postgres.Testing"
+[ "$testing_referenced" = "$platform_version" ] \
+  || fail "Platform.Persistence.Postgres.Testing is referenced at ${testing_referenced} but the feed carries ${platform_version}; re-pack and commit, or correct the reference"
+echo "    Platform.Persistence.Postgres.Testing is pinned at ${testing_referenced} (test project only)"
+
 # Nothing outside Infrastructure may need the feed: Core, Application and Api have to compile against
 # the platform's contract without the platform's artifacts being on offer. This is what keeps the
 # operation state machine free of platform types while every platform-typed seam - dispatcher, payload
@@ -94,6 +104,12 @@ for project in src/Chronicleaf.Core src/Chronicleaf.Application src/Chronicleaf.
   fi
 done
 echo "    only Infrastructure depends on the platform packages"
+
+# The shared postgres test server is test-support: no production project may reference it.
+if grep -rqE 'PackageReference Include="Platform\.Persistence\.Postgres\.Testing"' src/; then
+  fail "a production project references Platform.Persistence.Postgres.Testing; only the integration test project may"
+fi
+echo "    no production project references the postgres testing package"
 
 echo "== 4. cold restore resolves the platform packages from the committed feed"
 scratch="$(mktemp -d)"

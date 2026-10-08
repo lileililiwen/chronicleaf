@@ -41,8 +41,8 @@ namespace Chronicleaf.Integration.Tests;
 /// and what a panel is told when a run fails.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class ScheduledProjectSyncTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 6, 9, 0, 0, TimeSpan.Zero);
 

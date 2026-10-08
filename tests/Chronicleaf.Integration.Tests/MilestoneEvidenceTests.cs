@@ -41,8 +41,9 @@ namespace Chronicleaf.Integration.Tests;
 /// append leaves no bundle behind.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class MilestoneEvidenceTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>, IDisposable
+    : IDisposable
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 3, 14, 0, 0, TimeSpan.Zero);
 

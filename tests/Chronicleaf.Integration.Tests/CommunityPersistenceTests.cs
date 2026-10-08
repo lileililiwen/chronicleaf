@@ -17,7 +17,8 @@ namespace Chronicleaf.Integration.Tests;
 /// started from a pinned Docker image. Nothing here is simulated: transactions, constraints,
 /// rollback, idempotence and connection failure are produced by a real PostgreSQL server.
 /// </summary>
-public sealed class CommunityPersistenceTests(ChronicleafPostgresFixture postgres) : IClassFixture<ChronicleafPostgresFixture>
+[Collection(ChronicleafPostgresCollection.Name)]
+public sealed class CommunityPersistenceTests(ChronicleafPostgresFixture postgres)
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 2, 12, 0, 0, TimeSpan.Zero);
 

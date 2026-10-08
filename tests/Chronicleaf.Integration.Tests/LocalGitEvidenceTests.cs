@@ -54,8 +54,8 @@ namespace Chronicleaf.Integration.Tests;
 /// after the scenario it covers.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class LocalGitEvidenceTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 8, 16, 0, 0, TimeSpan.Zero);
 

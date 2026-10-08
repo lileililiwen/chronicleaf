@@ -32,7 +32,10 @@ FEED_DIR="${FEED_DIR:-$repo_root/packages/platform-feed}"
 # Platform.Storage.S3 is the S3-compatible adapter the cloud object storage package is scoped to,
 # and Platform.Core is Platform.Storage's own dependency. Platform.Jobs carries the IJobDispatcher
 # contract and the JobPayload shape, Platform.Jobs.Hangfire is the durable scheduling adapter, and
-# Platform.Core is Platform.Jobs's dependency too. The whole closure is listed because a feed
+# Platform.Core is Platform.Jobs's dependency too. Platform.Persistence.Postgres.Testing carries
+# the assembly-shared PostgreSQL test server (PostgresTestServer) the integration suite adopts:
+# its own nuspec closure (Npgsql, Testcontainers.PostgreSql, DI/Logging abstractions) resolves
+# from nuget.org, so no further feed entry is needed. The whole closure is listed because a feed
 # that carries only the direct references is a feed that fails to restore on a cold cache, which
 # is the whole failure this stage exists to catch. Nothing else is copied - a feed that carries
 # the sibling's whole catalogue would make a version bump in an unrelated package look like a
@@ -44,6 +47,7 @@ PACKAGES=(
   Platform.Storage.S3
   Platform.Jobs
   Platform.Jobs.Hangfire
+  Platform.Persistence.Postgres.Testing
 )
 
 if [[ ! -d "$PLATFORM_ROOT/src" ]]; then

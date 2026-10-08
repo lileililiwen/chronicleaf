@@ -41,8 +41,9 @@ namespace Chronicleaf.Integration.Tests;
 /// repository, the routes and the access boundary are the production ones in every scenario.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class LocalMediaStorageTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>, IDisposable
+    : IDisposable
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 3, 12, 0, 0, TimeSpan.Zero);
 

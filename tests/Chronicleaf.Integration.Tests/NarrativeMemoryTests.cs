@@ -39,8 +39,8 @@ namespace Chronicleaf.Integration.Tests;
 /// covers.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class NarrativeMemoryTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 11, 9, 0, 0, TimeSpan.Zero);
 

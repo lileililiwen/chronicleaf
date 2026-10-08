@@ -40,8 +40,8 @@ namespace Chronicleaf.Integration.Tests;
 /// and no external write is attempted: the resolve job reads the leased bytes and returns them.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class CredentialVaultTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 3, 9, 0, 0, TimeSpan.Zero);
 

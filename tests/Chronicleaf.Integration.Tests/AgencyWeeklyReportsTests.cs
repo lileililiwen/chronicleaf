@@ -38,8 +38,8 @@ namespace Chronicleaf.Integration.Tests;
 /// rendered through a deterministic template.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class AgencyWeeklyReportsTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 15, 12, 0, 0, TimeSpan.Zero);
 

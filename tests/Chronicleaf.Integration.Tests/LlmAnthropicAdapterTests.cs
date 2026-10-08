@@ -48,8 +48,8 @@ namespace Chronicleaf.Integration.Tests;
 /// provider answer lives in the delivered LlmProviderContractTests; this suite is about the dialect.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class LlmAnthropicAdapterTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 5, 9, 0, 0, TimeSpan.Zero);
 

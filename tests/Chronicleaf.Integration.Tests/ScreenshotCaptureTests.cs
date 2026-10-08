@@ -60,8 +60,8 @@ namespace Chronicleaf.Integration.Tests;
 /// as unproven on this host rather than asserted.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class ScreenshotCaptureTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 4, 9, 0, 0, TimeSpan.Zero);
 

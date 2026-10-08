@@ -50,8 +50,8 @@ namespace Chronicleaf.Integration.Tests;
 /// the clock is injected and advanced by hand, so every expiry is deterministic.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class GithubAppConnectionTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 6, 9, 0, 0, TimeSpan.Zero);
 

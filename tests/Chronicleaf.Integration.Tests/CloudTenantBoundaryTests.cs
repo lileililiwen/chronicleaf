@@ -33,8 +33,8 @@ namespace Chronicleaf.Integration.Tests;
 /// lookup, the issuer/audience/lifetime/nonce checks and the RSA signature verification are the
 /// production code under test. An unavailable container is a failure, never a passing result.
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class CloudTenantBoundaryTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 16, 12, 0, 0, TimeSpan.Zero);
 

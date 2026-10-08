@@ -35,8 +35,8 @@ namespace Chronicleaf.Integration.Tests;
 /// renderer.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class ScreenshotEvolutionImagesTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 5, 9, 0, 0, TimeSpan.Zero);
 

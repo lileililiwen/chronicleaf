@@ -35,8 +35,8 @@ namespace Chronicleaf.Integration.Tests;
 /// fixture the capture suite already uses.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class ScreenshotCurationTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 4, 9, 0, 0, TimeSpan.Zero);
 

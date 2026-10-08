@@ -39,8 +39,8 @@ namespace Chronicleaf.Integration.Tests;
 /// test is named after the scenario it covers.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class ContentAssetVariantsTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 7, 9, 0, 0, TimeSpan.Zero);
 

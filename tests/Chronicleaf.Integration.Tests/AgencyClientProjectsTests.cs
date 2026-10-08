@@ -33,8 +33,8 @@ namespace Chronicleaf.Integration.Tests;
 /// responses rather than assumed.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class AgencyClientProjectsTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 15, 12, 0, 0, TimeSpan.Zero);
 

@@ -38,8 +38,8 @@ namespace Chronicleaf.Integration.Tests;
 /// process built.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class VoiceProfilesTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 3, 15, 0, 0, TimeSpan.Zero);
 

@@ -45,8 +45,8 @@ namespace Chronicleaf.Integration.Tests;
 /// evolution PNG reader - so the encoder is verified by two readers it does not own.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class EvolutionGifExportTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 5, 9, 0, 0, TimeSpan.Zero);
 

@@ -1,17 +1,28 @@
 using Chronicleaf.Infrastructure.Persistence;
-using DotNet.Testcontainers.Builders;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
-using Testcontainers.PostgreSql;
+using Platform.Persistence.Postgres.Testing;
 using Xunit;
 
 namespace Chronicleaf.Integration.Tests;
 
 /// <summary>
+/// The xUnit collection every persistence test in this assembly shares: one real PostgreSQL
+/// container for the whole run, so no test class ever boots its own server.
+/// </summary>
+[CollectionDefinition(Name)]
+public sealed class ChronicleafPostgresCollection : ICollectionFixture<ChronicleafPostgresFixture>
+{
+    public const string Name = "ChronicleafPostgres";
+}
+
+/// <summary>
 /// The disposable real PostgreSQL every persistence test in this assembly runs against.
 /// </summary>
 /// <remarks>
-/// The database is a genuine PostgreSQL server started from a pinned image in Docker: schema
+/// A thin adapter over the adopted <see cref="PostgresTestServer"/> platform package: one
+/// pinned-image container per assembly, the committed EF migrations applied exactly once into
+/// a template database, and one <c>CREATE DATABASE ... TEMPLATE</c> clone per test. Schema
 /// application, transaction rollback, constraint enforcement and connection failure are all
 /// produced by that server, never by an in-memory provider or a stub. The container is removed
 /// when the fixture is disposed, and each test receives its own database on the shared server so
@@ -22,65 +33,72 @@ public sealed class ChronicleafPostgresFixture : IAsyncLifetime
     /// <summary>Pinned image tag. Change it deliberately, never to a floating tag.</summary>
     public const string Image = "postgres:17.6-alpine";
 
-    private const string DatabaseName = "chronicleaf";
     private const string Username = "chronicleaf";
     private const string Password = "chronicleaf-test";
+    private const string TemplateDatabase = "chronicleaf_template";
 
-    private PostgreSqlContainer? _database;
+    private PostgresTestServer? _server;
 
-    /// <summary>True once a real container is running; asserted so a stub can never pass as one.</summary>
-    public bool IsRealPostgres => _database is not null;
+    /// <summary>The adopted shared server, exposed for server-identity assertions.</summary>
+    public PostgresTestServer Server =>
+        _server ?? throw new InvalidOperationException("The disposable PostgreSQL fixture is not running.");
+
+    /// <summary>True once a real container is running and seeded; asserted so a stub can never pass as one.</summary>
+    public bool IsRealPostgres => _server?.IsTemplateSeeded is true;
 
     public async Task InitializeAsync()
     {
-        _database = new PostgreSqlBuilder(Image)
-            .WithDatabase(DatabaseName)
-            .WithUsername(Username)
-            .WithPassword(Password)
-            .WithCleanUp(true)
-            .Build();
+        var server = await PostgresTestServer.StartAsync(
+            new PostgresTestServerOptions
+            {
+                Image = Image,
+                Username = Username,
+                Password = Password,
+                MaintenanceDatabase = "postgres",
+            },
+            default).ConfigureAwait(false);
+        _server = server;
 
-        await _database.StartAsync().ConfigureAwait(false);
+        // The existing committed EF migrations, applied exactly once into the template database.
+        // The context is disposed before the delegate returns so later TEMPLATE clones are
+        // never blocked by an open connection, which the platform contract requires.
+        await server.EnsureTemplateSeededAsync(
+            static async (templateConnectionString, ct) =>
+            {
+                await using var context = CreateContext(templateConnectionString);
+                await context.Database.MigrateAsync(ct).ConfigureAwait(false);
+            },
+            TemplateDatabase,
+            default).ConfigureAwait(false);
 
         // Fail loudly here rather than silently falling back: a missing database is a failed
         // prerequisite, never a passing mock runtime.
-        await using var connection = new NpgsqlConnection(_database.GetConnectionString());
+        await using var connection = new NpgsqlConnection(server.ServerConnectionString);
         await connection.OpenAsync().ConfigureAwait(false);
     }
 
     public async Task DisposeAsync()
     {
-        if (_database is not null)
+        if (_server is not null)
         {
-            await _database.DisposeAsync().ConfigureAwait(false);
-            _database = null;
+            await _server.DisposeAsync().ConfigureAwait(false);
+            _server = null;
         }
     }
 
-    /// <summary>Creates an empty database on the running server and returns its connection string.</summary>
+    /// <summary>Creates an isolated database on the running server and returns its connection string.</summary>
     public async Task<string> CreateDatabaseAsync(string purpose)
     {
         ArgumentNullException.ThrowIfNull(purpose);
         EnsureRunning();
 
         var name = $"chronicleaf_{purpose}_{Guid.NewGuid():N}"[..40].ToLowerInvariant();
-        await using (var connection = new NpgsqlConnection(ServerConnectionString()))
-        {
-            await connection.OpenAsync().ConfigureAwait(false);
-            await using var command = connection.CreateCommand();
-            command.CommandText = $"CREATE DATABASE \"{name}\"";
-            await command.ExecuteNonQueryAsync().ConfigureAwait(false);
-        }
-
-        return $"Host={_database!.Hostname};Port={_database.GetMappedPublicPort(PostgreSqlBuilder.PostgreSqlPort)};Database={name};Username={Username};Password={Password};Timeout=5;Command Timeout=5";
+        return await Server.CreateIsolatedDatabaseAsync(name, default).ConfigureAwait(false);
     }
 
-    /// <summary>A connection string for the server itself, used to create and drop databases.</summary>
-    private string ServerConnectionString() =>
-        $"Host={_database!.Hostname};Port={_database.GetMappedPublicPort(PostgreSqlBuilder.PostgreSqlPort)};Database=postgres;Username={Username};Password={Password};Timeout=5";
-
     /// <summary>
-    /// Applies the committed EF migrations, exactly as the operator command does. Applying it a
+    /// Applies the committed EF migrations, exactly as the operator command does. Against a
+    /// template clone this is a history-table no-op, kept as an idempotent guard; applying it a
     /// second time is a no-op, which is what the idempotence boundary scenario asserts.
     /// </summary>
     public static async Task MigrateAsync(string connectionString)
@@ -132,7 +150,7 @@ public sealed class ChronicleafPostgresFixture : IAsyncLifetime
 
     private void EnsureRunning()
     {
-        if (_database is null)
+        if (!IsRealPostgres)
         {
             throw new InvalidOperationException("The disposable PostgreSQL fixture is not running.");
         }

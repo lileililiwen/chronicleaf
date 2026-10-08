@@ -50,8 +50,8 @@ namespace Chronicleaf.Integration.Tests;
 /// is named after the scenario it covers.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class GithubGraphqlEnrichmentTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 5, 9, 0, 0, TimeSpan.Zero);
 

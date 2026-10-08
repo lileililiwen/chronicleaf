@@ -40,8 +40,8 @@ namespace Chronicleaf.Integration.Tests;
 /// covered as carry-over. Each test is named after the scenario it covers.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class PublicProjectJourneyTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 14, 9, 0, 0, TimeSpan.Zero);
 

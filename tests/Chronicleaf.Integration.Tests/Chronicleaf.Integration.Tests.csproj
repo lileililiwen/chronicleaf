@@ -13,6 +13,12 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageReference Include="Testcontainers.PostgreSql" Version="4.15.0" />
     <!--
+      PG-ADOPT-001. The assembly-shared PostgreSQL test server the postgres fixture adopts:
+      one pinned-image container per assembly, template seeded once, per-test TEMPLATE clones.
+      Test-support by contract: no production project may reference this package.
+    -->
+    <PackageReference Include="Platform.Persistence.Postgres.Testing" Version="0.1.0" />
+    <!--
       CLOUD-OBJECT-STORAGE-001/002. The S3 SDK the MinIO conformance scenarios drive the real
       platform adapter with, pinned to the version the adopted Platform.Storage.S3 pins, so the
       client the tests build and the adapter agree. No MinIO module package: the container is a

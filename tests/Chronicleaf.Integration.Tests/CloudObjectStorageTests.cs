@@ -50,8 +50,9 @@ namespace Chronicleaf.Integration.Tests;
 /// foreign scope, the project and the media ids a scenario declares in advance.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class CloudObjectStorageTests(ChronicleafPostgresFixture postgres, MinioFixture minio)
-    : IClassFixture<ChronicleafPostgresFixture>, IClassFixture<MinioFixture>, IDisposable
+    : IClassFixture<MinioFixture>, IDisposable
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 6, 12, 0, 0, TimeSpan.Zero);
 

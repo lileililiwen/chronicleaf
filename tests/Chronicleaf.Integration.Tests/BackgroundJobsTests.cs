@@ -41,8 +41,8 @@ namespace Chronicleaf.Integration.Tests;
 /// meaningful if the implementation changes shape.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class BackgroundJobsTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 2, 12, 0, 0, TimeSpan.Zero);
 

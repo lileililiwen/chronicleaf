@@ -60,8 +60,8 @@ namespace Chronicleaf.Integration.Tests;
 /// Nothing upstream is inferred from a row this system wrote.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class PublisherGhostAdapterTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 7, 9, 0, 0, TimeSpan.Zero);
 

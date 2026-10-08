@@ -30,7 +30,8 @@ namespace Chronicleaf.Integration.Tests;
 /// back from the database.
 /// </para>
 /// </remarks>
-public sealed class CommunityAccessTests(ChronicleafPostgresFixture postgres) : IClassFixture<ChronicleafPostgresFixture>
+[Collection(ChronicleafPostgresCollection.Name)]
+public sealed class CommunityAccessTests(ChronicleafPostgresFixture postgres)
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 2, 12, 0, 0, TimeSpan.Zero);
 

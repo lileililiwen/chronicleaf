@@ -44,8 +44,8 @@ namespace Chronicleaf.Integration.Tests;
 /// the scenario it covers.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class StaticBlogExportTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 8, 9, 0, 0, TimeSpan.Zero);
 

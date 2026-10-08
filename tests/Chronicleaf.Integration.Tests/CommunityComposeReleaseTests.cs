@@ -42,8 +42,8 @@ namespace Chronicleaf.Integration.Tests;
 /// host on the retained database) serves identical bytes.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class CommunityComposeReleaseTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 8, 9, 0, 0, TimeSpan.Zero);
 

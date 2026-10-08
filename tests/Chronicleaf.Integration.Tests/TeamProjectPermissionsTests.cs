@@ -33,8 +33,8 @@ namespace Chronicleaf.Integration.Tests;
 /// the grant: it is stored as a hash, disclosed exactly once, single-use and bound to 7 days.
 /// </para>
 /// </remarks>
+[Collection(ChronicleafPostgresCollection.Name)]
 public sealed class TeamProjectPermissionsTests(ChronicleafPostgresFixture postgres)
-    : IClassFixture<ChronicleafPostgresFixture>
 {
     private static readonly DateTimeOffset Clock = new(2026, 10, 16, 12, 0, 0, TimeSpan.Zero);
 

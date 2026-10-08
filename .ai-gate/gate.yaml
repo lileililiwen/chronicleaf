@@ -1,0 +1,28 @@
+version: 1
+runtime: driftwatchdog
+profile: chronicleaf-gate
+# verify-gate-adoption: project-defined profile — the gate schedules exactly
+# the checks below, each bound under `commands:`. An unbound required check
+# would be UNBOUND and fail, so every declared check has a command. Native
+# gate.toml wins on conflict per the sibling's resolution order, so no
+# gate.toml may exist alongside this file (GATE-ADOPT-001 Boundary).
+checks:
+  platform-feed: true
+  web-scaffolding-lint: true
+  dotnet: true
+  frontend-build: true
+  frontend-depth: true
+  e2e-browser: true
+commands:
+  platform-feed: "bash scripts/gate/platform-feed.sh"
+  web-scaffolding-lint: "bash scripts/gate/web-scaffolding-lint.sh"
+  dotnet: "bash scripts/gate/dotnet-tests.sh"
+  frontend-build: "bash scripts/gate/frontend-build.sh"
+  frontend-depth: "bash scripts/gate/frontend-depth.sh"
+  e2e-browser: "bash scripts/gate/e2e-browser.sh"
+timeouts:
+  dotnet: 3600000
+  frontend-build: 1200000
+  frontend-depth: 3600000
+  e2e-browser: 3600000
+blocking: [FAIL, REVIEW_REQUIRED]

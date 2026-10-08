@@ -9,8 +9,59 @@ archived and the two owner-BLOCKED changes are deferred to ROADMAP for later
 `hosted-managed-ai`: provider/model/quota/unit weights plus financial settlement policy — both
 packages parked intact in `openspec/deferred/`, nothing active remains).
 
-Next: `current_spec` is `web-form-feedback`, the next package in drain order after
-`web-token-sweep`.
+Next: `current_spec` is `web-perf-and-animation`, the next package in drain order after
+`web-form-feedback`.
+
+Next: `web-form-feedback` is archived
+(`617c44d`, canonical spec `openspec/specs/web-form-feedback/spec.md`):
+five closed form-feedback gaps on the Web client, frontend-only, no backend
+byte changed. One module-level toast store (`features/ui-feedback/Toast.tsx`:
+`showToast`/`dismissToast`/`useToast` over `useSyncExternalStore`, latest
+replaces, 4s auto-dismiss) rendered once as a `role="status"`
+`aria-live="polite"` region fixed top-center in `ProductShell`, so a save
+that navigates away still announces; success toasts (`Milestone saved.`,
+`Project saved.`, `Client saved.`, `Credential stored./removed.`, `Saved as
+a new revision.`, `Revision approved.`, `Approval withdrawn.`) and failure
+toasts (inline-notice message verbatim) wired into `MilestoneEditor`,
+`ProjectEditor`, `ClientForm`, `CredentialVaultPanel` (save + remove) and
+`MarkdownReviewPanel` (save + approve + unapprove), inline notices kept
+beside every toast. The review editor gains `review__edit--dirty` (gold
+left border, `var(--border-flag)` + `var(--shell-accent)`, tokens only) and
+an `Unsaved changes` `badge--pending` tag in the new `review-title-row`
+while dirty, both cleared through the existing `load()` on save. One
+`formatRevisionConflict(storedRevision)` helper owns the stale-revision
+sentence entity-neutrally in all three panels (the review
+`revision_conflict` branch drops its `(code)` suffix to stay byte-identical;
+`ReviewApiError` gains an additive `storedRevision` getter mirroring
+`MilestoneApiError`). Capture URL label names `(up to 3, at least 1
+required)` matching the existing submit guard, and the empty state links to
+the form via `#capture-form` (`id` added; anchor withheld when archived).
+Seven `<small data-testid="<field>-count">` counters read live `n / max`
+(milestone title/version/notes, project name/description, client name/notes;
+client notes gains the delivered `Client.NotesMaxLength` 20000); each vault
+row wraps in `fieldset` with the provider name as `legend` (existing name
+span kept) and the viewport group keeps its `Viewports` legend. Verification
+found one real defect, none worked around: the empty live region is zero-size
+so `toBeVisible` fails on it — the suite asserts attached while empty and
+visible content once shown, re-proven 8/8. Evidence, all run by the
+implementer rather than taken on report:
+`node scripts/check-openspec-change-names.mjs` exit 0,
+`openspec validate --all --strict --no-interactive` 67/67 with no
+`--skip-specs`; `npm ci`, `tsc --noEmit` exit 0, `vite build` exit 0
+(chunk-size warning only); `npx playwright test tests/form-feedback.spec.ts`
+8/8 standalone (Vite dev server plus route-mocked `/api/*`, no database:
+toast on project save + dismiss, toast surviving milestone post-save
+navigation, vault toast auto-dismiss ~4s, dirty tag + computed gold border
+`rgb(217, 164, 65)` + clear on save, helper exact sentences + all three
+imports, capture hint + anchor + viewport legend, client counters + save
+toast, all 8 provider fieldset legends); `tests/token-sweep.spec.ts` still
+5/5 over the appended token-only CSS. Full `CHRONICLEAF_E2E=1 bash
+scripts/verify.sh` is deferred to the end of the batch per the batch plan
+and was NOT run here; no claim is made about the other suites beyond their
+selectors and testids surviving verbatim. `git diff --check` clean. No
+secret-bearing captures; dist/test-results artifacts never committed.
+Deployment stays `deployable: false`; there is no remote, no push and no
+publication.
 
 Next: `web-token-sweep` is archived
 (`f07b60c`, canonical spec `openspec/specs/web-token-sweep/spec.md`):
@@ -324,6 +375,7 @@ two owner-BLOCKED changes stay deferred to ROADMAP. Deployment stays
 | 59 | `web-accessibility-roles` | `31b146b` | `openspec/specs/web-accessibility-roles/spec.md` |
 | 60 | `web-responsive-shell` | `dce359f` | `openspec/specs/web-responsive-shell/spec.md` |
 | 61 | `web-token-sweep` | `f07b60c` | `openspec/specs/web-token-sweep/spec.md` |
+| 62 | `web-form-feedback` | `617c44d` | `openspec/specs/web-form-feedback/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)

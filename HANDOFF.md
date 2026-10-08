@@ -464,9 +464,43 @@ two owner-BLOCKED changes stay deferred to ROADMAP. Deployment stays
 | 62 | `web-form-feedback` | `617c44d` | `openspec/specs/web-form-feedback/spec.md` |
 | 63 | `web-perf-and-animation` | `d90ca3d` | `openspec/specs/web-perf-and-animation/spec.md` |
 | 64 | `verify-gate-adoption` | `4ac2e08` | `openspec/specs/verify-gate-adoption/spec.md` |
+| 65 | `platform-testing-postgres-adoption` | `d618180` | `openspec/specs/platform-testing-postgres-adoption/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
-ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
+ever used. `platform-testing-postgres-adoption` (row 65, commit `d618180`, canonical spec
+`openspec/specs/platform-testing-postgres-adoption/spec.md`): test-infrastructure only, zero
+product-code change (no C# outside `tests/`, no TSX, no migration, no API, no envelope — `git diff`
+names test infra, `e2e.sh`, feed, and the archived change only). The sibling
+`Platform.Persistence.Postgres.Testing` 0.1.0 is adopted as a published artifact (reconnaissance
+decision ADOPT, like `platform-jobs-adoption`; no sibling edit): `scripts/pack-platform.sh` lists it,
+`packages/platform-feed/` carries the new `.nupkg` (the 6 existing nupkgs restored byte-identical
+after the re-pack), the test project pins exactly `0.1.0`, and `scripts/verify-platform-feed.sh`
+enforces the pin plus the production-side ban with the same cold-restore discipline. Dotnet:
+`ChronicleafPostgresFixture.cs` is a thin adapter over one assembly-shared `PostgresTestServer`
+(static `StartAsync` factory — the one API correction found at build time), template
+`chronicleaf_template` seeded once with the existing EF `MigrateAsync` as the delegate, per-test
+`TEMPLATE` clones with GUID names kept; ~50 classes moved from `IClassFixture` to one
+`CollectionDefinition` (constructor injection unchanged, assertions byte-identical);
+`MinioFixture` inspected and left per-class (exactly one consumer). `scripts/e2e.sh`: ONE container,
+seed template migrated once, per-suite `TEMPLATE` clones with per-suite DB names/ports/tokens/servers
+unchanged, 30 suites N-way parallel (`CHRONICLEAF_E2E_JOBS`, default 4) with per-suite
+`playwright-<suite>.log` + `server-<suite>.log` and aggregated failure reporting naming failed
+suites; `workers: 1` kept (empty-state claims share one DB); token cleanup completed with the three
+missing entries (candidates/narrative/variants). Evidence, all run by the implementer rather than
+taken on report: `node scripts/check-openspec-change-names.mjs` exit 0,
+`openspec validate --all --strict --no-interactive` 70/70 with no `--skip-specs`;
+`dotnet build Chronicleaf.sln --nologo` 0 errors, 0 warnings;
+`bash scripts/verify-platform-feed.sh` passed including the cold restore resolving the new package;
+proof (a) `dotnet test --filter` on exactly `MediumImportPackageTests` + `MilestoneTimelineTests` +
+the new proof tests 16/16 green with exactly 1 new `postgres:17.6-alpine` container observed and the
+two proof classes asserting equal `ContainerId` with distinct clone databases; proof (b) the
+timeline e2e suite 3/3 end-to-end in ~28s through shared-boot + `TEMPLATE`-clone + per-suite server.
+LIGHT verification only: the full gate runs once at the end of the batch by the coordinator via the
+new runner, not here; no claim is made about the other 29 e2e suites beyond their DB names, seeds,
+and selectors surviving verbatim. No `current_spec` remains: the batch is still complete — this
+change is test infrastructure. Deployment stays `deployable: false`; there is no remote, no push
+and no publication.
+`platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)
 after the `background-jobs` deviation below was found, and validated before implementation.
 
 **Release evidence (`community-compose-release`, commit `5a40d46`, all run by the implementer

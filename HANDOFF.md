@@ -9,8 +9,52 @@ archived and the two owner-BLOCKED changes are deferred to ROADMAP for later
 `hosted-managed-ai`: provider/model/quota/unit weights plus financial settlement policy — both
 packages parked intact in `openspec/deferred/`, nothing active remains).
 
-Next: `current_spec` is `web-token-sweep`, the next package in drain order after
-`web-responsive-shell`.
+Next: `current_spec` is `web-form-feedback`, the next package in drain order after
+`web-token-sweep`.
+
+Next: `web-token-sweep` is archived
+(`f07b60c`, canonical spec `openspec/specs/web-token-sweep/spec.md`):
+pure CSS sweep with zero visual change, frontend-only, no backend byte
+changed and no `.tsx` byte changed. All 200+ raw sizing literals in
+`styles.css` now reference tokens (existing `--space-1..7`,
+`--font-size-*`, `--radius-*` where values matched; 39 value-exact
+additions in `tokens.css` where none fit: twelve `--space-<px>px`
+steps, six `--font-size-*`, `--line-height-snug`/`--line-height-draft`,
+`--tracking-tight`/`--tracking-tighter`/`--tracking-wide`,
+`--border-thin`/`--border-flag`/`--ring-width`/`--ring-offset`,
+`--radius-large`, eleven measure/layout tokens — zero existing token
+value changed); hex was already absent outside `tokens.css` and is now
+pinned; every raw `line-height` takes its line-height token and every
+raw `letter-spacing` takes its tracking token. Literal survivors are
+exactly the closed set: unitless `0`, `100%`, `z-index` integers,
+media-query `px` breakpoints, and the `1fr` fraction; comments were
+reworded off numeric literals so a naive grep agrees. The new
+`tests/token-sweep.spec.ts` runs standalone (no server, no database,
+not wired into `scripts/e2e.sh`): stripped-source sizing grep zero,
+zero hex in source with the built-`dist` hex set equal to the token
+hex set, every `line-height:`/`letter-spacing:` referencing `var()`,
+plus 50 computed-style probes equal to the pre-change values captured
+at the start of the run (body `16px`, shell padding `32px`, card
+padding `16px`, action padding `8px 15px`, nav gap `6px`, page heading
+`28px`, notice/fabricated-finding and draft/review line-heights
+`22.5/24/21.7/23.68px`). Verification found one real defect, none
+worked around: the mechanical pass nested a `var()` inside the new
+`--space-2px` name on `.badge` (padding read `0px` instead of `2px`,
+caught by the computed diff, fixed to a direct reference and
+re-proven identical on all 50 probes). Evidence, all run by the
+implementer rather than taken on report:
+`node scripts/check-openspec-change-names.mjs` exit 0,
+`openspec validate --all --strict --no-interactive` 66/66 with no
+`--skip-specs`; `npm ci`, `tsc --noEmit` exit 0, `vite build` exit 0
+(chunk-size warning only); `npx playwright test
+tests/token-sweep.spec.ts` 5/5 standalone. Full
+`CHRONICLEAF_E2E=1 bash scripts/verify.sh` is deferred to the end of
+the batch per the batch plan and was NOT run here; no claim is made
+about the other suites beyond their selectors and testids surviving
+verbatim (no `.tsx` file was touched, so no migration was needed).
+`git diff --check` clean. No secret-bearing captures;
+dist/test-results artifacts never committed. Deployment stays
+`deployable: false`; there is no remote, no push and no publication.
 
 Next: `web-responsive-shell` is archived
 (`dce359f`, canonical spec `openspec/specs/web-responsive-shell/spec.md`):
@@ -279,6 +323,7 @@ two owner-BLOCKED changes stay deferred to ROADMAP. Deployment stays
 | 58 | `web-accessibility-core` | `cdac4a7` | `openspec/specs/web-accessibility-core/spec.md` |
 | 59 | `web-accessibility-roles` | `31b146b` | `openspec/specs/web-accessibility-roles/spec.md` |
 | 60 | `web-responsive-shell` | `dce359f` | `openspec/specs/web-responsive-shell/spec.md` |
+| 61 | `web-token-sweep` | `f07b60c` | `openspec/specs/web-token-sweep/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)

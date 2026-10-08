@@ -6,6 +6,8 @@ import { approveAsset, editAsset, exportAsset, readReview, unapproveAsset } from
 import type { ExportFormat } from './api';
 import { renderSafeMarkdown } from './sanitize';
 import { ReviewApiError, type ContentReview } from './types';
+import { formatRevisionConflict } from '../ui-feedback/revisionConflict';
+import { useToast } from '../ui-feedback/Toast';
 
 /**
  * Human editing, approval and export of one milestone's Markdown draft
@@ -60,6 +62,8 @@ export function MarkdownReviewPanel({
   const [approveFailure, setApproveFailure] = useState<ReviewApiError | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportFailure, setExportFailure] = useState<ReviewApiError | null>(null);
+  // WEB-FEED-001: outcomes are announced through the shell-level toast region.
+  const { showToast } = useToast();
 
   const load = useCallback(async () => {
     setReading(true);
@@ -111,13 +115,16 @@ export function MarkdownReviewPanel({
         // than rewriting it with an identical value through a different path.
         title: title === (draft.title ?? '') ? null : title,
       });
+      showToast('Saved as a new revision.', 'ok');
       await load();
     } catch (thrown) {
-      setSaveFailure(asReviewError(thrown));
+      const failure = asReviewError(thrown);
+      setSaveFailure(failure);
+      showToast(describeFailure(failure), 'error');
     } finally {
       setSaving(false);
     }
-  }, [body, draft, load, title]);
+  }, [body, draft, load, showToast, title]);
 
   const approve = useCallback(async () => {
     if (draft?.assetId == null || draft.currentRevision == null) {
@@ -139,13 +146,16 @@ export function MarkdownReviewPanel({
         contentRevision: draft.currentRevision,
         evidenceRevision: head.revision,
       });
+      showToast('Revision approved.', 'ok');
       await load();
     } catch (thrown) {
-      setApproveFailure(asReviewError(thrown));
+      const failure = asReviewError(thrown);
+      setApproveFailure(failure);
+      showToast(describeFailure(failure), 'error');
     } finally {
       setApproving(false);
     }
-  }, [draft, load, milestoneId]);
+  }, [draft, load, milestoneId, showToast]);
 
   const unapprove = useCallback(async () => {
     if (draft?.assetId == null) {
@@ -157,13 +167,16 @@ export function MarkdownReviewPanel({
 
     try {
       await unapproveAsset(draft.assetId, null);
+      showToast('Approval withdrawn.', 'ok');
       await load();
     } catch (thrown) {
-      setApproveFailure(asReviewError(thrown));
+      const failure = asReviewError(thrown);
+      setApproveFailure(failure);
+      showToast(describeFailure(failure), 'error');
     } finally {
       setApproving(false);
     }
-  }, [draft, load]);
+  }, [draft, load, showToast]);
 
   const download = useCallback(async (format: ExportFormat) => {
     if (draft?.assetId == null) {
@@ -280,10 +293,17 @@ export function MarkdownReviewPanel({
           )}
 
           {canEdit ? (
-            <div data-testid="review-editor">
-              <label className="session__label" htmlFor="review-title">
-                Title
-              </label>
+            <div className={dirty ? 'review__edit review__edit--dirty' : 'review__edit'} data-testid="review-editor">
+              <div className="review__title-row" data-testid="review-title-row">
+                <label className="session__label" htmlFor="review-title">
+                  Title
+                </label>
+                {dirty ? (
+                  <span className="badge badge--pending" data-testid="review-dirty-tag">
+                    Unsaved changes
+                  </span>
+                ) : null}
+              </div>
               <input
                 id="review-title"
                 className="session__input"
@@ -471,7 +491,9 @@ function describeFailure(failure: ReviewApiError): string {
   }
 
   if (failure.isRevisionConflict) {
-    return `The revision moved while it was being read (${failure.code}). Re-read the current state and decide again.`;
+    // WEB-FEED-003: the one shared conflict sentence, byte-identical with the
+    // milestone and project editors for the same stored revision.
+    return formatRevisionConflict(failure.storedRevision);
   }
 
   return `${failure.message} (${failure.code})`;

@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { archiveClient, createClient, listClients, updateClient } from './api';
 import { AgencyApiError } from './types';
 import type { AgencyClient } from './types';
+import { FieldCount } from '../ui-feedback/FieldCount';
+import { useToast } from '../ui-feedback/Toast';
 
 /**
  * The agency Clients area (AGENCY-AREA-UI-001).
@@ -244,6 +246,8 @@ export function ClientForm({
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<AgencyApiError | null>(null);
+  // WEB-FEED-001: outcomes are announced through the shell-level toast region.
+  const { showToast } = useToast();
 
   const save = useCallback(async () => {
     setSaving(true);
@@ -254,13 +258,16 @@ export function ClientForm({
         initial === null
           ? await createClient({ name: name.trim(), notes })
           : await updateClient(initial.id, initial.revision, { name: name.trim(), notes });
+      showToast('Client saved.', 'ok');
       onSaved(saved);
     } catch (thrown) {
-      setFailure(toAgencyError(thrown));
+      const apiError = toAgencyError(thrown);
+      setFailure(apiError);
+      showToast(apiError.message, 'error');
     } finally {
       setSaving(false);
     }
-  }, [initial, name, notes, onSaved]);
+  }, [initial, name, notes, onSaved, showToast]);
 
   return (
     <form
@@ -284,6 +291,7 @@ export function ClientForm({
           maxLength={160}
           onChange={(event) => setName(event.target.value)}
         />
+        <FieldCount value={name} max={160} testId="client-form-name-count" />
       </p>
       <p>
         <label htmlFor="client-form-notes">Notes</label>
@@ -291,8 +299,10 @@ export function ClientForm({
           id="client-form-notes"
           data-testid="client-form-notes"
           value={notes}
+          maxLength={20000}
           onChange={(event) => setNotes(event.target.value)}
         />
+        <FieldCount value={notes} max={20000} testId="client-form-notes-count" />
       </p>
       <p className="view__actions">
         <button

@@ -89,6 +89,18 @@ export class ReviewApiError extends Error {
     return this.code === 'media_unavailable';
   }
 
+  /**
+   * The stored revision the server named, when the refusal was a stale-revision conflict.
+   * WEB-FEED-003: mirrors `MilestoneApiError.storedRevision` so the review panel's
+   * `describeFailure` can render the one shared conflict sentence.
+   */
+  get storedRevision(): number | null {
+    const named = this.fieldErrors['If-Match']?.[0];
+    const matched = named ? /(\d+)/.exec(named) : null;
+
+    return matched ? Number.parseInt(matched[1], 10) : null;
+  }
+
   /** The first message recorded for a field, for showing next to that field. */
   messageFor(field: string): string | null {
     return this.fieldErrors[field]?.[0] ?? null;

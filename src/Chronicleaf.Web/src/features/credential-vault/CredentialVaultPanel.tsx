@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useCredentials } from './useCredentials';
 import { CREDENTIAL_PROVIDERS, providerHint, providerLabel } from './types';
 import type { CredentialProvider } from './types';
+import { useToast } from '../ui-feedback/Toast';
 
 /**
  * The credential settings surface, rendered only for a signed-in owner like every other product area.
@@ -30,6 +31,8 @@ export function CredentialVaultPanel() {
   const credentials = useCredentials();
   const [drafts, setDrafts] = useState<Readonly<Record<string, string>>>({});
   const [cleared, setCleared] = useState<Readonly<Record<string, boolean>>>({});
+  // WEB-FEED-001: outcomes are announced through the shell-level toast region.
+  const { showToast } = useToast();
 
   const draftFor = (provider: CredentialProvider): string => drafts[provider] ?? '';
   const isCleared = (provider: CredentialProvider): boolean => cleared[provider] === true;
@@ -75,6 +78,13 @@ export function CredentialVaultPanel() {
 
           return (
             <li key={provider} className="card" data-testid={`credential-${provider}`}>
+              {/* WEB-FEED-005. Each provider row is a fieldset grouped under the
+                  provider's name. The existing name span stays beside the legend
+                  so vault suites keep their hooks verbatim. */}
+              <fieldset className="credential__fieldset">
+                <legend className="credential__legend" data-testid={`credential-${provider}-legend`}>
+                  {providerLabel(provider)}
+                </legend>
               <span className="card__name" data-testid={`credential-${provider}-name`}>
                 {providerLabel(provider)}
               </span>
@@ -151,6 +161,9 @@ export function CredentialVaultPanel() {
                       // back: the server will not return it.
                       setDrafts((current) => ({ ...current, [provider]: '' }));
                       setCleared((current) => ({ ...current, [provider]: true }));
+                      showToast('Credential stored.', 'ok');
+                    } else {
+                      showToast('The credential was not stored.', 'error');
                     }
                   }}
                 >
@@ -163,7 +176,13 @@ export function CredentialVaultPanel() {
                     className="action"
                     data-testid={`credential-${provider}-delete`}
                     disabled={busy}
-                    onClick={() => void credentials.remove(provider)}
+                    onClick={async () => {
+                      const removed = await credentials.remove(provider);
+                      showToast(
+                        removed ? 'Credential removed.' : 'The credential was not removed.',
+                        removed ? 'ok' : 'error',
+                      );
+                    }}
                   >
                     Remove
                   </button>
@@ -185,6 +204,7 @@ export function CredentialVaultPanel() {
                   {refusal.message} ({refusal.code})
                 </p>
               ) : null}
+              </fieldset>
             </li>
           );
         })}

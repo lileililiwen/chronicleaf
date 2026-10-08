@@ -2,6 +2,9 @@ import { useState } from 'react';
 
 import { MilestoneApiError, createProject, updateProject } from './api';
 import type { ProjectDraft } from './types';
+import { FieldCount } from '../ui-feedback/FieldCount';
+import { formatRevisionConflict } from '../ui-feedback/revisionConflict';
+import { useToast } from '../ui-feedback/Toast';
 
 /**
  * Creating a project, and editing one that already exists.
@@ -27,6 +30,8 @@ export function ProjectEditor({
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<MilestoneApiError | null>(null);
   const [conflict, setConflict] = useState<string | null>(null);
+  // WEB-FEED-001: outcomes are announced through the shell-level toast region.
+  const { showToast } = useToast();
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -46,20 +51,22 @@ export function ProjectEditor({
           ? await createProject(draft)
           : await updateProject(project.id, project.revision, draft);
 
+      showToast('Project saved.', 'ok');
       onSaved(saved.id);
+      return;
     } catch (thrown) {
       const apiError = thrown instanceof MilestoneApiError ? thrown : null;
 
       if (apiError?.status === 409) {
         // Somebody else's edit landed first. The values in this form were not written, and the
-        // owner is told that rather than being left to assume they were.
-        setConflict(
-          apiError.storedRevision === null
-            ? 'This project changed since you opened it, so your edit was not saved.'
-            : `This project changed since you opened it (the stored revision is ${apiError.storedRevision}). Your edit was not saved.`,
-        );
+        // owner is told that rather than being left to assume they were. WEB-FEED-003: the one
+        // shared conflict sentence; the inline notice below renders the same words.
+        const copy = formatRevisionConflict(apiError.storedRevision);
+        setConflict(copy);
+        showToast(copy, 'error');
       } else {
         setFailure(apiError);
+        showToast(apiError?.message ?? 'The project was not saved.', 'error');
       }
     } finally {
       setBusy(false);
@@ -87,6 +94,7 @@ export function ProjectEditor({
             onChange={(event) => setName(event.target.value)}
             data-testid="project-name-input"
           />
+          <FieldCount value={name} max={120} testId="project-name-count" />
           {failure?.messageFor('name') ? (
             <p
               className="form__error"
@@ -112,6 +120,7 @@ export function ProjectEditor({
             onChange={(event) => setDescription(event.target.value)}
             data-testid="project-description-input"
           />
+          <FieldCount value={description} max={2000} testId="project-description-count" />
         </div>
 
         <div className="form__field">

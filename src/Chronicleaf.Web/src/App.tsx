@@ -7,6 +7,7 @@ import { ProjectArea } from './features/projects-and-milestones/ProjectArea';
 import { useRoute } from './features/projects-and-milestones/useRoute';
 import type { Route } from './features/projects-and-milestones/useRoute';
 import { PublicJourneyView } from './features/journey-publish/PublicJourneyView';
+import { ToastRegion } from './features/ui-feedback/Toast';
 
 /** Visible identity of the shell. The brand mark links home; it is a nav control, not a heading. */
 export const BRAND = 'Chronicleaf';
@@ -144,6 +145,13 @@ function ProductShell({ session }: { readonly session: OwnerSessionState }) {
   return (
     <div className="shell shell--app" data-testid="app-shell">
       <SkipLink />
+      {/*
+        WEB-FEED-001. The one toast region for form outcomes. It lives in the
+        shell rather than in any panel, so a toast shown by a save that
+        navigates away survives the navigation instead of unmounting with
+        the form.
+      */}
+      <ToastRegion />
       <div className="app">
         <header className="app__header">
           <button type="button" className="app__brand" onClick={() => go('/')} data-testid="brand-home">

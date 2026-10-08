@@ -1454,3 +1454,81 @@ main:focus {
     grid-template-columns: repeat(auto-fit, minmax(var(--measure-card), 1fr));
   }
 }
+
+/* WEB-FEED-001/002/005: form-feedback elements. Every value references a
+   token: no raw sizing, color, line-height or tracking is declared here, so
+   the token-sweep source oracles keep passing unchanged. */
+.toast-region {
+  position: fixed;
+  top: var(--space-3);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1001;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: var(--measure-card);
+  background: var(--color-surface);
+  color: var(--color-foreground);
+  border: var(--border-thin) solid var(--shell-border);
+  border-radius: var(--radius-medium);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-body);
+  pointer-events: auto;
+}
+
+.toast--error {
+  border-color: var(--color-error-border);
+  color: var(--color-error);
+}
+
+.toast__dismiss {
+  background: transparent;
+  border: var(--border-thin) solid var(--shell-border);
+  border-radius: var(--radius-small);
+  color: var(--shell-muted);
+  padding: var(--space-2px) var(--space-2);
+  font-size: var(--font-size-small);
+}
+
+.form__count {
+  display: block;
+  margin: 0;
+  color: var(--shell-muted);
+  font-size: var(--font-size-caption);
+}
+
+.review__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.review__edit--dirty {
+  border-left: var(--border-flag) solid var(--shell-accent);
+  padding-left: var(--space-3);
+}
+
+.credential__fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-3);
+  border: var(--border-thin) solid var(--shell-border);
+  border-radius: var(--radius-card);
+}
+
+.credential__legend {
+  padding: 0 var(--space-2px);
+  color: var(--shell-muted);
+  font-size: var(--font-size-small);
+}

@@ -109,6 +109,16 @@ export function ScreenshotCapturePanel({
             This milestone has no candidates. That is what is stored - it is not a placeholder and not
             a failed read. Ask for a capture below and the pictures will appear here once the job has
             run; a capture is bounded browser work, so it is answered by a job and not immediately.
+            {/* WEB-FEED-004. The anchor is offered only when the form below exists:
+                an archived milestone keeps its screenshots with no form to link to. */}
+            {archived ? null : (
+              <>
+                {' '}
+                <a href="#capture-form" data-testid="capture-empty-link">
+                  Go to the capture form
+                </a>
+              </>
+            )}
           </p>
         </div>
       ) : (
@@ -130,6 +140,7 @@ export function ScreenshotCapturePanel({
       ) : (
         <form
           className="evidence__form"
+          id="capture-form"
           data-testid="capture-form"
           onSubmit={(event) => {
             event.preventDefault();
@@ -151,7 +162,7 @@ export function ScreenshotCapturePanel({
           </p>
 
           <label className="session__label" htmlFor="capture-url">
-            The pages to photograph (up to {CAPTURE_BOUNDS.maximumPages})
+            The pages to photograph (up to {CAPTURE_BOUNDS.maximumPages}, at least 1 required)
           </label>
           <input
             id="capture-url"

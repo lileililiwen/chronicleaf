@@ -3,6 +3,9 @@ import { useState } from 'react';
 import { MilestoneApiError, createMilestone, getProject, updateMilestone } from './api';
 import { useProject } from './useRecords';
 import { MILESTONE_TYPES, type Milestone, type MilestoneDraft, type MilestoneType } from './types';
+import { FieldCount } from '../ui-feedback/FieldCount';
+import { formatRevisionConflict } from '../ui-feedback/revisionConflict';
+import { useToast } from '../ui-feedback/Toast';
 
 /**
  * The milestone editor: create one, or edit one that exists.
@@ -41,6 +44,9 @@ export function MilestoneEditor({
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<MilestoneApiError | null>(null);
   const [conflict, setConflict] = useState<string | null>(null);
+  // WEB-FEED-001: outcomes are announced through the shell-level toast region,
+  // so a save that navigates away still leaves a trace it happened.
+  const { showToast } = useToast();
   // WEB-RESP-006: the stored project name for the crumb chain above the h1.
   const project = useProject(getProject, projectId);
 
@@ -72,18 +78,20 @@ export function MilestoneEditor({
         await updateMilestone(milestone.id, milestone.revision, draft);
       }
 
+      showToast('Milestone saved.', 'ok');
       onSaved();
     } catch (thrown) {
       const apiError = thrown instanceof MilestoneApiError ? thrown : null;
 
       if (apiError?.status === 409) {
-        setConflict(
-          apiError.storedRevision === null
-            ? 'This milestone changed since you opened it, so your edit was not saved.'
-            : `This milestone changed since you opened it (the stored revision is ${apiError.storedRevision}). Your edit was not saved.`,
-        );
+        // WEB-FEED-003: the one shared conflict sentence; the inline notice
+        // below renders the same words.
+        const copy = formatRevisionConflict(apiError.storedRevision);
+        setConflict(copy);
+        showToast(copy, 'error');
       } else {
         setFailure(apiError);
+        showToast(apiError?.message ?? 'The milestone was not saved.', 'error');
       }
     } finally {
       setBusy(false);
@@ -131,6 +139,7 @@ export function MilestoneEditor({
             onChange={(event) => setTitle(event.target.value)}
             data-testid="milestone-title-input"
           />
+          <FieldCount value={title} max={160} testId="milestone-title-count" />
           <FieldError failure={failure} field="title" testId="milestone-title-error" />
         </div>
 
@@ -174,6 +183,7 @@ export function MilestoneEditor({
               onChange={(event) => setVersion(event.target.value)}
               data-testid="milestone-version-input"
             />
+            <FieldCount value={version} max={80} testId="milestone-version-count" />
             <FieldError failure={failure} field="version" testId="milestone-version-error" />
           </div>
         </div>
@@ -214,6 +224,7 @@ export function MilestoneEditor({
             onChange={(event) => setNotes(event.target.value)}
             data-testid="milestone-notes-input"
           />
+          <FieldCount value={notes} max={20000} testId="milestone-notes-count" />
           <FieldError failure={failure} field="notes" testId="milestone-notes-error" />
         </div>
 

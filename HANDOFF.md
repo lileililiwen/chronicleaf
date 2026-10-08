@@ -9,8 +9,67 @@ archived and the two owner-BLOCKED changes are deferred to ROADMAP for later
 `hosted-managed-ai`: provider/model/quota/unit weights plus financial settlement policy — both
 packages parked intact in `openspec/deferred/`, nothing active remains).
 
-Next: `current_spec` is `web-accessibility-roles`, the next package in drain order after
-`web-accessibility-core`.
+Next: `current_spec` is `web-responsive-shell`, the next package in drain order after
+`web-accessibility-roles`.
+
+Next: `web-accessibility-roles` is archived
+(`31b146b`, canonical spec `openspec/specs/web-accessibility-roles/spec.md`):
+five closed roles gaps on the Web client, frontend-only, no backend byte
+changed. Every feature panel retagged to one `h1` per view with
+`h1→h2→h3` and no skips (tags only — every class and `data-testid`
+verbatim): milestone-row titles `h3→h2` with `h3` subsections,
+`ProjectTimeline` `h3→h2` with `h3` dates, row detail panels
+(evidence, syncs, picker, generation, draft, review, capture)
+`h4→h3` with `h4` children, project-level panels (connections,
+candidates, publication, journey, export, evolution images/GIFs)
+and team/tenancy sections to `h2`, voice drafts/profile/check to
+`h2` with the draft view at `h3`. Selection speaks one vocabulary:
+`aria-current="page"` kept on both navs, the timeline picker gains
+the missing `role="group"` + `aria-label` over its `aria-pressed`
+chips, and the voice toggle gains `aria-controls="voice-panels"`
+onto the matching panel `id`. An explicit `isActive` branch names
+`/settings/credentials` (no new nav entry; unknown settings
+sub-routes highlight nothing). Every `badge--ok` / `badge--pending`
+/ `badge--muted` render (9 sites: dashboard, projects list, client
+cards, milestone rows, timeline entries, evidence bundles/items,
+curation primary, credential rows) gains a data-status-derived
+`Status: ` accessible name with the visible word untouched, so
+exact-text assertions keep passing unmodified — a hidden span was
+rejected for joining badge text content and breaking four existing
+suites. Touch floor `min-block-size: 2.5rem` on `.action`,
+`.filter` and `button.link` (with comfortable padding on the
+latter); nav rows and card rows keep their layout. The new
+`tests/a11y-roles.spec.ts` runs as its own e2e group (suite 29, own
+disposable PostgreSQL, no seed): Playwright sorts spec files
+alphabetically, so the suite-1 placement first tried ran these
+record-creating tests before the emptiness suites and failed two
+unrelated projects-and-milestones claims — the suite was moved and
+the rerun is fully green. Evidence, all run by the implementer
+rather than taken on report:
+`node scripts/check-openspec-change-names.mjs` exit 0,
+`openspec validate --all --strict --no-interactive` 64/64 before and
+after the archive, which used no `--skip-specs`; `npm ci`,
+`tsc --noEmit` exit 0, `vite build` exit 0 (chunk-size warning only);
+`CHRONICLEAF_E2E=1 bash scripts/verify.sh` exit 0 with
+`set -o pipefail` and explicit `GATE_EXIT=0`: platform-feed stage,
+all dotnet filter stages green (each asserted to select ≥1 test),
+frontend install/build, bundle lint, 143/143 Playwright across 29
+database-isolated suites (suite 1: 36 = 4 shell + 7 a11y-core + 5
+jobs + 5 access + 8 product-shell-ux + 7 projects, emptiness claims
+intact; suite 29: 10/10 new `a11y-roles`: heading order on 7 static
+views + 6 project areas + timeline-with-choice, chips grouped +
+pressed, voice disclosure named + resolving, deep-linked credentials
+nav active + unknown sub-route unhighlighted, `Status: ` name on
+every modifier badge, ≥40px on sampled action/filter/link
+controls). One earlier full-gate attempt died in the unrelated
+publisher-devto stage on the known xUnit class-cleanup
+`TaskCanceledException` with 12/12 tests passed (the recorded
+environment teardown flake); the rerun below is fully green.
+`dotnet build` 0 errors, same 2 pre-existing warnings as HEAD (CS0649
+ScreenshotCandidate, CS0618 HasCheckConstraint). `git diff --check`
+clean. No secret-bearing captures; dist/test-results artifacts never
+committed. Deployment stays `deployable: false`; there is no remote,
+no push and no publication.
 
 Next: `web-accessibility-core` is archived
 (`cdac4a7`, canonical spec `openspec/specs/web-accessibility-core/spec.md`):
@@ -170,6 +229,7 @@ two owner-BLOCKED changes stay deferred to ROADMAP. Deployment stays
 | 56 | `publisher-adapter-panels` | `13b2cb8` | `openspec/specs/publisher-adapter-panels/spec.md` |
 | 57 | `content-pack-panels` | `b7d1dd7` | `openspec/specs/content-pack-panels/spec.md` |
 | 58 | `web-accessibility-core` | `cdac4a7` | `openspec/specs/web-accessibility-core/spec.md` |
+| 59 | `web-accessibility-roles` | `31b146b` | `openspec/specs/web-accessibility-roles/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-jobs-adoption` was authored during this batch (proposal/design/tasks/specs)

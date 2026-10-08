@@ -87,9 +87,10 @@ export function ScreenshotCapturePanel({
 
   return (
     <section className="evidence" data-testid="capture-panel">
-      <h4 className="evidence__heading" data-testid="capture-heading">
+      {/* WEB-A11Y-ROLES-001. Detail panels are h3 under the h2 row title. */}
+      <h3 className="evidence__heading" data-testid="capture-heading">
         Screenshots
-      </h4>
+      </h3>
 
       {capture.reading && capture.candidates.length === 0 ? (
         <p className="view__state" aria-live="polite" aria-busy="true" data-testid="capture-loading">

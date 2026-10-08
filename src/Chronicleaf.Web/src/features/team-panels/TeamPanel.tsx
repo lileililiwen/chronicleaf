@@ -193,7 +193,8 @@ export function TeamPanel() {
         </p>
       ) : null}
 
-      <h4 className="view__heading">Invite</h4>
+      {/* WEB-A11Y-ROLES-001. Sections are h2 under the view h1. */}
+      <h2 className="view__heading">Invite</h2>
       <label className="form__label">
         Email label
         <input
@@ -228,7 +229,7 @@ export function TeamPanel() {
         </button>
       </div>
 
-      <h4 className="view__heading">Pending invitations</h4>
+      <h2 className="view__heading">Pending invitations</h2>
       {invitations.length === 0 ? (
         <p className="view__state" data-testid="team-invitations-empty">
           No pending invitations. Nothing has been invited that has not yet joined.
@@ -253,7 +254,7 @@ export function TeamPanel() {
         </ul>
       )}
 
-      <h4 className="view__heading">Members</h4>
+      <h2 className="view__heading">Members</h2>
       {members.length === 0 ? (
         <p className="view__state" data-testid="team-members-empty">
           No members beyond the owner. Nobody has joined this tenant yet.
@@ -294,7 +295,7 @@ export function TeamPanel() {
         </ul>
       )}
 
-      <h4 className="view__heading">Accept an invitation</h4>
+      <h2 className="view__heading">Accept an invitation</h2>
       <label className="form__label">
         Bearer token
         <input
@@ -322,7 +323,7 @@ export function TeamPanel() {
         </p>
       ) : null}
 
-      <h4 className="view__heading">Project grants</h4>
+      <h2 className="view__heading">Project grants</h2>
       <label className="form__label">
         Project id
         <input

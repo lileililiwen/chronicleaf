@@ -317,7 +317,7 @@ function ProjectsRoute({ onNavigate }: { readonly onNavigate: (to: string) => vo
               >
                 <span className="card__name">{project.name}</span>
                 <span className="card__body">{project.description || 'No description yet.'}</span>
-                {project.archivedAt ? <span className="badge badge--muted">Archived</span> : null}
+                {project.archivedAt ? <span className="badge badge--muted" aria-label="Status: Archived">Archived</span> : null}
               </button>
               <p className="card__areas">
                 <button type="button" className="link" onClick={() => onNavigate(`/projects/${project.id}/publish`)} data-testid="project-publish-link">

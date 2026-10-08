@@ -202,9 +202,10 @@ export function JourneyPanel({ projectId }: { readonly projectId: string }) {
 
   return (
     <section className="view" aria-label="Project journey" data-testid="journey-panel">
-      <h3 className="view__heading" data-testid="journey-heading">
+      {/* WEB-A11Y-ROLES-001. Project-level panels are h2 sections under the view h1. */}
+      <h2 className="view__heading" data-testid="journey-heading">
         Project journey
-      </h3>
+      </h2>
       <p className="view__hint" data-testid="journey-hint">
         A preview computes the hash a publication must carry; a publication freezes the
         snapshot only after every approval passes. Unpublished material never renders on the
@@ -247,7 +248,7 @@ export function JourneyPanel({ projectId }: { readonly projectId: string }) {
         </dl>
       ) : null}
 
-      <h4 className="view__heading">Preview a selection</h4>
+      <h3 className="view__heading">Preview a selection</h3>
       {milestones === null ? (
         <p className="view__state" aria-live="polite" aria-busy="true" data-testid="journey-milestones-loading">
           Reading milestones…
@@ -315,7 +316,7 @@ export function JourneyPanel({ projectId }: { readonly projectId: string }) {
         </p>
       ) : null}
 
-      <h4 className="view__heading">Publish or revoke</h4>
+      <h3 className="view__heading">Publish or revoke</h3>
       <label className="form__label">
         Slug, lowercase kebab case
         <input

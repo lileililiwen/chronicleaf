@@ -53,7 +53,8 @@ export function LocalRepositoryPanel({
 
   return (
     <section className="evidence" data-testid="local-repository-panel">
-      <h4 className="evidence__heading">Local repository this project collects from</h4>
+      {/* WEB-A11Y-ROLES-001. Project-level panels are h2 sections under the view h1. */}
+      <h2 className="evidence__heading">Local repository this project collects from</h2>
 
       {catalog.loading && catalog.catalog === null ? (
         <p className="view__state" aria-live="polite" aria-busy="true" data-testid="local-catalog-loading">

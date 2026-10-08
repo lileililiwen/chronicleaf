@@ -104,9 +104,10 @@ export function ProjectTimeline({
 
   return (
     <section className="timeline" aria-label="Project timeline" data-testid="project-timeline">
-      <h3 className="timeline__heading" data-testid="timeline-heading">
+      {/* WEB-A11Y-ROLES-001. The timeline is an h2 section under the view h1. */}
+      <h2 className="timeline__heading" data-testid="timeline-heading">
         Timeline
-      </h3>
+      </h2>
 
       <label className="timeline__toggle">
         <input
@@ -141,9 +142,9 @@ export function ProjectTimeline({
           <ol className="timeline__list" data-testid="timeline-list">
             {groupedByDay(items).map((group) => (
               <li key={group.day} className="timeline__day" data-testid="timeline-day">
-                <h4 className="timeline__date" data-testid="timeline-date">
+                <h3 className="timeline__date" data-testid="timeline-date">
                   {group.label}
-                </h4>
+                </h3>
                 <ol className="timeline__entries">
                   {group.items.map((item) => (
                     <li
@@ -167,7 +168,9 @@ export function ProjectTimeline({
                             item.status === 'confirmed' ? 'badge badge--ok' : 'badge badge--pending'
                           }
                           data-testid="timeline-status"
+                          aria-label={`Status: ${item.status}`}
                         >
+                          {/* WEB-A11Y-ROLES-004. The visible status word plus a non-color accessible name. */}
                           {item.status}
                         </span>
                       </button>

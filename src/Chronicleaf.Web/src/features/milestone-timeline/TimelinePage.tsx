@@ -57,7 +57,12 @@ export function TimelinePage({ onNavigate }: { readonly onNavigate: (to: string)
         </div>
       ) : (
         <>
-          <p className="view__actions" data-testid="timeline-picker">
+          {/*
+            WEB-A11Y-ROLES-002. The project choice is a set of pressed
+            chips in a labelled group, the same vocabulary the
+            milestone and operations filters use.
+          */}
+          <div className="view__actions" role="group" aria-label="Choose a project" data-testid="timeline-picker">
             {items.map((project) => (
               <button
                 key={project.id}
@@ -70,7 +75,7 @@ export function TimelinePage({ onNavigate }: { readonly onNavigate: (to: string)
                 {project.name}
               </button>
             ))}
-          </p>
+          </div>
 
           {chosen === null ? (
             <p className="view__state" data-testid="timeline-unpicked">

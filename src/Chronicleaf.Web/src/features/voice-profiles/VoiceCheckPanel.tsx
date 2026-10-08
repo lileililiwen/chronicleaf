@@ -41,9 +41,10 @@ export function VoiceCheckPanel({
 
   return (
     <section className="evidence" data-testid="voice-check-panel">
-      <h3 className="view__heading" data-testid="voice-check-heading">
+      {/* WEB-A11Y-ROLES-001. Voice panels are h2 sections under the view h1. */}
+      <h2 className="view__heading" data-testid="voice-check-heading">
         Check a draft against this voice
-      </h3>
+      </h2>
       <p
         className="view__state"
         aria-live="polite"

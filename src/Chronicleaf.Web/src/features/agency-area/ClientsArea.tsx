@@ -169,7 +169,7 @@ function ClientCard({
           {client.notes === '' ? 'No notes yet.' : client.notes}
         </span>
         {client.archivedAt ? (
-          <span className="badge badge--muted" data-testid="client-card-archived">
+          <span className="badge badge--muted" data-testid="client-card-archived" aria-label="Status: Archived">
             Archived
           </span>
         ) : null}

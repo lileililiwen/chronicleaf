@@ -43,11 +43,17 @@ export function VoiceArea({ projectId }: { readonly projectId: string }) {
   return (
     <section className="evidence" data-testid="voice-area">
       <p className="view__actions">
+        {/*
+          WEB-A11Y-ROLES-002. A proper disclosure: aria-expanded names
+          the state and aria-controls names the controlled panel id
+          below, so a screen reader knows what the toggle opens.
+        */}
         <button
           type="button"
           className="action"
           data-testid="voice-toggle"
           aria-expanded={open}
+          aria-controls="voice-panels"
           onClick={() => setOpen((value) => !value)}
         >
           {open ? 'Hide writing voice' : 'Writing voice'}
@@ -55,7 +61,7 @@ export function VoiceArea({ projectId }: { readonly projectId: string }) {
       </p>
 
       {open ? (
-        <div className="voice-panels" data-testid="voice-panels">
+        <div className="voice-panels" id="voice-panels" data-testid="voice-panels">
           {catalogue.loading ? (
             <p className="view__state" aria-live="polite" aria-busy="true" data-testid="voice-catalogue-loading">
               Loading the voice presets…
@@ -111,7 +117,8 @@ function DraftList({
 
   return (
     <section className="evidence" data-testid="voice-drafts">
-      <h3 className="view__heading">Drafts under this voice</h3>
+      {/* WEB-A11Y-ROLES-001. The drafts list is an h2 section under the view h1. */}
+      <h2 className="view__heading">Drafts under this voice</h2>
 
       {failure !== null ? (
         <p className="notice notice--error" role="alert" data-testid="voice-drafts-error">
@@ -206,9 +213,9 @@ function VoiceDraftView({
 
   return (
     <section className="evidence" data-testid="voice-draft-view">
-      <h4 className="view__heading" data-testid="voice-draft-title">
+      <h3 className="view__heading" data-testid="voice-draft-title">
         {stored.title}
-      </h4>
+      </h3>
       <p className="view__state" data-testid="voice-draft-snapshot">
         Written under {stored.snapshot.presetId}, profile revision {stored.snapshot.profileRevision}{' '}
         ({stored.snapshot.fingerprint.slice(0, 12)}). Status {stored.status}, revision {stored.revision}.

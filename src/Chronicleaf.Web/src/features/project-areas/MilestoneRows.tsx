@@ -192,9 +192,10 @@ function MilestoneRow({
   return (
     <li className="milestone" data-testid="milestone" data-status={milestone.status}>
       <div className="milestone__head">
-        <h3 className="milestone__title" data-testid="milestone-title">
+        {/* WEB-A11Y-ROLES-001. Row titles are h2 sections under the view h1. */}
+        <h2 className="milestone__title" data-testid="milestone-title">
           {milestone.title}
-        </h3>
+        </h2>
         <span
           className={
             milestone.status === 'confirmed'
@@ -204,7 +205,9 @@ function MilestoneRow({
                 : 'badge badge--muted'
           }
           data-testid="milestone-status"
+          aria-label={`Status: ${milestone.status}`}
         >
+          {/* WEB-A11Y-ROLES-004. The visible status word plus a non-color accessible name. */}
           {milestone.status}
         </span>
       </div>
@@ -226,7 +229,7 @@ function MilestoneRow({
 
       {milestone.knownLimitations.length > 0 ? (
         <div className="milestone__list" data-testid="milestone-limitations">
-          <h4>Known limitations</h4>
+          <h3>Known limitations</h3>
           <ul>
             {milestone.knownLimitations.map((item) => (
               <li key={item}>{item}</li>
@@ -237,7 +240,7 @@ function MilestoneRow({
 
       {milestone.nextSteps.length > 0 ? (
         <div className="milestone__list" data-testid="milestone-next-steps">
-          <h4>Next steps</h4>
+          <h3>Next steps</h3>
           <ul>
             {milestone.nextSteps.map((item) => (
               <li key={item}>{item}</li>

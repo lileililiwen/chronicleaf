@@ -94,9 +94,10 @@ export function EvolutionGifPanel({ projectId }: { readonly projectId: string })
 
   return (
     <section className="view" aria-label="Evolution GIFs" data-testid="evolution-gif-panel">
-      <h3 className="view__heading" data-testid="evolution-gif-heading">
+      {/* WEB-A11Y-ROLES-001. Project-level panels are h2 sections under the view h1. */}
+      <h2 className="view__heading" data-testid="evolution-gif-heading">
         Evolution GIFs
-      </h3>
+      </h2>
       <p className="view__hint" data-testid="evolution-gif-hint">
         Animations depict only selected screenshots, in canvas order with the playback the
         review authorized. Nothing here is synthesised.
@@ -157,7 +158,7 @@ export function EvolutionGifPanel({ projectId }: { readonly projectId: string })
         </ul>
       ) : null}
 
-      <h4 className="view__heading">Render an animation</h4>
+      <h3 className="view__heading">Render an animation</h3>
       <label className="form__label">
         Milestone ids, comma separated
         <input

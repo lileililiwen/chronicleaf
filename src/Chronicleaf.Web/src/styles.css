@@ -400,6 +400,7 @@ body {
 }
 
 .action {
+  min-block-size: 2.5rem;
   padding: 0.5rem 0.9375rem;
   border: 1px solid var(--shell-border);
   border-radius: 0.5rem;
@@ -447,6 +448,16 @@ body {
   font-size: 0.9375rem;
   text-decoration: underline;
   cursor: pointer;
+}
+
+/*
+ * WEB-A11Y-ROLES-005. A link-styled button is still a touch target:
+ * the 40px floor plus comfortable padding, so crumbs and card-area
+ * links meet the same minimum as actions and filters.
+ */
+button.link {
+  min-block-size: 2.5rem;
+  padding: 0.375rem 0.25rem;
 }
 
 .empty {
@@ -538,6 +549,7 @@ body {
 }
 
 .filter {
+  min-block-size: 2.5rem;
   padding: 0.3125rem 0.75rem;
   border: 1px solid var(--shell-border);
   border-radius: 999px;

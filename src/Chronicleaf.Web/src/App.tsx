@@ -206,6 +206,17 @@ function isActive(path: string, entry: string): boolean {
     return path === '/settings' || path.startsWith('/settings/team') || path.startsWith('/settings/tenancy');
   }
 
+  /*
+   * WEB-A11Y-ROLES-003. Credentials is a settings sub-route with its
+   * own top-level nav entry, so it names its own rule rather than
+   * riding the generic fallthrough: exactly this path and its real
+   * sub-paths highlight Credentials. Unknown settings sub-routes
+   * match no branch and highlight nothing.
+   */
+  if (entry === '/settings/credentials') {
+    return path === '/settings/credentials' || path.startsWith('/settings/credentials/');
+  }
+
   return path === entry || path.startsWith(`${entry}/`);
 }
 

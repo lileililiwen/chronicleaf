@@ -245,9 +245,10 @@ export function ExportPanel({ projectId }: { readonly projectId: string }) {
 
   return (
     <section className="view" aria-label="Static blog export" data-testid="static-blog-export-panel">
-      <h3 className="view__heading" data-testid="static-blog-export-heading">
+      {/* WEB-A11Y-ROLES-001. Project-level panels are h2 sections under the view h1. */}
+      <h2 className="view__heading" data-testid="static-blog-export-heading">
         Static blog export
-      </h3>
+      </h2>
       <p className="view__hint" data-testid="static-blog-export-hint">
         An export depicts only the approved assets it names, as a portable site with an index,
         one page per post and a checksum manifest. Nothing here exports on render: the
@@ -267,7 +268,7 @@ export function ExportPanel({ projectId }: { readonly projectId: string }) {
         </p>
       ) : null}
 
-      <h4 className="view__heading">Select approved assets</h4>
+      <h3 className="view__heading">Select approved assets</h3>
       {milestones === null ? (
         <p className="view__state" aria-live="polite" aria-busy="true" data-testid="static-blog-export-milestones-loading">
           Reading milestones…
@@ -332,7 +333,7 @@ export function ExportPanel({ projectId }: { readonly projectId: string }) {
         </p>
       )}
 
-      <h4 className="view__heading">Export</h4>
+      <h3 className="view__heading">Export</h3>
       <label className="form__label">
         Base path, empty for the site root
         <input

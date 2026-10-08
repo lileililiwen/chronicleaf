@@ -81,7 +81,8 @@ export function CredentialVaultPanel() {
 
               <span data-testid={`credential-${provider}-status`}>
                 {!read ? (
-                  <span className="badge badge--muted" data-testid={`credential-${provider}-unknown`}>
+                  <span className="badge badge--muted" data-testid={`credential-${provider}-unknown`} aria-label="Status: Reading">
+                    {/* WEB-A11Y-ROLES-004. The visible status word plus a non-color accessible name. */}
                     Reading
                   </span>
                 ) : configured ? (
@@ -92,7 +93,9 @@ export function CredentialVaultPanel() {
                   <span
                     className="badge badge--muted"
                     data-testid={`credential-${provider}-unconfigured`}
+                    aria-label="Status: Not configured"
                   >
+                    {/* WEB-A11Y-ROLES-004. The visible status word plus a non-color accessible name. */}
                     Not configured
                   </span>
                 )}

@@ -92,9 +92,10 @@ export function EvolutionImagePanel({ projectId }: { readonly projectId: string 
 
   return (
     <section className="view" aria-label="Evolution images" data-testid="evolution-image-panel">
-      <h3 className="view__heading" data-testid="evolution-image-heading">
+      {/* WEB-A11Y-ROLES-001. Project-level panels are h2 sections under the view h1. */}
+      <h2 className="view__heading" data-testid="evolution-image-heading">
         Evolution images
-      </h3>
+      </h2>
       <p className="view__hint" data-testid="evolution-image-hint">
         Comparisons depict only selected screenshots. Candidates are never compared here, and
         nothing here promotes one.
@@ -152,7 +153,7 @@ export function EvolutionImagePanel({ projectId }: { readonly projectId: string 
         </ul>
       ) : null}
 
-      <h4 className="view__heading">Render a comparison</h4>
+      <h3 className="view__heading">Render a comparison</h3>
       <label className="form__label">
         Milestone ids, comma separated
         <input

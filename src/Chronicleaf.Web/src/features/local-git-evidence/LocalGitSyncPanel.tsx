@@ -63,7 +63,8 @@ export function LocalGitSyncPanel({
 
   return (
     <section className="evidence" data-testid="local-git-sync-panel">
-      <h4 className="evidence__heading">Collect from the local repository for “{milestoneTitle}”</h4>
+      {/* WEB-A11Y-ROLES-001. Detail panels are h3 under the h2 row title. */}
+      <h3 className="evidence__heading">Collect from the local repository for “{milestoneTitle}”</h3>
 
       {registered === null ? (
         <p className="notice notice--muted" data-testid="local-git-sync-no-repository">

@@ -67,7 +67,8 @@ export function GitHubSyncPanel({
 
   return (
     <section className="evidence" data-testid="github-sync-panel">
-      <h4 className="evidence__heading">Collect from GitHub for “{milestoneTitle}”</h4>
+      {/* WEB-A11Y-ROLES-001. Detail panels are h3 under the h2 row title. */}
+      <h3 className="evidence__heading">Collect from GitHub for “{milestoneTitle}”</h3>
 
       {connected === null ? (
         <p className="notice notice--muted" data-testid="github-sync-no-connection">

@@ -76,9 +76,10 @@ export function GroundedMarkdownDraftPanel({
 
   return (
     <section className="evidence" data-testid="draft-panel">
-      <h4 className="evidence__heading" data-testid="draft-heading">
+      {/* WEB-A11Y-ROLES-001. Detail panels are h3 under the h2 row title. */}
+      <h3 className="evidence__heading" data-testid="draft-heading">
         Draft
-      </h4>
+      </h3>
 
       <p className="view__hint" data-testid="draft-hint">
         A draft is written from this milestone&rsquo;s evidence by a provider you name, and it is a draft:
@@ -283,9 +284,9 @@ function DraftView({ asset }: { readonly asset: ContentAsset }) {
       </p>
 
       {asset.title !== null ? (
-        <h5 className="milestone__title" data-testid="draft-title">
+        <h4 className="milestone__title" data-testid="draft-title">
           {asset.title}
-        </h5>
+        </h4>
       ) : null}
 
       {asset.summary !== null ? (
@@ -366,7 +367,7 @@ function Findings<T>({
 }) {
   return (
     <div className="draft__findings" data-testid={testId}>
-      <h5 className="view__subsection">{heading}</h5>
+      <h4 className="view__subsection">{heading}</h4>
       <p className="view__hint">{intro}</p>
       {rules.length === 0 ? (
         <p className="view__state" data-testid={emptyTestId}>

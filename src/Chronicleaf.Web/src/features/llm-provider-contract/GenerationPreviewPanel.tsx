@@ -61,7 +61,8 @@ export function GenerationPreviewPanel({
 
   return (
     <section className="evidence" data-testid="generation-panel">
-      <h4 className="evidence__heading">Draft a story for “{milestoneTitle}” with your own provider</h4>
+      {/* WEB-A11Y-ROLES-001. Detail panels are h3 under the h2 row title. */}
+      <h3 className="evidence__heading">Draft a story for “{milestoneTitle}” with your own provider</h3>
 
       {flow.catalogueError !== null ? (
         <p className="notice notice--error" role="alert" data-testid="generation-catalogue-error">
@@ -153,9 +154,9 @@ export function GenerationPreviewPanel({
         </p>
       ) : null}
 
-      <h5 className="evidence__kind" id={`generation-evidence-${milestoneId}`}>
+      <h4 className="evidence__kind" id={`generation-evidence-${milestoneId}`}>
         Evidence to include
-      </h5>
+      </h4>
 
       {flow.evidenceBusy ? (
         <p className="view__state" aria-live="polite" aria-busy="true" data-testid="generation-evidence-loading">

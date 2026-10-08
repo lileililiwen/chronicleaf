@@ -65,7 +65,8 @@ export function VoiceProfilePanel({
   if (profile.failure?.status === 404) {
     return (
       <section className="evidence" data-testid="voice-profile-missing">
-        <h3 className="view__heading">Project not found</h3>
+        {/* WEB-A11Y-ROLES-001. Voice panels are h2 sections under the view h1. */}
+        <h2 className="view__heading">Project not found</h2>
         <p className="view__state">
           This project is not in your installation, so it has no voice to edit. Nothing was changed.
         </p>
@@ -99,9 +100,9 @@ export function VoiceProfilePanel({
 
   return (
     <section className="evidence" data-testid="voice-profile-panel">
-      <h3 className="view__heading" data-testid="voice-profile-heading">
+      <h2 className="view__heading" data-testid="voice-profile-heading">
         Writing voice
-      </h3>
+      </h2>
       <p className="view__state" data-testid="voice-profile-state">
         {profile.profile.stored
           ? `Preset ${profile.profile.presetId}, revision ${profile.profile.revision}.`

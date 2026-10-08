@@ -173,9 +173,10 @@ export function PublicationPanel({ projectId }: { readonly projectId: string }) 
 
   return (
     <section className="view" aria-label="Publications" data-testid="publication-panel">
-      <h3 className="view__heading" data-testid="publication-heading">
+      {/* WEB-A11Y-ROLES-001. Project-level panels are h2 sections under the view h1. */}
+      <h2 className="view__heading" data-testid="publication-heading">
         Publications
-      </h3>
+      </h2>
       <p className="view__hint" data-testid="publication-hint">
         A receipt names what was sent where and what the remote side answered. Nothing here
         contacts a transport except through the route the owner explicitly triggered.
@@ -193,7 +194,7 @@ export function PublicationPanel({ projectId }: { readonly projectId: string }) 
         </p>
       ) : null}
 
-      <h4 className="view__heading">Publication status</h4>
+      <h3 className="view__heading">Publication status</h3>
       <label className="form__label">
         Attempt id
         <input
@@ -253,7 +254,7 @@ export function PublicationPanel({ projectId }: { readonly projectId: string }) 
         </dl>
       )}
 
-      <h4 className="view__heading">Publish an asset</h4>
+      <h3 className="view__heading">Publish an asset</h3>
       {milestones === null ? (
         <p className="view__state" aria-live="polite" aria-busy="true" data-testid="publication-milestones-loading">
           Reading milestones…

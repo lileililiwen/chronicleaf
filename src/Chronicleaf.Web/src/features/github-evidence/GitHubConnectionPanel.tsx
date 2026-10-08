@@ -95,7 +95,8 @@ export function GitHubConnectionPanel({
 
   return (
     <section className="evidence" data-testid="github-connection-panel">
-      <h4 className="evidence__heading">Repository this project collects from</h4>
+      {/* WEB-A11Y-ROLES-001. Project-level panels are h2 sections under the view h1. */}
+      <h2 className="evidence__heading">Repository this project collects from</h2>
 
       {connection.loading && connected === null ? (
         <p className="view__state" aria-live="polite" aria-busy="true" data-testid="github-connection-loading">

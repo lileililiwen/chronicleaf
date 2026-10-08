@@ -63,7 +63,8 @@ export function GitHubCandidatePanel({
 
   return (
     <section className="evidence" data-testid="github-candidate-panel">
-      <h4 className="evidence__heading">Milestone candidates from GitHub</h4>
+      {/* WEB-A11Y-ROLES-001. Project-level panels are h2 sections under the view h1. */}
+      <h2 className="evidence__heading">Milestone candidates from GitHub</h2>
 
       {/*
         The framing, above everything else this panel shows. It is here rather than in a tooltip or a

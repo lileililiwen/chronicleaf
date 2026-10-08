@@ -184,9 +184,10 @@ export function ScreenshotPicker({
 
   return (
     <section className="evidence" data-testid="curation-panel">
-      <h4 className="evidence__heading" data-testid="curation-heading">
+      {/* WEB-A11Y-ROLES-001. Detail panels are h3 under the h2 row title. */}
+      <h3 className="evidence__heading" data-testid="curation-heading">
         Selected screenshots
-      </h4>
+      </h3>
 
       {reading && pictures.length === 0 ? (
         <p className="view__state" aria-live="polite" aria-busy="true" data-testid="curation-loading">
@@ -240,9 +241,9 @@ export function ScreenshotPicker({
 
           {offered.length > 0 ? (
             <>
-              <h5 className="evidence__subheading" data-testid="curation-offered-heading">
+              <h4 className="evidence__subheading" data-testid="curation-offered-heading">
                 Offered candidates
-              </h5>
+              </h4>
               <ul className="evidence__bundles" data-testid="curation-offered">
                 {offered.map((picture) => (
                   <PictureView
@@ -352,7 +353,8 @@ function PictureView({
           {picture.status}
         </span>
         {picture.isPrimary ? (
-          <span className="badge badge--ok" data-testid="curation-item-primary-badge">
+          <span className="badge badge--ok" data-testid="curation-item-primary-badge" aria-label="Status: primary">
+            {/* WEB-A11Y-ROLES-004. The visible status word plus a non-color accessible name. */}
             primary
           </span>
         ) : null}

@@ -154,7 +154,8 @@ export function TenancyPanel() {
         </p>
       ) : null}
 
-      <h4 className="view__heading">Create a tenant</h4>
+      {/* WEB-A11Y-ROLES-001. Sections are h2 under the view h1. */}
+      <h2 className="view__heading">Create a tenant</h2>
       <label className="form__label">
         Tenant name
         <input
@@ -177,7 +178,7 @@ export function TenancyPanel() {
         </button>
       </div>
 
-      <h4 className="view__heading">Select a tenant</h4>
+      <h2 className="view__heading">Select a tenant</h2>
       <label className="form__label">
         Tenant id
         <input
@@ -200,7 +201,7 @@ export function TenancyPanel() {
         </button>
       </div>
 
-      <h4 className="view__heading">Hosted login</h4>
+      <h2 className="view__heading">Hosted login</h2>
       <p className="view__hint">
         Starts a verified login and navigates to the authorization address. The callback is
         server-side.
@@ -217,7 +218,7 @@ export function TenancyPanel() {
         </button>
       </div>
 
-      <h4 className="view__heading">Community import</h4>
+      <h2 className="view__heading">Community import</h2>
       <label className="form__label">
         Tenant id
         <input

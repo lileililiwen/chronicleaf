@@ -119,9 +119,10 @@ export function MilestoneEvidencePanel({
 
   return (
     <section className="evidence" data-testid="evidence-panel">
-      <h4 className="evidence__heading" data-testid="evidence-heading">
+      {/* WEB-A11Y-ROLES-001. Detail panels are h3 under the h2 row title. */}
+      <h3 className="evidence__heading" data-testid="evidence-heading">
         Evidence
-      </h4>
+      </h3>
 
       {evidence.loading && evidence.data === null ? (
         <p className="view__state" aria-live="polite" aria-busy="true" data-testid="evidence-loading">
@@ -243,7 +244,8 @@ function EvidenceBundleView({ bundle }: { readonly bundle: EvidenceBundle }) {
       <p className="evidence__revision" data-testid="evidence-revision">
         Revision {bundle.revision}
         {gaps > 0 ? (
-          <span className="badge badge--pending" data-testid="evidence-bundle-gaps">
+          <span className="badge badge--pending" data-testid="evidence-bundle-gaps" aria-label={`Status: ${gaps} not complete`}>
+            {/* WEB-A11Y-ROLES-004. The visible status word plus a non-color accessible name. */}
             {gaps} not complete
           </span>
         ) : null}
@@ -281,7 +283,9 @@ function EvidenceItemView({ item }: { readonly item: EvidenceItem }) {
                 : 'badge badge--ok'
           }
           data-testid="evidence-item-availability"
+          aria-label={`Status: ${availabilityLabel(item.availability)}`}
         >
+          {/* WEB-A11Y-ROLES-004. The visible status word plus a non-color accessible name. */}
           {availabilityLabel(item.availability)}
         </span>
       </p>

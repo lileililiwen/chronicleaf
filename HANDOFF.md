@@ -398,6 +398,77 @@ the archive, which used no `--skip-specs`. No `current_spec` remains: the
 two owner-BLOCKED changes stay deferred to ROADMAP. Deployment stays
 `deployable: false`; there is no remote, no push and no publication.
 
+Next: `platform-testing-postgres-tighten` is archived (commit
+`b7d9622`, canonical spec
+`openspec/specs/platform-testing-postgres-tighten/spec.md`):
+test-infrastructure tightening, zero product-code change (no C#
+outside `tests/`, no TSX, no migration, no API, no envelope). The
+predecessor `platform-testing-postgres-adoption-complete` was
+authored during this batch but never archived; this commit absorbs
+its per-class `MigrateAsync` removals (51 test classes, the one
+`Stopped_postgres_makes_ready_unavailable_while_health_stays_ok`
+outlier that owns its own `PostgreSqlBuilder` is preserved verbatim)
+plus the four scope items the predecessor change left undone: the
+canonical `OperationRows.AwaitAsync` polling sleep in
+`BackgroundJobsApiHost.cs` dropped from `Task.Delay(100)` to
+`Task.Delay(10)`; the same drop applied to every per-class
+`AwaitErrorAsync` / inline-status loop across the 12 test classes
+named in the audit, with the early-exit on terminal status
+(`succeeded`/`failed`/`cancelled`/`superseded`) placed BEFORE the
+delay in every loop (the two loops that lacked it —
+`GithubEvidenceTests.AwaitErrorAsync` and
+`GithubGraphqlEnrichmentTests.AwaitErrorAsync` — gained the
+early-exit; the `GithubGraphqlEnrichmentTests` transport-arrival
+loop at line 362 polls a transport's `Requests` list and stays at
+100 ms by the PG-TIGHTEN-001 boundary). The 90s `JobBudget`
+constant in 19 test classes stays as the safety-net default
+(`OperationRows.AwaitAsync`'s 90s fallback when `within` is null
+is unchanged) and every per-call site that previously passed it now
+passes a tighter literal — `TimeSpan.FromSeconds(5)` for in-process
+operations — matching the test's actual expectation. The
+`ChronicleafPostgresFixture.CreateDatabaseAsync` per-test
+connection string still applies the four pool-self-trimming params
+from the predecessor change
+(`Maximum Pool Size=4; Minimum Pool Size=0; Connection Pruning
+Interval=1; Connection Idle Lifetime=5`); the audit-found comment
+in this commit notes that `Connection Lifetime=30` is NOT applied
+because a hard 30s recycle inflates the assembly run by forcing a
+TCP+TLS handshake on every long-running test, with no observable
+benefit on the `53300: too many clients already` failure class (the
+per-test pool is already bounded by `MaxPoolSize=4` and pruned by
+`ConnectionIdleLifetime=5`). The audit confirms every
+`new NpgsqlConnection` opened inside a test body remains
+`await using` (zero counter-examples in the assembly). The new
+oracle test `PostgresSharedServerProofE` reads
+`CreateDatabaseAsync("pool-format")` and asserts the four pool
+params and the Npgsql-default `Pooling=true` carry through. Evidence,
+all run by the implementer rather than taken on report: full
+unfiltered `dotnet test tests/Chronicleaf.Integration.Tests/
+Chronicleaf.Integration.Tests.csproj --no-build --nologo` green
+end-to-end with **858 passed, 0 failed, 0 skipped, duration 28 m
+33 s** on the first run, then 27 m 1 s, 26 m 5 s, 28 m 46 s on
+three subsequent runs (delta vs the 14m31s baseline: +13-14 min —
+the per-class `CreateDatabaseAsync` template clones are the
+dominant cost on this serialised assembly; the 10ms polling drop is
+not visible in the run time because the operations complete before
+the loop's first sleep would have elapsed); the proof tests
+`PostgresSharedServerProofA..E` are green
+(`ContainerId` rendezvous stable across the assembly, two-class
+equality, `MigrationDelegateInvocations == 1`, per-test pool string
+carries the four params plus `Pooling=true`); one PostgreSQL
+container observed across the full run (`Server.ContainerId` is
+the same value in every proof observation); the `53300 too many
+clients already` failure class does not appear (zero occurrences in
+any run); name preflight exit 0,
+`openspec validate --all --strict --no-interactive` 72/72 with no
+`--skip-specs`; `dotnet build Chronicleaf.sln --nologo` 0 errors,
+same 4 pre-existing `xUnit1030 ConfigureAwait` warnings as HEAD
+(in `GithubAppConnectionTests.cs`, untouched by this change);
+`bash scripts/gate/dotnet-tests.sh` exit 0 with the same single
+unfiltered run; `git diff --check` clean. The two owner-BLOCKED
+changes stay deferred to ROADMAP. Deployment stays `deployable:
+false`; there is no remote, no push and no publication.
+
 | # | Change | Implementation commit | Canonical spec |
 |---|---|---|---|
 | 1 | `community-foundation` | `ee1da62` | `openspec/specs/runtime-shell/spec.md` |
@@ -465,6 +536,7 @@ two owner-BLOCKED changes stay deferred to ROADMAP. Deployment stays
 | 63 | `web-perf-and-animation` | `d90ca3d` | `openspec/specs/web-perf-and-animation/spec.md` |
 | 64 | `verify-gate-adoption` | `4ac2e08` | `openspec/specs/verify-gate-adoption/spec.md` |
 | 65 | `platform-testing-postgres-adoption` | `d618180` | `openspec/specs/platform-testing-postgres-adoption/spec.md` |
+| 67 | `platform-testing-postgres-tighten` | `b7d9622` | `openspec/specs/platform-testing-postgres-tighten/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-testing-postgres-adoption` (row 65, commit `d618180`, canonical spec

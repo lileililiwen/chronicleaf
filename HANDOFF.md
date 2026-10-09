@@ -2,7 +2,7 @@
 
 ## Current state — 2026-10-09
 
-Sixty-seven changes implemented, verified and archived, each with exactly two commits (implementation/
+Sixty-eight changes implemented, verified and archived, each with exactly two commits (implementation/
 tests/archive, then this HANDOFF-only pointer). No `current_spec` remains: every drainable change is
 archived and the two owner-BLOCKED changes are deferred to ROADMAP for later
 (`semantic-narrative-retrieval`: demand plus embedding model/provider/dimension and consent policy;
@@ -514,6 +514,43 @@ full-gate run; `node scripts/check-openspec-change-names.mjs` exit 0;
 changes stay deferred to ROADMAP. Deployment stays `deployable:
 false`; there is no remote, no push and no publication.
 
+Next: `gate-check-correctness` is archived (commit `28051ce`,
+canonical spec `openspec/specs/gate-check-correctness/spec.md`):
+gate-check correctness after the 2026-10-09 diagnosis, shell/YAML only,
+no product or test code. Three defects: (1) `platform-feed` was declared
+with no `timeouts:` entry and so inherited the driftwatch adapter's
+`DEFAULT_CHECK_TIMEOUT_MS = 60000`, while its step 4 is a full
+`dotnet restore --no-cache` of the solution into an empty package
+folder — so the check was killed mid-restore and reported
+`REVIEW_REQUIRED` on every run; fixed with `platform-feed: 1800000` in
+`.ai-gate/gate.yaml`. (2) The cold-restore proof rewrites every
+project's `obj/project.assets.json` to name its `mktemp` scratch folder
+as the global packages folder, and the script's EXIT trap then deletes
+that folder — reproduced directly (`--packages <scratch>` moved
+`packageFolders` to `/tmp/pf-scratch`, then `rm -rf`), leaving a later
+`dotnet build` to skip restore and `dotnet test --no-build` to resolve
+against a deleted path, which is the intermittent `dotnet` FAIL with no
+test failure; fixed by a trailing normal restore in
+`scripts/verify-platform-feed.sh`. (3) When the `dotnet` check failed,
+the gate kept only the first `MAX_DIAGNOSTIC_BYTES = 2048` bytes of
+combined output, and default-verbosity build lines filled that head, so
+the test failure at the tail was invisible — a hand run of the same
+suite passed 858/858 in 40m47s while the gate table showed only the
+build; fixed with `--verbosity quiet -clp:ErrorsOnly` on the build
+(measured 78 bytes) and `--verbosity quiet` on the test. Evidence:
+`bash scripts/gate/platform-feed.sh` exits 0 ("platform feed
+verification passed") and leaves `src/Chronicleaf.Core/obj/
+project.assets.json` naming the live `/home/paul/.nuget/packages/`;
+a temporary failing test (`TempGateDiagnosticProbeTests`, added then
+removed) shows the `[FAIL]` line and `失败: 1` inside the first 2048
+bytes of combined output; `node scripts/check-openspec-change-names.mjs`
+exit 0; `openspec validate --all --strict --no-interactive` 73/73 with
+no `--skip-specs`; `git diff --check` clean. The driftwatch runner's
+defaults are recorded as sibling facts and deliberately not patched.
+The two owner-BLOCKED changes stay deferred to ROADMAP. Deployment
+stays `deployable: false`; there is no remote, no push and no
+publication.
+
 | # | Change | Implementation commit | Canonical spec |
 |---|---|---|---|
 | 1 | `community-foundation` | `ee1da62` | `openspec/specs/runtime-shell/spec.md` |
@@ -583,6 +620,7 @@ false`; there is no remote, no push and no publication.
 | 65 | `platform-testing-postgres-adoption` | `d618180` | `openspec/specs/platform-testing-postgres-adoption/spec.md` |
 | 66 | `platform-testing-postgres-tighten` | `b7d9622` | `openspec/specs/platform-testing-postgres-tighten/spec.md` |
 | 67 | `platform-testing-postgres-tighten-followup` | `f7e1881` | `openspec/specs/platform-testing-postgres-tighten-followup/spec.md` |
+| 68 | `gate-check-correctness` | `28051ce` | `openspec/specs/gate-check-correctness/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-testing-postgres-adoption` (row 65, commit `d618180`, canonical spec

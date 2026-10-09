@@ -98,6 +98,12 @@ test('linkedin: derive, preview, approve, byte-equal download, verbatim refusal,
   await panel.getByTestId('linkedin-pack-approve').click();
   await expect(panel.getByTestId('linkedin-pack-review-status')).toHaveText('approved');
 
+  // PG-TIGHTEN-FU-002 pin: the download button is enabled only when approved
+  // is true, which the preceding toHaveText('approved') already proved - this
+  // extra wait is the regression locator for the savePackDownload microtask
+  // fix, so a future reader sees the click was wired to an enabled control.
+  await expect(panel.getByTestId('linkedin-pack-download')).toBeEnabled();
+
   // The offered download is the server's attachment, not a re-render:
   // byte-equal to the delivered export route fetched directly.
   const [download] = await Promise.all([

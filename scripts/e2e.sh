@@ -175,6 +175,10 @@ postgres_database=""
 cleanup() {
   local exit_status=$?
   stop_suite
+  # PG-TIGHTEN-FU-001: kill every dotnet Chronicleaf.Api.dll this script may have
+  # started, so a subsequent run does not see them as orphan port holders. pkill
+  # exits 1 when nothing matches; that is the clean-run case and is ignored here.
+  pkill -f "dotnet Chronicleaf.Api.dll" >/dev/null 2>&1 || true
   if [ -n "$shared_postgres_container" ]; then
     docker rm --force --volumes "$shared_postgres_container" >/dev/null 2>&1 || true
     shared_postgres_container=""
@@ -228,12 +232,43 @@ stop_suite() {
   server_pid=""
 }
 
+# PG-TIGHTEN-FU-001. Refuses to let a suite start when its origin port is already bound
+# by a `dotnet` process - the orphan class that survives an interrupted prior run and
+# masquerades as a ready server in start_suite's /api/health loop. Walks ss -tnlp for
+# the port, prints the holder PID + command line when one exists, and exits non-zero so
+# the gate fails loudly BEFORE any disposable database is cloned or any new server is
+# launched. The readiness loop in start_suite is unchanged in shape: it runs only after
+# this assertion has confirmed the port is free, so an orphan can no longer answer
+# /api/health on behalf of a suite the script never started.
+assert_suite_ports_free() {
+  local origin port pid listener_cmd
+  for origin in "$@"; do
+    port="$(printf '%s' "$origin" | sed -n 's|^http://127.0.0.1:\([0-9][0-9]*\).*|\1|p')"
+    if [ -z "$port" ]; then
+      continue
+    fi
+    # ss -tnlp prints one row per accepted socket; the `users:` field carries
+    # `("dotnet",pid=<N>,fd=<M>)` for dotnet listeners. Strip everything but the pid.
+    pid="$(ss -tnlp "sport = :$port" 2>/dev/null \
+      | sed -n 's|.*pid=\([0-9][0-9]*\).*|\1|p' \
+      | head -n 1)"
+    if [ -n "$pid" ] && [ -d "/proc/$pid" ]; then
+      listener_cmd="$(tr '\0' ' ' </proc/"$pid"/cmdline 2>/dev/null || echo '<unknown>')"
+      echo "port $port (origin $origin) is held by an orphan listener (pid=$pid cmd='$listener_cmd') - refusing to start a suite on a port another process owns" >&2
+      return 1
+    fi
+  done
+}
+
 # start_suite <suffix> <origin> <log> <token file> [extra server env]
 #
 # The optional fifth argument is space-separated KEY=value pairs (values carry no spaces)
 # appended to the server's environment. It exists for the suite whose installation needs a
 # transport registered and a dispatch loop silenced; every other suite passes nothing and the
 # server starts exactly as before.
+#
+# PG-TIGHTEN-FU-001. assert_suite_ports_free runs at the top of start_suite so a held port
+# fails the gate before clone_suite_database opens any disposable database.
 #
 # start_shared_postgres
 #
@@ -323,6 +358,11 @@ start_suite() {
   local token_path="$4"
   local extra_env="${5:-}"
   local database_name="chronicleaf_e2e_${suffix}"
+
+  # PG-TIGHTEN-FU-001: refuse to start on a port another process holds, so an orphan
+  # dotnet Chronicleaf.Api.dll from a prior interrupted run cannot masquerade as a
+  # ready server in the readiness loop below.
+  assert_suite_ports_free "$origin"
 
   clone_suite_database "$suffix"
 
@@ -3423,6 +3463,25 @@ SUITES=(
   suite_a11y_roles
   suite_responsive
 )
+
+# PG-TIGHTEN-FU-005. Optional single-suite filter for diagnosis: set
+# CHRONICLEAF_E2E_ONLY to one suite name without the `suite_` prefix (e.g.
+# `a11y_roles`) and only that suite runs, against its own TEMPLATE clone like
+# any other run. Unset, the full 30-suite list runs unchanged — the filter is a
+# debugging aid, never the gate's own path.
+if [ -n "${CHRONICLEAF_E2E_ONLY:-}" ]; then
+  filtered=()
+  for suite in "${SUITES[@]}"; do
+    if [ "${suite#suite_}" = "$CHRONICLEAF_E2E_ONLY" ]; then
+      filtered+=("$suite")
+    fi
+  done
+  if [ "${#filtered[@]}" -eq 0 ]; then
+    echo "FAILED: CHRONICLEAF_E2E_ONLY=${CHRONICLEAF_E2E_ONLY} names no suite" >&2
+    exit 1
+  fi
+  SUITES=("${filtered[@]}")
+fi
 
 status_dir="$(mktemp -d)"
 

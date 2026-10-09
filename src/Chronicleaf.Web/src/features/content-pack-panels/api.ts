@@ -163,7 +163,13 @@ export function savePackDownload(fileName: string, bytes: Blob): void {
     anchor.download = fileName;
     document.body.appendChild(anchor);
     anchor.click();
-    anchor.remove();
+    // PG-TIGHTEN-FU-002: detach the anchor in a microtask, not synchronously,
+    // so Chromium's download pipeline has one tick to register the
+    // navigation-to-blob download before the anchor is removed. The synchronous
+    // detach used to cancel the linkedin download under the parallel boot
+    // (download.path returned canceled before the bytes were flushed to
+    // Playwright's download temp file).
+    queueMicrotask(() => anchor.remove());
   } finally {
     // The bytes are the server's attachment, handed to a file: revoking here
     // would race the click above on some browsers, so the object URL lives as

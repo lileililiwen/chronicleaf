@@ -246,6 +246,13 @@ async function assertHeadingOrder(page: Page, path: string | null, expected: { h
     await page.goto(path);
   }
 
+  // PG-TIGHTEN-FU-004: wait for the SPA to render the main landmark's first
+  // heading before reading the order. Under the parallel e2e harness a
+  // data-heavy view (e.g. a project content area) can still be hydrating when
+  // goto's load event fires, and reading before then sees an empty heading
+  // list even though the view conforms.
+  await page.locator('main#main h1, main#main h2, main#main h3').first().waitFor({ state: 'attached' });
+
   const headings = await page.evaluate(() => {
     const main = document.querySelector('main#main');
     const scope = main ?? document;

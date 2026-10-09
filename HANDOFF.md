@@ -1,10 +1,17 @@
 # Chronicleaf handoff
 
-## Current state — 2026-10-07
+## Current state — 2026-10-09
 
-Fifty-seven changes implemented, verified and archived, each with exactly two commits (implementation/
+Sixty-seven changes implemented, verified and archived, each with exactly two commits (implementation/
 tests/archive, then this HANDOFF-only pointer). No `current_spec` remains: every drainable change is
 archived and the two owner-BLOCKED changes are deferred to ROADMAP for later
+(`semantic-narrative-retrieval`: demand plus embedding model/provider/dimension and consent policy;
+`hosted-managed-ai`: provider/model/quota/unit weights plus financial settlement policy — both
+packages parked intact in `openspec/deferred/`, nothing active remains).
+
+(2026-10-07 lineage before this batch: fifty-seven changes implemented, verified and archived,
+each with exactly two commits. No `current_spec` was active; the two owner-BLOCKED changes were
+deferred to ROADMAP for later
 (`semantic-narrative-retrieval`: demand plus embedding model/provider/dimension and consent policy;
 `hosted-managed-ai`: provider/model/quota/unit weights plus financial settlement policy — both
 packages parked intact in `openspec/deferred/`, nothing active remains).
@@ -469,6 +476,44 @@ unfiltered run; `git diff --check` clean. The two owner-BLOCKED
 changes stay deferred to ROADMAP. Deployment stays `deployable:
 false`; there is no remote, no push and no publication.
 
+Next: `platform-testing-postgres-tighten-followup` is archived
+(commit `f7e1881`, canonical spec
+`openspec/specs/platform-testing-postgres-tighten-followup/spec.md`):
+test-infrastructure followup to `platform-testing-postgres-tighten`
+(`b7d9622`), zero backend product-code change (no C# outside `tests/`,
+no migration, no API, no envelope). The parallel e2e harness surfaced
+two suite failures plus one render race, each now fixed at the
+harness/test layer: (1) `curation` failed with "could not read an
+antiforgery value" because an orphan `dotnet Chronicleaf.Api.dll`
+from an interrupted prior run held port 5089 and answered
+`/api/health` on its behalf, so the seed signed in against the
+orphan (whose `AccessTokenHash` differed) — fixed with
+`assert_suite_ports_free` at the top of `start_suite` (walks
+`ss -tnlp` per origin, names the holder PID and command line, and
+refuses before any clone) plus a `pkill -f "dotnet
+Chronicleaf.Api.dll"` cleanup step and an e2e-browser preflight;
+(2) `content_pack.linkedin` failed with Playwright
+`download.path: canceled` because `savePackDownload` removed the
+`<a download>` anchor synchronously after `click()`, racing
+Chromium's download registration — fixed by deferring the removal to
+`queueMicrotask`, with a `toBeEnabled()` pin in the linkedin sub-test;
+(3) `a11y_roles` failed intermittently with "exactly one h1 (found:
+[])" because `assertHeadingOrder` read the SPA headings immediately
+after `goto`, before a data-heavy project view had hydrated — fixed
+by waiting for `main#main`'s first heading before reading the order.
+A `CHRONICLEAF_E2E_ONLY` single-suite filter was added for diagnosis
+(unset, the full 30-suite list runs unchanged). Evidence, all run by
+the implementer: full `CHRONICLEAF_E2E=1 bash
+scripts/gate/e2e-browser.sh` green — **all 30 e2e suites pass** (one
+shared PostgreSQL, per-suite TEMPLATE clones, jobs=4); the `curation`
+and `content_pack` failures do not recur; the isolated `a11y_roles`
+run is 10/10; the driftwatch `dotnet` check passed in the same batch
+full-gate run; `node scripts/check-openspec-change-names.mjs` exit 0;
+`openspec validate --all --strict --no-interactive` 72/72 with no
+`--skip-specs`; `git diff --check` clean. The two owner-BLOCKED
+changes stay deferred to ROADMAP. Deployment stays `deployable:
+false`; there is no remote, no push and no publication.
+
 | # | Change | Implementation commit | Canonical spec |
 |---|---|---|---|
 | 1 | `community-foundation` | `ee1da62` | `openspec/specs/runtime-shell/spec.md` |
@@ -536,7 +581,8 @@ false`; there is no remote, no push and no publication.
 | 63 | `web-perf-and-animation` | `d90ca3d` | `openspec/specs/web-perf-and-animation/spec.md` |
 | 64 | `verify-gate-adoption` | `4ac2e08` | `openspec/specs/verify-gate-adoption/spec.md` |
 | 65 | `platform-testing-postgres-adoption` | `d618180` | `openspec/specs/platform-testing-postgres-adoption/spec.md` |
-| 67 | `platform-testing-postgres-tighten` | `b7d9622` | `openspec/specs/platform-testing-postgres-tighten/spec.md` |
+| 66 | `platform-testing-postgres-tighten` | `b7d9622` | `openspec/specs/platform-testing-postgres-tighten/spec.md` |
+| 67 | `platform-testing-postgres-tighten-followup` | `f7e1881` | `openspec/specs/platform-testing-postgres-tighten-followup/spec.md` |
 
 Each package is archived under `openspec/changes/archive/2026-10-0*-<name>/`. No `--skip-specs` was
 ever used. `platform-testing-postgres-adoption` (row 65, commit `d618180`, canonical spec

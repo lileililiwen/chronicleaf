@@ -34,12 +34,21 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 log_file="${CHRONICLEAF_DOTNET_LOG:-$(pwd)/dotnet-gate.log}"
-echo "==> dotnet build: dotnet build Chronicleaf.sln --nologo"
-dotnet build Chronicleaf.sln --nologo
+# `--verbosity quiet` on both steps is deliberate: the gate adapter keeps only
+# the first 2048 bytes of a check's combined output (MAX_DIAGNOSTIC_BYTES), and
+# at default verbosity the build's per-project lines alone consume that budget,
+# so a test failure at the tail was invisible in the gate table. Quiet build
+# output alone is not enough: the pre-existing compiler warnings still fill the
+# budget, so -clp:ErrorsOnly drops the build to one success line (78 bytes
+# measured); quiet test output is then the failed-test details plus the summary,
+# which lands inside the visible head. The full output is still teed to
+# $log_file for deep diagnosis.
+echo "==> dotnet build: dotnet build Chronicleaf.sln --nologo --verbosity quiet -clp:ErrorsOnly"
+dotnet build Chronicleaf.sln --nologo --verbosity quiet -clp:ErrorsOnly
 
-echo "==> dotnet test (single unfiltered run): dotnet test Chronicleaf.sln --no-build --nologo"
+echo "==> dotnet test (single unfiltered run): dotnet test Chronicleaf.sln --no-build --nologo --verbosity quiet"
 status=0
-dotnet test Chronicleaf.sln --no-build --nologo 2>&1 | tee "$log_file" || status=$?
+dotnet test Chronicleaf.sln --no-build --nologo --verbosity quiet 2>&1 | tee "$log_file" || status=$?
 
 echo "==> dotnet attribution (per test-class):"
 bash scripts/gate/attribute-dotnet-failures.sh "$log_file" || true

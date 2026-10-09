@@ -21,6 +21,11 @@ commands:
   frontend-depth: "bash scripts/gate/frontend-depth.sh"
   e2e-browser: "bash scripts/gate/e2e-browser.sh"
 timeouts:
+  # platform-feed runs scripts/verify-platform-feed.sh, whose step 4 is a full
+  # `dotnet restore --no-cache` into an empty package folder (the cold-restore
+  # proof). That is minutes, not seconds, so the 60000ms default killed it
+  # mid-restore and left the check permanently REVIEW_REQUIRED.
+  platform-feed: 1800000
   dotnet: 3600000
   frontend-build: 1200000
   frontend-depth: 3600000

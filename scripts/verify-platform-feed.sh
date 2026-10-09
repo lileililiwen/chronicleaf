@@ -133,4 +133,13 @@ for package in "${expected[@]}"; do
   echo "    resolved: ${package} ${platform_version}"
 done
 
+# The cold restore above rewrote every project's obj/project.assets.json to name
+# the scratch package folder as its global packages folder. The EXIT trap removes
+# that folder, so without this step the solution is left pointing at a deleted
+# path: a later `dotnet build` sees obj as up to date and skips restore, and a
+# `dotnet test --no-build` then resolves assemblies against a gone folder. That
+# is exactly the flake where the gate's later check fails with no test failure.
+# Re-restore against the normal cache so the repository is left consistent.
+dotnet restore Chronicleaf.sln --nologo --verbosity quiet >/dev/null
+
 echo "platform feed verification passed"

@@ -254,7 +254,7 @@ public sealed class MarkdownReviewExportTests(ChronicleafPostgresFixture postgre
 
         await fixture.Host.DispatchAsync();
         await OperationRows.AwaitAsync(
-            fixture.Database, accepted.RootElement.GetProperty("operationId").GetGuid(), "succeeded", JobBudget);
+            fixture.Database, accepted.RootElement.GetProperty("operationId").GetGuid(), "succeeded", TimeSpan.FromSeconds(5));
 
         // The generation appended beside the human edit rather than overwriting it: the edited
         // revision is byte-identical and the new head is the grounded one.
@@ -511,7 +511,6 @@ public sealed class MarkdownReviewExportTests(ChronicleafPostgresFixture postgre
     public async Task The_approval_table_index_and_vocabulary_come_from_the_forward_migration_and_readiness_requires_it()
     {
         var database = await postgres.CreateDatabaseAsync("rev_migration");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         // Readiness requires the review migration by id, and it is the newest required one by
         // position rather than by name - a named "newest" is a value somebody has to remember to
@@ -641,7 +640,7 @@ public sealed class MarkdownReviewExportTests(ChronicleafPostgresFixture postgre
         var operationId = accepted.RootElement.GetProperty("operationId").GetGuid();
 
         await host.DispatchAsync();
-        await OperationRows.AwaitAsync(database, operationId, "succeeded", JobBudget);
+        await OperationRows.AwaitAsync(database, operationId, "succeeded", TimeSpan.FromSeconds(5));
 
         var asset = await ContentRows.ReadAssetForMilestoneAsync(database, milestoneId);
         Assert.NotNull(asset);
@@ -687,7 +686,6 @@ public sealed class MarkdownReviewExportTests(ChronicleafPostgresFixture postgre
     private async Task<string> ProvisionedDatabaseAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using var host = GroundedMarkdownDraftsApiHost.StartProduction(
             database,

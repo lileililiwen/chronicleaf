@@ -1226,7 +1226,6 @@ public sealed class GithubEvidenceTests(ChronicleafPostgresFixture postgres)
         string? keyFile = null)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         var host = GithubEvidenceApiHost.Start(database, new FixedTimeProvider(Clock), github, keyFile);
 
@@ -1603,7 +1602,12 @@ public sealed class GithubEvidenceTests(ChronicleafPostgresFixture postgres)
                 return last;
             }
 
-            await Task.Delay(100);
+            if (last is not null && last.Status is "failed" or "succeeded" or "cancelled")
+            {
+                break;
+            }
+
+            await Task.Delay(10);
         }
 
         throw new InvalidOperationException(

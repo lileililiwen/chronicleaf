@@ -472,7 +472,6 @@ public sealed class AgencyClientProjectsTests(ChronicleafPostgresFixture postgre
     public async Task The_client_table_and_association_come_from_the_forward_migration_and_readiness_requires_it()
     {
         var database = await postgres.CreateDatabaseAsync("agency_migration");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         // Readiness requires the agency migration by id, and it is the newest required one by
         // position rather than by name - a named "newest" is a value somebody has to remember to
@@ -545,7 +544,6 @@ public sealed class AgencyClientProjectsTests(ChronicleafPostgresFixture postgre
     private async Task<string> ProvisionedDatabaseAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using (var host = ChronicleafApiHost.Start(database, Clock))
         {

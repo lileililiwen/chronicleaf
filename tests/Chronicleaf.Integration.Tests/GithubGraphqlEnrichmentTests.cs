@@ -585,7 +585,6 @@ public sealed class GithubGraphqlEnrichmentTests(ChronicleafPostgresFixture post
         string? keyFile = null)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         var host = GithubGraphqlEnrichmentApiHost.Start(database, new FixedTimeProvider(Clock), transport, keyFile);
 
@@ -973,7 +972,12 @@ public sealed class GithubGraphqlEnrichmentTests(ChronicleafPostgresFixture post
                 return last;
             }
 
-            await Task.Delay(100);
+            if (last is not null && last.Status is "failed" or "succeeded" or "cancelled")
+            {
+                break;
+            }
+
+            await Task.Delay(10);
         }
 
         throw new InvalidOperationException(

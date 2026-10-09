@@ -138,7 +138,7 @@ public sealed class PublisherGithubPagesAdapterTests(ChronicleafPostgresFixture 
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", TimeSpan.FromSeconds(5));
         Assert.Equal(1, operation.Attempt);
 
         // The exact Git Data API exchange, in order: the repository read, the base read, one
@@ -261,7 +261,7 @@ public sealed class PublisherGithubPagesAdapterTests(ChronicleafPostgresFixture 
         var operationId = accepted.RootElement.GetProperty("operationId").GetGuid();
 
         await host.DispatchAsync();
-        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", JobBudget);
+        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", TimeSpan.FromSeconds(5));
 
         // Three files: the document plus the one approval-covered picture under generated asset
         // paths - and the document's sources rewritten to them.
@@ -338,7 +338,7 @@ public sealed class PublisherGithubPagesAdapterTests(ChronicleafPostgresFixture 
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal(GitHubPagesError.Unauthorized, operation.ErrorCode);
 
         // Refused before any blob existed: one repository read, no tree, no commit, no ref move.
@@ -484,7 +484,7 @@ public sealed class PublisherGithubPagesAdapterTests(ChronicleafPostgresFixture 
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal(GitHubPagesError.UpstreamMoved, operation.ErrorCode);
 
         // The conditional write lost and nothing retried it: every ref move carried force=false,
@@ -577,7 +577,7 @@ public sealed class PublisherGithubPagesAdapterTests(ChronicleafPostgresFixture 
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal("publication_unknown", operation.ErrorCode);
 
         // The bytes may have left: unknown, with the planned commit SHA retained for the
@@ -651,7 +651,7 @@ public sealed class PublisherGithubPagesAdapterTests(ChronicleafPostgresFixture 
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
 
         // The commit answer was lost before any ref named it: unreachable objects are not a
         // publication, so this is failed rather than unknown - and the branch was never moved.
@@ -712,7 +712,7 @@ public sealed class PublisherGithubPagesAdapterTests(ChronicleafPostgresFixture 
         var attemptId = firstAccepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", JobBudget);
+        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", TimeSpan.FromSeconds(5));
         var dispatchCalls = wire.Calls.Count;
         Assert.True(dispatchCalls > 0);
 
@@ -904,7 +904,7 @@ public sealed class PublisherGithubPagesAdapterTests(ChronicleafPostgresFixture 
                 .RootElement.GetProperty("operationId").GetString()!);
 
             await capture.DispatchAsync();
-            await OperationRows.AwaitAsync(database, captureOperationId, "succeeded", JobBudget);
+            await OperationRows.AwaitAsync(database, captureOperationId, "succeeded", TimeSpan.FromSeconds(5));
 
             using var candidates = await pictureOwner.GetAsync($"/api/milestones/{milestoneId:D}/screenshots");
             var candidate = JsonDocument.Parse(await candidates.Content.ReadAsStringAsync())
@@ -974,7 +974,7 @@ public sealed class PublisherGithubPagesAdapterTests(ChronicleafPostgresFixture 
             var draftOperationId = accepted.RootElement.GetProperty("operationId").GetGuid();
 
             await drafts.DispatchAsync();
-            await OperationRows.AwaitAsync(database, draftOperationId, "succeeded", JobBudget);
+            await OperationRows.AwaitAsync(database, draftOperationId, "succeeded", TimeSpan.FromSeconds(5));
         }
 
         var asset = await ContentRows.ReadAssetForMilestoneAsync(database, milestoneId);
@@ -1055,7 +1055,6 @@ public sealed class PublisherGithubPagesAdapterTests(ChronicleafPostgresFixture 
     private async Task<string> ProvisionedDatabaseAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using var host = GroundedMarkdownDraftsApiHost.StartProduction(
             database,

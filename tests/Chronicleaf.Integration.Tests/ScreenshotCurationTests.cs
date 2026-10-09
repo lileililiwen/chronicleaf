@@ -788,7 +788,6 @@ public sealed class ScreenshotCurationTests(ChronicleafPostgresFixture postgres)
     public async Task The_curation_columns_index_and_vocabulary_come_from_the_forward_migration_and_readiness_requires_it()
     {
         var database = await postgres.CreateDatabaseAsync("cur_migration");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         // Readiness requires the curation migration by id, and it is the newest required one by
         // position rather than by name - a named "newest" is a value somebody has to remember to
@@ -844,7 +843,6 @@ public sealed class ScreenshotCurationTests(ChronicleafPostgresFixture postgres)
     private async Task<Scenario> ScenarioAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         var mediaRoot = Path.Combine(Path.GetTempPath(), $"chronicleaf-curation-{Guid.NewGuid():N}");
         Directory.CreateDirectory(mediaRoot);
@@ -1044,7 +1042,7 @@ public sealed class ScreenshotCurationTests(ChronicleafPostgresFixture postgres)
                 return;
             }
 
-            await Task.Delay(100);
+            await Task.Delay(10);
         }
 
         Assert.Fail($"The capture operation {operationId} did not reach a terminal status.");

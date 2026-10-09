@@ -1036,7 +1036,7 @@ public sealed class VideoStoryScriptsTests(ChronicleafPostgresFixture postgres)
         var draftOperationId = accepted.RootElement.GetProperty("operationId").GetGuid();
 
         await host.DispatchAsync();
-        await OperationRows.AwaitAsync(database, draftOperationId, "succeeded", JobBudget);
+        await OperationRows.AwaitAsync(database, draftOperationId, "succeeded", TimeSpan.FromSeconds(5));
 
         var asset = await ContentRows.ReadAssetForMilestoneAsync(database, milestoneId);
         Assert.NotNull(asset);
@@ -1099,7 +1099,7 @@ public sealed class VideoStoryScriptsTests(ChronicleafPostgresFixture postgres)
             .RootElement.GetProperty("operationId").GetString()!);
 
         await capture.DispatchAsync();
-        await OperationRows.AwaitAsync(capture.Database, operationId, "succeeded", JobBudget);
+        await OperationRows.AwaitAsync(capture.Database, operationId, "succeeded", TimeSpan.FromSeconds(5));
 
         using var candidates = await owner.GetAsync($"/api/milestones/{milestoneId:D}/screenshots");
         var candidate = JsonDocument.Parse(await candidates.Content.ReadAsStringAsync())
@@ -1131,7 +1131,6 @@ public sealed class VideoStoryScriptsTests(ChronicleafPostgresFixture postgres)
     private async Task<string> ProvisionedDatabaseAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using var host = GroundedMarkdownDraftsApiHost.StartProduction(
             database,

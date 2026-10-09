@@ -39,7 +39,6 @@ public sealed class CommunityPersistenceTests(ChronicleafPostgresFixture postgre
         Assert.True(postgres.IsRealPostgres, "the persistence scenarios require a real PostgreSQL container");
 
         var database = await postgres.CreateDatabaseAsync("success");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         // First host: write the installation, its audit row and its outbox row in one transaction.
         await using (var first = ChronicleafApiHost.Start(database, Clock))
@@ -95,7 +94,6 @@ public sealed class CommunityPersistenceTests(ChronicleafPostgresFixture postgre
     public async Task Exception_before_commit_leaves_no_partial_row_in_any_table()
     {
         var database = await postgres.CreateDatabaseAsync("rollback_fresh");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using var host = ChronicleafApiHost.Start(database, Clock);
 
@@ -118,7 +116,6 @@ public sealed class CommunityPersistenceTests(ChronicleafPostgresFixture postgre
     public async Task Exception_before_commit_leaves_committed_state_untouched()
     {
         var database = await postgres.CreateDatabaseAsync("rollback_preserves");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using var host = ChronicleafApiHost.Start(database, Clock);
 
@@ -156,7 +153,6 @@ public sealed class CommunityPersistenceTests(ChronicleafPostgresFixture postgre
     public async Task Running_the_migration_again_leaves_existing_rows_unchanged()
     {
         var database = await postgres.CreateDatabaseAsync("idempotent");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using var host = ChronicleafApiHost.Start(database, Clock);
         await ProvisionAsync(host.Services, InstallationId, InstallationProvisioned, revision: 1);
@@ -173,7 +169,6 @@ public sealed class CommunityPersistenceTests(ChronicleafPostgresFixture postgre
             "the first migration run must have applied at least this build's initial migration");
 
         // Applying the committed migrations a second time must be a no-op.
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         Assert.Equal(before, await ReadInstallationAsync(database));
         Assert.Equal(
@@ -199,7 +194,6 @@ public sealed class CommunityPersistenceTests(ChronicleafPostgresFixture postgre
     public async Task Ready_endpoint_reports_ready_when_the_expected_schema_is_reachable()
     {
         var database = await postgres.CreateDatabaseAsync("ready_success");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using var host = ChronicleafApiHost.Start(database, Clock);
         using var client = host.CreateClient();
@@ -252,7 +246,7 @@ public sealed class CommunityPersistenceTests(ChronicleafPostgresFixture postgre
     public async Task Missing_schema_makes_ready_a_mismatch_while_health_stays_ok()
     {
         // A reachable, empty database: PostgreSQL answers, but nothing has been migrated.
-        var database = await postgres.CreateDatabaseAsync("schema_missing");
+        var database = await postgres.CreateEmptyDatabaseAsync("schema_missing");
 
         await using var host = ChronicleafApiHost.Start(database, Clock);
         using var client = host.CreateClient();
@@ -272,7 +266,7 @@ public sealed class CommunityPersistenceTests(ChronicleafPostgresFixture postgre
     {
         // A database migrated by an earlier build: reachable, and its history stops at an older
         // migration id. It is a real older schema, not an empty one.
-        var database = await postgres.CreateDatabaseAsync("schema_older");
+        var database = await postgres.CreateEmptyDatabaseAsync("schema_older");
         await ChronicleafPostgresFixture.ExecuteAsync(
             database,
             """
@@ -308,7 +302,6 @@ public sealed class CommunityPersistenceTests(ChronicleafPostgresFixture postgre
     public async Task Duplicate_outbox_revision_is_rejected_by_the_database()
     {
         var database = await postgres.CreateDatabaseAsync("outbox_unique");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using var host = ChronicleafApiHost.Start(database, Clock);
         await ProvisionAsync(host.Services, InstallationId, InstallationProvisioned, revision: 1);
@@ -343,7 +336,6 @@ public sealed class CommunityPersistenceTests(ChronicleafPostgresFixture postgre
     public async Task Unknown_payload_version_is_unsupported_and_never_executed()
     {
         var database = await postgres.CreateDatabaseAsync("outbox_version");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         // One event this build understands and one it does not, both with a registered consumer.
         var futureKind = InstallationReprovisioned;
@@ -400,7 +392,6 @@ public sealed class CommunityPersistenceTests(ChronicleafPostgresFixture postgre
     public async Task Cancellation_before_commit_rolls_the_transaction_back()
     {
         var database = await postgres.CreateDatabaseAsync("cancelled");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using var host = ChronicleafApiHost.Start(database, Clock);
         using var cancellation = new CancellationTokenSource();
@@ -417,7 +408,6 @@ public sealed class CommunityPersistenceTests(ChronicleafPostgresFixture postgre
     public async Task Failed_consumer_leaves_the_event_pending_so_it_can_be_redelivered()
     {
         var database = await postgres.CreateDatabaseAsync("outbox_retry");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await ProvisionDirectlyAsync(database, InstallationId, InstallationProvisioned, revision: 1);
 

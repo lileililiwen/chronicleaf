@@ -1118,7 +1118,6 @@ public sealed class LlmOpenrouterAdapterTests(ChronicleafPostgresFixture postgre
     private async Task<string> ProvisionedDatabaseAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using (var host = OpenRouterApiHost.StartWithoutAdapter(
                          database,

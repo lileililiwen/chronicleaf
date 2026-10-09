@@ -564,7 +564,6 @@ public sealed class ScheduledProjectSyncTests(ChronicleafPostgresFixture postgre
         FakeGitHubHandler? github = null)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         // The delivered connection route reads the repository over the transport, so a scenario
         // that scripted only its own poll reads would fail at the connection and never reach the

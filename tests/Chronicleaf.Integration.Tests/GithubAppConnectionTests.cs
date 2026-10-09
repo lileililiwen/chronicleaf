@@ -543,7 +543,6 @@ public sealed class GithubAppConnectionTests(ChronicleafPostgresFixture postgres
         string? keyFile = null)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         var host = GithubAppConnectionApiHost.Start(database, clock, github, options, keyFile);
 

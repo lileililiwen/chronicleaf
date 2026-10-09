@@ -612,7 +612,6 @@ public sealed class EvolutionGifExportTests(ChronicleafPostgresFixture postgres)
     public async Task The_gif_table_index_and_vocabulary_come_from_the_forward_migration_and_readiness_requires_it()
     {
         var database = await postgres.CreateDatabaseAsync("gif_migration");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         Assert.Contains(ChronicleafSchema.EvolutionGifExportMigrationId, ChronicleafSchema.RequiredMigrationIds);
         Assert.Equal(
@@ -683,7 +682,6 @@ public sealed class EvolutionGifExportTests(ChronicleafPostgresFixture postgres)
     private async Task<Scenario> ScenarioAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         var mediaRoot = Path.Combine(Path.GetTempPath(), $"chronicleaf-gif-{Guid.NewGuid():N}");
         Directory.CreateDirectory(mediaRoot);
@@ -861,7 +859,7 @@ public sealed class EvolutionGifExportTests(ChronicleafPostgresFixture postgres)
                 return;
             }
 
-            await Task.Delay(100);
+            await Task.Delay(10);
         }
 
         Assert.Fail($"The capture operation {operationId} did not reach a terminal status.");

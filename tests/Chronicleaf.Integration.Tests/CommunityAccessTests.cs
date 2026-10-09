@@ -801,7 +801,6 @@ public sealed class CommunityAccessTests(ChronicleafPostgresFixture postgres)
     {
         // A migrated database with no installation row: this deployment was never provisioned.
         var database = await postgres.CreateDatabaseAsync("unprovisioned");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using var host = ChronicleafApiHost.StartWithAccess(database, Clock, AccessTokenHash, PublicOrigin);
         using var client = host.CreateClient();
@@ -908,7 +907,6 @@ public sealed class CommunityAccessTests(ChronicleafPostgresFixture postgres)
     private async Task<string> ProvisionedDatabaseAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using (var host = ChronicleafApiHost.Start(database, Clock))
         {

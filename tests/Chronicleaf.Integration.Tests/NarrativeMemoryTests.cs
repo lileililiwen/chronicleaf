@@ -90,7 +90,7 @@ public sealed class NarrativeMemoryTests(ChronicleafPostgresFixture postgres)
         Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(database, accepted.OperationId, "succeeded", JobBudget);
+        var operation = await OperationRows.AwaitAsync(database, accepted.OperationId, "succeeded", TimeSpan.FromSeconds(5));
         Assert.Null(operation.ErrorCode);
         Assert.NotNull(operation.ResultRef);
 
@@ -150,7 +150,7 @@ public sealed class NarrativeMemoryTests(ChronicleafPostgresFixture postgres)
         Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
 
         await host.DispatchAsync();
-        await OperationRows.AwaitAsync(database, accepted.OperationId, "succeeded", JobBudget);
+        await OperationRows.AwaitAsync(database, accepted.OperationId, "succeeded", TimeSpan.FromSeconds(5));
 
         var narrative = await ReadNarrativeAsync(owner, projectId);
         Assert.NotNull(narrative.Summary);
@@ -198,7 +198,7 @@ public sealed class NarrativeMemoryTests(ChronicleafPostgresFixture postgres)
         Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
 
         await host.DispatchAsync();
-        await OperationRows.AwaitAsync(database, accepted.OperationId, "succeeded", JobBudget);
+        await OperationRows.AwaitAsync(database, accepted.OperationId, "succeeded", TimeSpan.FromSeconds(5));
 
         var narrative = await ReadNarrativeAsync(owner, projectId);
         Assert.NotNull(narrative.Summary);
@@ -240,7 +240,7 @@ public sealed class NarrativeMemoryTests(ChronicleafPostgresFixture postgres)
 
         var first = await RefreshAsync(owner, projectId, cutoff: null, selected: [], key: "narrative-stale-1");
         await host.DispatchAsync();
-        await OperationRows.AwaitAsync(database, first.OperationId, "succeeded", JobBudget);
+        await OperationRows.AwaitAsync(database, first.OperationId, "succeeded", TimeSpan.FromSeconds(5));
 
         var before = await ReadNarrativeAsync(owner, projectId);
         Assert.NotNull(before.Summary);
@@ -260,7 +260,7 @@ public sealed class NarrativeMemoryTests(ChronicleafPostgresFixture postgres)
 
         var second = await RefreshAsync(owner, projectId, cutoff: null, selected: [], key: "narrative-stale-2");
         await host.DispatchAsync();
-        await OperationRows.AwaitAsync(database, second.OperationId, "succeeded", JobBudget);
+        await OperationRows.AwaitAsync(database, second.OperationId, "succeeded", TimeSpan.FromSeconds(5));
 
         var after = await ReadNarrativeAsync(owner, projectId);
         Assert.NotNull(after.Summary);
@@ -306,7 +306,7 @@ public sealed class NarrativeMemoryTests(ChronicleafPostgresFixture postgres)
 
             var first = await RefreshAsync(owner, projectId.ToString("D"), cutoff: null, selected: [], key: "narrative-fail-1");
             await host.DispatchAsync();
-            await OperationRows.AwaitAsync(database, first.OperationId, "succeeded", JobBudget);
+            await OperationRows.AwaitAsync(database, first.OperationId, "succeeded", TimeSpan.FromSeconds(5));
 
             goodBody = (await ReadNarrativeAsync(owner, projectId.ToString("D"))).Summary!.BodyJson;
 
@@ -328,7 +328,7 @@ public sealed class NarrativeMemoryTests(ChronicleafPostgresFixture postgres)
             Assert.Equal(HttpStatusCode.Accepted, second.StatusCode);
 
             await failing.DispatchAsync();
-            var failed = await OperationRows.AwaitAsync(database, second.OperationId, "failed", JobBudget);
+            var failed = await OperationRows.AwaitAsync(database, second.OperationId, "failed", TimeSpan.FromSeconds(5));
             Assert.Equal("narrative_summary_build_failed", failed.ErrorCode);
 
             var kept = await ReadNarrativeAsync(owner, projectId.ToString("D"));
@@ -370,7 +370,7 @@ public sealed class NarrativeMemoryTests(ChronicleafPostgresFixture postgres)
 
         var unselected = await RefreshAsync(owner, projectId, cutoff: null, selected: [], key: "narrative-private-1");
         await host.DispatchAsync();
-        await OperationRows.AwaitAsync(database, unselected.OperationId, "succeeded", JobBudget);
+        await OperationRows.AwaitAsync(database, unselected.OperationId, "succeeded", TimeSpan.FromSeconds(5));
 
         var without = await ReadNarrativeAsync(owner, projectId);
         Assert.NotNull(without.Summary);
@@ -381,7 +381,7 @@ public sealed class NarrativeMemoryTests(ChronicleafPostgresFixture postgres)
         // selection, not an inheritance.
         var consented = await RefreshAsync(owner, projectId, cutoff: null, [feedback.Id], key: "narrative-private-2");
         await host.DispatchAsync();
-        await OperationRows.AwaitAsync(database, consented.OperationId, "succeeded", JobBudget);
+        await OperationRows.AwaitAsync(database, consented.OperationId, "succeeded", TimeSpan.FromSeconds(5));
 
         var with = await ReadNarrativeAsync(owner, projectId);
         Assert.NotNull(with.Summary);
@@ -471,7 +471,6 @@ public sealed class NarrativeMemoryTests(ChronicleafPostgresFixture postgres)
     private async Task<string> ProvisionedDatabaseAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using (var host = NarrativeMemoryApiHost.Start(database, new FixedTimeProvider(Clock)))
         {

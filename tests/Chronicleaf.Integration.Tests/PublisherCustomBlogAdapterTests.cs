@@ -134,7 +134,7 @@ public sealed class PublisherCustomBlogAdapterTests(ChronicleafPostgresFixture p
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", TimeSpan.FromSeconds(5));
         Assert.Equal(1, operation.Attempt);
 
         // Exactly two upstream calls: the capabilities probe, then the posts create. No second
@@ -248,7 +248,7 @@ public sealed class PublisherCustomBlogAdapterTests(ChronicleafPostgresFixture p
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", JobBudget);
+        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", TimeSpan.FromSeconds(5));
 
         // The probe plus one call: the same create, now with the publish mode. No update verb
         // exists on this transport, so a publish can never rewrite a remote post.
@@ -312,7 +312,7 @@ public sealed class PublisherCustomBlogAdapterTests(ChronicleafPostgresFixture p
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal(CustomBlogError.CredentialRejected, operation.ErrorCode);
 
         // The key was refused on the probe: no post call followed, no retry.
@@ -383,7 +383,7 @@ public sealed class PublisherCustomBlogAdapterTests(ChronicleafPostgresFixture p
 
         await host.DispatchAsync();
         var rejectedOperation = await OperationRows.AwaitAsync(
-            fixture.Database, rejectedOperationId, "failed", JobBudget);
+            fixture.Database, rejectedOperationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal(CustomBlogError.InvalidPayload, rejectedOperation.ErrorCode);
 
         var rejectedAttempt = await AttemptRows.ReadAsync(fixture.Database, rejectedAttemptId);
@@ -418,7 +418,7 @@ public sealed class PublisherCustomBlogAdapterTests(ChronicleafPostgresFixture p
 
         await host.DispatchAsync();
         var forbiddenOperation = await OperationRows.AwaitAsync(
-            fixture.Database, forbiddenOperationId, "failed", JobBudget);
+            fixture.Database, forbiddenOperationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal(CustomBlogError.PublishForbidden, forbiddenOperation.ErrorCode);
 
         var forbiddenAttempt = await AttemptRows.ReadAsync(fixture.Database, forbiddenAttemptId);
@@ -449,7 +449,7 @@ public sealed class PublisherCustomBlogAdapterTests(ChronicleafPostgresFixture p
 
         await host.DispatchAsync();
         var conflictedOperation = await OperationRows.AwaitAsync(
-            fixture.Database, conflictedOperationId, "failed", JobBudget);
+            fixture.Database, conflictedOperationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal(CustomBlogError.ContentConflict, conflictedOperation.ErrorCode);
 
         var conflictedAttempt = await AttemptRows.ReadAsync(fixture.Database, conflictedAttemptId);
@@ -494,7 +494,7 @@ public sealed class PublisherCustomBlogAdapterTests(ChronicleafPostgresFixture p
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal(CustomBlogError.IncompatibleRemoteContract, operation.ErrorCode);
 
         // The probe refused the contract, so no post call followed: exactly one call, and it
@@ -582,7 +582,7 @@ public sealed class PublisherCustomBlogAdapterTests(ChronicleafPostgresFixture p
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal(CustomBlogError.RedirectRefused, operation.ErrorCode);
 
         // The redirect was refused, not followed: the probe plus the one post call, both to the
@@ -677,7 +677,7 @@ public sealed class PublisherCustomBlogAdapterTests(ChronicleafPostgresFixture p
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal("publication_unknown", operation.ErrorCode);
 
         // The bytes may have left and a create has no reliable idempotency from here: unknown,
@@ -753,7 +753,7 @@ public sealed class PublisherCustomBlogAdapterTests(ChronicleafPostgresFixture p
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal("publication_unknown", operation.ErrorCode);
 
         // Answered success in a shape this client does not understand: the post may exist but
@@ -805,7 +805,7 @@ public sealed class PublisherCustomBlogAdapterTests(ChronicleafPostgresFixture p
         var attemptId = firstAccepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", JobBudget);
+        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", TimeSpan.FromSeconds(5));
         var dispatchCalls = wire.Calls.Count;
         Assert.Equal(2, dispatchCalls);
 
@@ -1171,7 +1171,7 @@ public sealed class PublisherCustomBlogAdapterTests(ChronicleafPostgresFixture p
             var draftOperationId = accepted.RootElement.GetProperty("operationId").GetGuid();
 
             await drafts.DispatchAsync();
-            await OperationRows.AwaitAsync(database, draftOperationId, "succeeded", JobBudget);
+            await OperationRows.AwaitAsync(database, draftOperationId, "succeeded", TimeSpan.FromSeconds(5));
         }
 
         var asset = await ContentRows.ReadAssetForMilestoneAsync(database, milestoneId);
@@ -1250,7 +1250,6 @@ public sealed class PublisherCustomBlogAdapterTests(ChronicleafPostgresFixture p
     private async Task<string> ProvisionedDatabaseAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using var host = GroundedMarkdownDraftsApiHost.StartProduction(
             database,

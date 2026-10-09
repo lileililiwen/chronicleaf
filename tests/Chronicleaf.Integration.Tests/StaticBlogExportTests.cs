@@ -102,7 +102,7 @@ public sealed class StaticBlogExportTests(ChronicleafPostgresFixture postgres)
             .RootElement.GetProperty("operationId").GetGuid();
 
         await fixture.Host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", TimeSpan.FromSeconds(5));
         Assert.Null(operation.ErrorCode);
         Assert.NotNull(operation.ResultRef);
 
@@ -299,7 +299,7 @@ public sealed class StaticBlogExportTests(ChronicleafPostgresFixture postgres)
             .RootElement.GetProperty("operationId").GetGuid();
 
         await fixture.Host.DispatchAsync();
-        await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", JobBudget);
+        await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", TimeSpan.FromSeconds(5));
 
         using var downloaded = await fixture.Owner.GetAsync(
             $"/api/projects/{fixture.ProjectId:D}/exports/static-blog/{operationId:D}/download");
@@ -410,8 +410,8 @@ public sealed class StaticBlogExportTests(ChronicleafPostgresFixture postgres)
         Assert.NotEqual(first, second);
 
         await fixture.Host.DispatchAsync();
-        await OperationRows.AwaitAsync(fixture.Database, first, "succeeded", JobBudget);
-        await OperationRows.AwaitAsync(fixture.Database, second, "succeeded", JobBudget);
+        await OperationRows.AwaitAsync(fixture.Database, first, "succeeded", TimeSpan.FromSeconds(5));
+        await OperationRows.AwaitAsync(fixture.Database, second, "succeeded", TimeSpan.FromSeconds(5));
 
         var firstBytes = await DownloadAsync(fixture, first);
         var secondBytes = await DownloadAsync(fixture, second);
@@ -549,7 +549,6 @@ public sealed class StaticBlogExportTests(ChronicleafPostgresFixture postgres)
     public async Task The_export_request_table_index_and_vocabulary_come_from_the_forward_migration_and_readiness_requires_it()
     {
         var database = await postgres.CreateDatabaseAsync("blog_migration");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         Assert.Contains(ChronicleafSchema.StaticBlogExportMigrationId, ChronicleafSchema.RequiredMigrationIds);
         Assert.Equal(
@@ -945,7 +944,7 @@ public sealed class StaticBlogExportTests(ChronicleafPostgresFixture postgres)
 
         try
         {
-            await OperationRows.AwaitAsync(database, operationId, "succeeded", JobBudget);
+            await OperationRows.AwaitAsync(database, operationId, "succeeded", TimeSpan.FromSeconds(5));
         }
         catch (TimeoutException timeout)
         {
@@ -1036,7 +1035,7 @@ public sealed class StaticBlogExportTests(ChronicleafPostgresFixture postgres)
         Guid operationId,
         string errorCode)
     {
-        var deadline = DateTimeOffset.UtcNow + JobBudget;
+        var deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(5);
         StoredOperation? last = null;
 
         while (DateTimeOffset.UtcNow < deadline)
@@ -1053,7 +1052,7 @@ public sealed class StaticBlogExportTests(ChronicleafPostgresFixture postgres)
                 break;
             }
 
-            await Task.Delay(100);
+            await Task.Delay(10);
         }
 
         Assert.NotNull(last);
@@ -1065,7 +1064,6 @@ public sealed class StaticBlogExportTests(ChronicleafPostgresFixture postgres)
     private async Task<string> ProvisionedDatabaseAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using var host = GroundedMarkdownDraftsApiHost.StartProduction(
             database,
@@ -1237,7 +1235,7 @@ public sealed class StaticBlogExportTests(ChronicleafPostgresFixture postgres)
                 break;
             }
 
-            await Task.Delay(100);
+            await Task.Delay(10);
         }
 
         using var operation = await owner.GetAsync($"/api/operations/{operationId:D}");

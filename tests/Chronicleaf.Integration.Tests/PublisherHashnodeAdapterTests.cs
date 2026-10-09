@@ -135,7 +135,7 @@ public sealed class PublisherHashnodeAdapterTests(ChronicleafPostgresFixture pos
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", TimeSpan.FromSeconds(5));
         Assert.Equal(1, operation.Attempt);
 
         // Exactly one upstream call: the draft create itself. No second hop, no publish
@@ -229,7 +229,7 @@ public sealed class PublisherHashnodeAdapterTests(ChronicleafPostgresFixture pos
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", JobBudget);
+        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", TimeSpan.FromSeconds(5));
 
         // Two calls, in order: the draft create, then the publish of the created draft.
         Assert.Equal(2, wire.Calls.Count);
@@ -310,7 +310,7 @@ public sealed class PublisherHashnodeAdapterTests(ChronicleafPostgresFixture pos
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal(HashnodeError.CredentialRejected, operation.ErrorCode);
 
         // The provider's verdict arrived on the one create call: no second hop, no retry.
@@ -377,7 +377,7 @@ public sealed class PublisherHashnodeAdapterTests(ChronicleafPostgresFixture pos
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal(HashnodeError.InvalidPayload, operation.ErrorCode);
 
         // A GraphQL errors array on an HTTP 200 is an answered refusal: nothing was created, so
@@ -432,7 +432,7 @@ public sealed class PublisherHashnodeAdapterTests(ChronicleafPostgresFixture pos
 
         await host.DispatchAsync();
         var forbiddenOperation = await OperationRows.AwaitAsync(
-            fixture.Database, forbiddenOperationId, "failed", JobBudget);
+            fixture.Database, forbiddenOperationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal(HashnodeError.PublishForbidden, forbiddenOperation.ErrorCode);
 
         var forbiddenAttempt = await AttemptRows.ReadAsync(fixture.Database, forbiddenAttemptId);
@@ -462,7 +462,7 @@ public sealed class PublisherHashnodeAdapterTests(ChronicleafPostgresFixture pos
 
         await host.DispatchAsync();
         var gatedOperation = await OperationRows.AwaitAsync(
-            fixture.Database, gatedOperationId, "failed", JobBudget);
+            fixture.Database, gatedOperationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal(HashnodeError.CapabilityUnavailable, gatedOperation.ErrorCode);
 
         var gatedAttempt = await AttemptRows.ReadAsync(fixture.Database, gatedAttemptId);
@@ -548,7 +548,7 @@ public sealed class PublisherHashnodeAdapterTests(ChronicleafPostgresFixture pos
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal(HashnodeError.RedirectRefused, operation.ErrorCode);
 
         // The redirect was refused, not followed: exactly one call, and it went to the pinned
@@ -598,7 +598,7 @@ public sealed class PublisherHashnodeAdapterTests(ChronicleafPostgresFixture pos
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal("publication_unknown", operation.ErrorCode);
 
         // The bytes may have left and a create has no reliable idempotency: unknown, with no
@@ -673,7 +673,7 @@ public sealed class PublisherHashnodeAdapterTests(ChronicleafPostgresFixture pos
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal("publication_unknown", operation.ErrorCode);
 
         // The create of this run is known, so the unknown carries its draft id: the owner
@@ -738,7 +738,7 @@ public sealed class PublisherHashnodeAdapterTests(ChronicleafPostgresFixture pos
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal(HashnodeError.InvalidPayload, operation.ErrorCode);
 
         // The publish mutation was refused after this run's create succeeded: the receipt is a
@@ -787,7 +787,7 @@ public sealed class PublisherHashnodeAdapterTests(ChronicleafPostgresFixture pos
         var attemptId = firstAccepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", JobBudget);
+        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", TimeSpan.FromSeconds(5));
         var dispatchCalls = wire.Calls.Count;
         Assert.Equal(1, dispatchCalls);
 
@@ -1020,7 +1020,7 @@ public sealed class PublisherHashnodeAdapterTests(ChronicleafPostgresFixture pos
             var draftOperationId = accepted.RootElement.GetProperty("operationId").GetGuid();
 
             await drafts.DispatchAsync();
-            await OperationRows.AwaitAsync(database, draftOperationId, "succeeded", JobBudget);
+            await OperationRows.AwaitAsync(database, draftOperationId, "succeeded", TimeSpan.FromSeconds(5));
         }
 
         var asset = await ContentRows.ReadAssetForMilestoneAsync(database, milestoneId);
@@ -1099,7 +1099,6 @@ public sealed class PublisherHashnodeAdapterTests(ChronicleafPostgresFixture pos
     private async Task<string> ProvisionedDatabaseAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using var host = GroundedMarkdownDraftsApiHost.StartProduction(
             database,

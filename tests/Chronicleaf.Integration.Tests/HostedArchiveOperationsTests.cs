@@ -859,7 +859,6 @@ public sealed class HostedArchiveOperationsTests(ChronicleafPostgresFixture post
     private async Task<Scenario> ScenarioAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         var mediaRoot = Path.Combine(Path.GetTempPath(), $"chronicleaf-archive-{purpose}-{Guid.NewGuid():N}");
         Directory.CreateDirectory(mediaRoot);

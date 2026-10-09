@@ -670,7 +670,6 @@ public sealed class ScreenshotCaptureTests(ChronicleafPostgresFixture postgres)
         // The same refusal, through the real queue: the production provider is what the default
         // registration resolves, and a scenario that removed the seam is the only way this could pass.
         var database = await postgres.CreateDatabaseAsync("cap_002_sandbox_job");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         // A host with the production registration intact: no IScreenshotProvider substitution at all.
         await using var host = CaptureApiHost.WithProductionProvider(database, new FixedTimeProvider(Clock));
@@ -1471,7 +1470,6 @@ public sealed class ScreenshotCaptureTests(ChronicleafPostgresFixture postgres)
         CaptureDeploymentMode mode = CaptureDeploymentMode.Community)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         // A real temporary media root per scenario, so stored bytes are real files under a directory
         // this test owns and nothing is shared between runs.
@@ -1639,7 +1637,7 @@ public sealed class ScreenshotCaptureTests(ChronicleafPostgresFixture postgres)
                 return;
             }
 
-            await Task.Delay(100);
+            await Task.Delay(10);
         }
 
         Assert.Fail($"The capture operation {operationId} did not reach a terminal status.");

@@ -584,7 +584,7 @@ public sealed class ContentAssetVariantsTests(ChronicleafPostgresFixture postgre
         var operationId = accepted.RootElement.GetProperty("operationId").GetGuid();
 
         await host.DispatchAsync();
-        await OperationRows.AwaitAsync(database, operationId, "succeeded", JobBudget);
+        await OperationRows.AwaitAsync(database, operationId, "succeeded", TimeSpan.FromSeconds(5));
 
         var asset = await ContentRows.ReadAssetForMilestoneAsync(database, milestoneId);
         Assert.NotNull(asset);
@@ -631,7 +631,6 @@ public sealed class ContentAssetVariantsTests(ChronicleafPostgresFixture postgre
     private async Task<string> ProvisionedDatabaseAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using var host = GroundedMarkdownDraftsApiHost.StartProduction(
             database,

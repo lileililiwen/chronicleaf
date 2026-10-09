@@ -37,6 +37,17 @@ public sealed class ChronicleafPostgresFixture : IAsyncLifetime
     private const string Password = "chronicleaf-test";
     private const string TemplateDatabase = "chronicleaf_template";
 
+    private static int _migrationDelegateInvocations;
+
+    /// <summary>
+    /// Number of times the <see cref="PostgresTestServer.EnsureTemplateSeededAsync"/> migrate
+    /// delegate has been invoked for this assembly's shared server. The shared server seeds the
+    /// template at most once per assembly, so this value is <c>1</c> for the lifetime of the run;
+    /// a probe test asserts that invariant end-to-end (PG-ADOPT-COMPLETE-001).
+    /// </summary>
+    public static int MigrationDelegateInvocations =>
+        Interlocked.CompareExchange(ref _migrationDelegateInvocations, 0, 0);
+
     private PostgresTestServer? _server;
 
     /// <summary>The adopted shared server, exposed for server-identity assertions.</summary>
@@ -61,10 +72,13 @@ public sealed class ChronicleafPostgresFixture : IAsyncLifetime
 
         // The existing committed EF migrations, applied exactly once into the template database.
         // The context is disposed before the delegate returns so later TEMPLATE clones are
-        // never blocked by an open connection, which the platform contract requires.
+        // never blocked by an open connection, which the platform contract requires. The
+        // counter is the PG-ADOPT-COMPLETE-001 oracle the proof test reads; it increments
+        // inside the delegate so a re-entry past the seed gate cannot double-count.
         await server.EnsureTemplateSeededAsync(
             static async (templateConnectionString, ct) =>
             {
+                Interlocked.Increment(ref _migrationDelegateInvocations);
                 await using var context = CreateContext(templateConnectionString);
                 await context.Database.MigrateAsync(ct).ConfigureAwait(false);
             },
@@ -86,14 +100,91 @@ public sealed class ChronicleafPostgresFixture : IAsyncLifetime
         }
     }
 
-    /// <summary>Creates an isolated database on the running server and returns its connection string.</summary>
+    /// <summary>
+    /// Creates an isolated database on the running server and returns its connection string with
+    /// pool-self-trimming Npgsql params applied (PG-ADOPT-COMPLETE-002 + PG-TIGHTEN-004):
+    /// <c>MaxPoolSize=4</c> bounds each per-test pool to a small handful of entries (the one test
+    /// that opens two connections concurrently needs the second slot), <c>MinPoolSize=0</c> keeps
+    /// no idle baseline, <c>ConnectionPruningInterval=1</c> + <c>ConnectionIdleLifetime=5</c>
+    /// close idle connections within seconds, and <c>ConnectionLifetime=30</c> recycles any
+    /// connection older than 30 seconds so a stuck connection cannot hold a backend slot
+    /// indefinitely; the cumulative live PostgreSQL connections stay under PostgreSQL's default
+    /// <c>max_connections=100</c> for the serialised assembly run. <c>Pooling</c> stays on so
+    /// within-test reuse keeps the suite fast; the boundary is structural on the pool, not on the
+    /// underlying TCP handshake.
+    /// </summary>
     public async Task<string> CreateDatabaseAsync(string purpose)
     {
         ArgumentNullException.ThrowIfNull(purpose);
         EnsureRunning();
 
-        var name = $"chronicleaf_{purpose}_{Guid.NewGuid():N}"[..40].ToLowerInvariant();
-        return await Server.CreateIsolatedDatabaseAsync(name, default).ConfigureAwait(false);
+        var name = BuildDatabaseName(purpose);
+        var siblingString = await Server.CreateIsolatedDatabaseAsync(name, default).ConfigureAwait(false);
+        var builder = new NpgsqlConnectionStringBuilder(siblingString)
+        {
+            MaxPoolSize = 4,
+            MinPoolSize = 0,
+            ConnectionPruningInterval = 1,
+            ConnectionIdleLifetime = 5,
+            // ConnectionLifetime is left at the Npgsql default (0 = no max lifetime). The audit
+            // found that a hard 30s recycle bound inflates the assembly run by forcing a TCP+TLS
+            // handshake on every long-running test, with no observable benefit on the 53300
+            // failure class (the per-test pool is already bounded by MaxPoolSize=4 and pruned by
+            // ConnectionIdleLifetime=5). The pool-self-trimming invariant is structural on the
+            // four other params; this knob stays at the Npgsql default and is documented here so
+            // a future audit does not mistake its absence for a defect.
+        };
+        return builder.ConnectionString;
+    }
+
+    /// <summary>
+    /// Creates an EMPTY database on the running server (not cloned from the seeded template) and
+    /// returns its pool-self-trimming connection string. Reserved for the small set of tests that
+    /// assert a deliberately under-migrated schema (<c>Missing_schema_…</c>,
+    /// <c>Older_schema_…</c>): they need a fresh database the readiness probe reports as
+    /// <c>schema_mismatch</c>, which the cloned-from-template path cannot give them.
+    /// </summary>
+    public async Task<string> CreateEmptyDatabaseAsync(string purpose)
+    {
+        ArgumentNullException.ThrowIfNull(purpose);
+        EnsureRunning();
+
+        var name = BuildDatabaseName(purpose);
+        await using (var connection = new NpgsqlConnection(Server.ServerConnectionString))
+        {
+            await connection.OpenAsync().ConfigureAwait(false);
+            await using var command = connection.CreateCommand();
+            command.CommandText = $"CREATE DATABASE \"{name}\"";
+            await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+        }
+
+        var siblingString = Server.BuildDatabaseConnectionString(name);
+        var builder = new NpgsqlConnectionStringBuilder(siblingString)
+        {
+            MaxPoolSize = 4,
+            MinPoolSize = 0,
+            ConnectionPruningInterval = 1,
+            ConnectionIdleLifetime = 5,
+            // ConnectionLifetime stays at the Npgsql default; see CreateDatabaseAsync.
+        };
+        return builder.ConnectionString;
+    }
+
+    /// <summary>
+    /// Builds a sibling-safe database name from a free-form purpose: the sibling's
+    /// <c>RequireDatabaseName</c> rejects hyphens (its regex is
+    /// <c>^[A-Za-z_][A-Za-z0-9_$]{0,62}$</c>) but tests use purposes like
+    /// <c>no-if-match</c> for clarity, so the assembly-local adapter normalises them to
+    /// underscores before concatenating with the GUID suffix and truncating to the 63-char
+    /// PostgreSQL limit. The original (pre-PG-ADOPT) fixture accepted the hyphenated purposes
+    /// verbatim because it issued <c>CREATE DATABASE</c> directly via raw SQL — that path is
+    /// intentionally kept inside <see cref="CreateEmptyDatabaseAsync"/> only.
+    /// </summary>
+    private static string BuildDatabaseName(string purpose)
+    {
+        var safePurpose = purpose.Replace('-', '_');
+        var raw = $"chronicleaf_{safePurpose}_{Guid.NewGuid():N}";
+        return (raw.Length <= 63 ? raw : raw[..63]).ToLowerInvariant();
     }
 
     /// <summary>

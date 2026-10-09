@@ -881,7 +881,6 @@ public sealed class BackgroundJobsTests(ChronicleafPostgresFixture postgres)
     private async Task<string> ProvisionedDatabaseAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using (var host = BackgroundJobsApiHost.Start(database, new AdjustableTimeProvider(Clock), new OperationScript()))
         {

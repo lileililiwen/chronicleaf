@@ -192,7 +192,6 @@ public sealed class CommunityComposeReleaseTests(ChronicleafPostgresFixture post
     {
         Assert.True(postgres.IsRealPostgres, "the release scenarios require a real PostgreSQL container.");
         var database = await postgres.CreateDatabaseAsync("release_001_adapters");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using var host = GroundedMarkdownDraftsApiHost.StartProduction(
             database,
@@ -215,7 +214,6 @@ public sealed class CommunityComposeReleaseTests(ChronicleafPostgresFixture post
     {
         Assert.True(postgres.IsRealPostgres, "the release scenarios require a real PostgreSQL container.");
         var database = await postgres.CreateDatabaseAsync("release_001_refused");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         var mediaRoot = Path.Combine(Path.GetTempPath(), $"chronicleaf-release-{Guid.NewGuid():N}");
         Directory.CreateDirectory(mediaRoot);
@@ -330,7 +328,6 @@ public sealed class CommunityComposeReleaseTests(ChronicleafPostgresFixture post
     {
         Assert.True(postgres.IsRealPostgres, "the release scenarios require a real PostgreSQL container.");
         var database = await postgres.CreateDatabaseAsync("release_002_ready");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using var host = ChronicleafApiHost.Start(database, Clock);
         using var client = host.CreateClient();
@@ -446,7 +443,7 @@ public sealed class CommunityComposeReleaseTests(ChronicleafPostgresFixture post
             .RootElement.GetProperty("operationId").GetGuid();
 
         await host.DispatchAsync();
-        await OperationRows.AwaitAsync(database, operationId, "succeeded", JobBudget);
+        await OperationRows.AwaitAsync(database, operationId, "succeeded", TimeSpan.FromSeconds(5));
 
         var asset = await ContentRows.ReadAssetForMilestoneAsync(database, milestoneId);
         Assert.NotNull(asset);
@@ -476,7 +473,6 @@ public sealed class CommunityComposeReleaseTests(ChronicleafPostgresFixture post
     private async Task<string> ProvisionedDatabaseAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using var host = GroundedMarkdownDraftsApiHost.StartProduction(
             database,

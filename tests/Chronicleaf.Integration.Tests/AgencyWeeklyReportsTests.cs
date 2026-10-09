@@ -169,7 +169,6 @@ public sealed class AgencyWeeklyReportsTests(ChronicleafPostgresFixture postgres
         Assert.True(postgres.IsRealPostgres, "the weekly-report scenarios require a real PostgreSQL container");
 
         var database = await postgres.CreateDatabaseAsync("weekly_001_shots");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         var mediaRoot = Path.Combine(Path.GetTempPath(), $"chronicleaf-weekly-{Guid.NewGuid():N}");
         Directory.CreateDirectory(mediaRoot);
@@ -758,7 +757,6 @@ public sealed class AgencyWeeklyReportsTests(ChronicleafPostgresFixture postgres
         Assert.Equal([ChronicleafSchema.AgencyWeeklyReportsMigrationId], missing);
 
         var database = await postgres.CreateDatabaseAsync("weekly_migration");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         Assert.Equal(
             "10",
@@ -789,7 +787,6 @@ public sealed class AgencyWeeklyReportsTests(ChronicleafPostgresFixture postgres
     private async Task<string> ProvisionedDatabaseAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using (var host = ChronicleafApiHost.Start(database, Clock))
         {
@@ -1026,7 +1023,7 @@ public sealed class AgencyWeeklyReportsTests(ChronicleafPostgresFixture postgres
                 return;
             }
 
-            await Task.Delay(100);
+            await Task.Delay(10);
         }
 
         Assert.Fail($"The capture operation {operationId} did not reach a terminal status.");

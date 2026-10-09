@@ -1030,7 +1030,6 @@ public sealed class LocalGitEvidenceTests(ChronicleafPostgresFixture postgres)
         Assert.Equal(ChronicleafSchema.ExpectedMigrationId, ChronicleafSchema.RequiredMigrationIds[^1]);
 
         var database = await postgres.CreateDatabaseAsync("lge_schema");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         var applied = await ChronicleafPostgresFixture.ReadTextAsync(
             database,
@@ -1194,7 +1193,6 @@ public sealed class LocalGitEvidenceTests(ChronicleafPostgresFixture postgres)
         IGitCommandRunner? runner = null)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         var host = LocalGitApiHost.Start(
             database,
@@ -1498,7 +1496,12 @@ public sealed class LocalGitEvidenceTests(ChronicleafPostgresFixture postgres)
                 return last;
             }
 
-            await Task.Delay(100);
+            if (last is not null && last.Status is "failed" or "succeeded" or "cancelled")
+            {
+                break;
+            }
+
+            await Task.Delay(10);
         }
 
         throw new InvalidOperationException(

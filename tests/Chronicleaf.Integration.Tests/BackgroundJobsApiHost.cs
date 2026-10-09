@@ -324,7 +324,7 @@ public static class OperationRows
                 return row;
             }
 
-            await Task.Delay(100);
+            await Task.Delay(10);
         }
 
         var last = await ReadAsync(connectionString, operationId);

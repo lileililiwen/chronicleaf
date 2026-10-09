@@ -1413,7 +1413,6 @@ public sealed class GithubReleaseCandidatesTests(ChronicleafPostgresFixture post
         Assert.Equal(ChronicleafSchema.ExpectedMigrationId, ChronicleafSchema.RequiredMigrationIds[^1]);
 
         var database = await postgres.CreateDatabaseAsync("grc_schema");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         var applied = await ChronicleafPostgresFixture.ReadTextAsync(
             database,
@@ -1892,7 +1891,6 @@ public sealed class GithubReleaseCandidatesTests(ChronicleafPostgresFixture post
         FakeGitHubHandler? github = null)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         // Every scenario's repository is described before this package is involved at all: the
         // delivered connection route reads it over the transport, so a scenario that scripted only its

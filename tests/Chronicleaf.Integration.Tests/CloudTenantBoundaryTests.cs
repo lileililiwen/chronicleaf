@@ -690,7 +690,6 @@ public sealed class CloudTenantBoundaryTests(ChronicleafPostgresFixture postgres
     public async Task The_tenant_tables_and_policies_come_from_the_forward_migration_and_readiness_requires_it()
     {
         var database = await postgres.CreateDatabaseAsync("tenant_migration");
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         // Readiness requires the tenancy migration by id, and it is the newest required one by
         // position rather than by name.
@@ -766,7 +765,6 @@ public sealed class CloudTenantBoundaryTests(ChronicleafPostgresFixture postgres
     private async Task<string> ProvisionedDatabaseAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using (var host = ChronicleafApiHost.Start(database, Clock))
         {

@@ -586,7 +586,7 @@ public sealed class HtmlContentExportTests(ChronicleafPostgresFixture postgres)
 
         try
         {
-            await OperationRows.AwaitAsync(database, operationId, "succeeded", JobBudget);
+            await OperationRows.AwaitAsync(database, operationId, "succeeded", TimeSpan.FromSeconds(5));
         }
         catch (TimeoutException timeout)
         {
@@ -654,7 +654,6 @@ public sealed class HtmlContentExportTests(ChronicleafPostgresFixture postgres)
     private async Task<string> ProvisionedDatabaseAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using var host = GroundedMarkdownDraftsApiHost.StartProduction(
             database,
@@ -821,7 +820,7 @@ public sealed class HtmlContentExportTests(ChronicleafPostgresFixture postgres)
                 break;
             }
 
-            await Task.Delay(100);
+            await Task.Delay(10);
         }
 
         using var operation = await owner.GetAsync($"/api/operations/{operationId:D}");

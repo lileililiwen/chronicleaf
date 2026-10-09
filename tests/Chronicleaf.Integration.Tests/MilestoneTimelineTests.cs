@@ -483,7 +483,6 @@ public sealed class MilestoneTimelineTests(ChronicleafPostgresFixture postgres)
     private async Task<string> ProvisionedDatabaseAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using (var host = ChronicleafApiHost.Start(database, Clock))
         {

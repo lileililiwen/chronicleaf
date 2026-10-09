@@ -117,7 +117,7 @@ public sealed class PublisherContractTests(ChronicleafPostgresFixture postgres)
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", TimeSpan.FromSeconds(5));
         Assert.Equal(1, operation.Attempt);
 
         // One dispatch, through a credential leased for the call: the adapter saw the saved
@@ -192,7 +192,7 @@ public sealed class PublisherContractTests(ChronicleafPostgresFixture postgres)
         var operationId = accepted.RootElement.GetProperty("operationId").GetGuid();
 
         await host.DispatchAsync();
-        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", JobBudget);
+        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", TimeSpan.FromSeconds(5));
 
         // The send carried exactly the approval-covered pictures: the selected bytes under the
         // owner's caption, and nothing the approval does not cover.
@@ -240,7 +240,7 @@ public sealed class PublisherContractTests(ChronicleafPostgresFixture postgres)
         var attemptId = firstAccepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", JobBudget);
+        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", TimeSpan.FromSeconds(5));
         Assert.Equal(1, adapter.Dispatches);
 
         using var second = await owner.SendAsync(await owner.Post(
@@ -732,7 +732,7 @@ public sealed class PublisherContractTests(ChronicleafPostgresFixture postgres)
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal("publication_unknown", operation.ErrorCode);
         Assert.Equal(1, operation.Attempt);
 
@@ -792,7 +792,7 @@ public sealed class PublisherContractTests(ChronicleafPostgresFixture postgres)
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal("publication_unknown", operation.ErrorCode);
 
         // A crash after the upstream commit is indistinguishable from an ambiguous timeout from
@@ -838,7 +838,7 @@ public sealed class PublisherContractTests(ChronicleafPostgresFixture postgres)
         var operationId = accepted.RootElement.GetProperty("operationId").GetGuid();
 
         await host.DispatchAsync();
-        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", JobBudget);
+        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", TimeSpan.FromSeconds(5));
         Assert.Equal(1, adapter.Dispatches);
 
         // The same key over another mode: the operation fingerprint only covers the asset and
@@ -903,7 +903,7 @@ public sealed class PublisherContractTests(ChronicleafPostgresFixture postgres)
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal("publication_unknown", operation.ErrorCode);
 
         using var reconciled = await owner.SendAsync(await owner.Post(
@@ -957,7 +957,7 @@ public sealed class PublisherContractTests(ChronicleafPostgresFixture postgres)
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
 
         // No reliable reconcile keeps unknown, and the receipt says so: manual inspection, not
         // a reissue.
@@ -1064,7 +1064,7 @@ public sealed class PublisherContractTests(ChronicleafPostgresFixture postgres)
                 .RootElement.GetProperty("operationId").GetString()!);
 
             await capture.DispatchAsync();
-            await OperationRows.AwaitAsync(database, captureOperationId, "succeeded", JobBudget);
+            await OperationRows.AwaitAsync(database, captureOperationId, "succeeded", TimeSpan.FromSeconds(5));
 
             using var candidates = await pictureOwner.GetAsync($"/api/milestones/{milestoneId:D}/screenshots");
             var candidate = JsonDocument.Parse(await candidates.Content.ReadAsStringAsync())
@@ -1134,7 +1134,7 @@ public sealed class PublisherContractTests(ChronicleafPostgresFixture postgres)
             var draftOperationId = accepted.RootElement.GetProperty("operationId").GetGuid();
 
             await drafts.DispatchAsync();
-            await OperationRows.AwaitAsync(database, draftOperationId, "succeeded", JobBudget);
+            await OperationRows.AwaitAsync(database, draftOperationId, "succeeded", TimeSpan.FromSeconds(5));
         }
 
         var asset = await ContentRows.ReadAssetForMilestoneAsync(database, milestoneId);
@@ -1215,7 +1215,6 @@ public sealed class PublisherContractTests(ChronicleafPostgresFixture postgres)
     private async Task<string> ProvisionedDatabaseAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using var host = GroundedMarkdownDraftsApiHost.StartProduction(
             database,

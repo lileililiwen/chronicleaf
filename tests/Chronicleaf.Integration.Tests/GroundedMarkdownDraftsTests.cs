@@ -1337,7 +1337,6 @@ public sealed class GroundedMarkdownDraftsTests(ChronicleafPostgresFixture postg
     private async Task<string> ProvisionedDatabaseAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using var host = GroundedMarkdownDraftsApiHost.StartProduction(
             database,
@@ -1455,7 +1454,7 @@ public sealed class GroundedMarkdownDraftsTests(ChronicleafPostgresFixture postg
     {
         try
         {
-            return await OperationRows.AwaitAsync(fixture.Database, operationId, status, JobBudget);
+            return await OperationRows.AwaitAsync(fixture.Database, operationId, status, TimeSpan.FromSeconds(5));
         }
         catch (TimeoutException timeout)
         {
@@ -1481,7 +1480,7 @@ public sealed class GroundedMarkdownDraftsTests(ChronicleafPostgresFixture postg
         Guid operationId,
         string errorCode)
     {
-        var deadline = DateTimeOffset.UtcNow + JobBudget;
+        var deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(5);
         StoredOperation? last = null;
 
         while (DateTimeOffset.UtcNow < deadline)
@@ -1498,7 +1497,7 @@ public sealed class GroundedMarkdownDraftsTests(ChronicleafPostgresFixture postg
                 break;
             }
 
-            await Task.Delay(100);
+            await Task.Delay(10);
         }
 
         throw new InvalidOperationException(

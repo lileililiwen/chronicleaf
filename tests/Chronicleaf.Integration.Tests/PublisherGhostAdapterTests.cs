@@ -144,7 +144,7 @@ public sealed class PublisherGhostAdapterTests(ChronicleafPostgresFixture postgr
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", TimeSpan.FromSeconds(5));
         Assert.Equal(1, operation.Attempt);
 
         // Exactly one upstream call: the Admin posts create itself. No second hop, no update -
@@ -261,7 +261,7 @@ public sealed class PublisherGhostAdapterTests(ChronicleafPostgresFixture postgr
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", JobBudget);
+        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", TimeSpan.FromSeconds(5));
 
         // One call: the same create, now with the published status. No update verb exists on
         // this transport, so a publish can never rewrite a remote post.
@@ -326,7 +326,7 @@ public sealed class PublisherGhostAdapterTests(ChronicleafPostgresFixture postgr
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal(GhostError.CredentialRejected, operation.ErrorCode);
 
         // The provider's verdict arrived on the one create call: no second hop, no retry.
@@ -398,7 +398,7 @@ public sealed class PublisherGhostAdapterTests(ChronicleafPostgresFixture postgr
 
         await host.DispatchAsync();
         var rejectedOperation = await OperationRows.AwaitAsync(
-            fixture.Database, rejectedOperationId, "failed", JobBudget);
+            fixture.Database, rejectedOperationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal(GhostError.InvalidPayload, rejectedOperation.ErrorCode);
 
         var rejectedAttempt = await AttemptRows.ReadAsync(fixture.Database, rejectedAttemptId);
@@ -433,7 +433,7 @@ public sealed class PublisherGhostAdapterTests(ChronicleafPostgresFixture postgr
 
         await host.DispatchAsync();
         var conflictedOperation = await OperationRows.AwaitAsync(
-            fixture.Database, conflictedOperationId, "failed", JobBudget);
+            fixture.Database, conflictedOperationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal(GhostError.UpdateConflict, conflictedOperation.ErrorCode);
 
         var conflictedAttempt = await AttemptRows.ReadAsync(fixture.Database, conflictedAttemptId);
@@ -516,7 +516,7 @@ public sealed class PublisherGhostAdapterTests(ChronicleafPostgresFixture postgr
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal(GhostError.RedirectRefused, operation.ErrorCode);
 
         // The redirect was refused, not followed: exactly one call, and it went to the
@@ -568,7 +568,7 @@ public sealed class PublisherGhostAdapterTests(ChronicleafPostgresFixture postgr
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal(GhostError.IncompatibleTarget, operation.ErrorCode);
 
         // Refused before any byte left: no token was signed and no call was made.
@@ -617,7 +617,7 @@ public sealed class PublisherGhostAdapterTests(ChronicleafPostgresFixture postgr
         var attemptId = accepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", JobBudget);
+        var operation = await OperationRows.AwaitAsync(fixture.Database, operationId, "failed", TimeSpan.FromSeconds(5));
         Assert.Equal("publication_unknown", operation.ErrorCode);
 
         // The bytes may have left and a create has no reliable idempotency: unknown, with no
@@ -692,7 +692,7 @@ public sealed class PublisherGhostAdapterTests(ChronicleafPostgresFixture postgr
         var attemptId = firstAccepted.RootElement.GetProperty("attemptId").GetGuid();
 
         await host.DispatchAsync();
-        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", JobBudget);
+        _ = await OperationRows.AwaitAsync(fixture.Database, operationId, "succeeded", TimeSpan.FromSeconds(5));
         var dispatchCalls = wire.Calls.Count;
         Assert.Equal(1, dispatchCalls);
 
@@ -1002,7 +1002,7 @@ public sealed class PublisherGhostAdapterTests(ChronicleafPostgresFixture postgr
             var draftOperationId = accepted.RootElement.GetProperty("operationId").GetGuid();
 
             await drafts.DispatchAsync();
-            await OperationRows.AwaitAsync(database, draftOperationId, "succeeded", JobBudget);
+            await OperationRows.AwaitAsync(database, draftOperationId, "succeeded", TimeSpan.FromSeconds(5));
         }
 
         var asset = await ContentRows.ReadAssetForMilestoneAsync(database, milestoneId);
@@ -1081,7 +1081,6 @@ public sealed class PublisherGhostAdapterTests(ChronicleafPostgresFixture postgr
     private async Task<string> ProvisionedDatabaseAsync(string purpose)
     {
         var database = await postgres.CreateDatabaseAsync(purpose);
-        await ChronicleafPostgresFixture.MigrateAsync(database);
 
         await using var host = GroundedMarkdownDraftsApiHost.StartProduction(
             database,
